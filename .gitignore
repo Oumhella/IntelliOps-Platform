@@ -1,0 +1,74 @@
+# ==========================================
+# GLOBAL & IDE CONFIGURATIONS
+# ==========================================
+.idea/
+*.iml
+*.iws
+.vscode/
+*.suo
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# ==========================================
+# JAVA / MAVEN MICROSERVICES (Common)
+# ==========================================
+**/target/
+**/pom.xml.tag
+**/pom.xml.releaseBackup
+**/pom.xml.versionsBackup
+**/pom.xml.next
+**/.flattened-pom.xml
+**/release.properties
+**/dependency-reduced-pom.xml
+**/buildNumber.properties
+**/.mvn/timing.properties
+**/.mvn/wrapper/maven-wrapper.jar
+
+# Fichiers de logs générés par Spring Boot
+**/logs/
+*.log
+**/logback*.xml
+!**/src/main/resources/logback*.xml
+
+# Crash dumps
+*.spec
+*.dump
+
+# ==========================================
+# ANGULAR FRONTEND
+# ==========================================
+**/node_modules/
+**/.angular/
+**/dist/
+**/tmp/
+**/out-tsc/
+
+# Rapports de couverture de tests locaux
+**/coverage/
+**/.nyc_output/
+*.tsbuildinfo
+
+# ==========================================
+# DOCKER & VOLUMES DE BASES DE DONNÉES
+# ==========================================
+# On ignore absolument les dossiers où Docker monte les données physiques des BDD
+**/docker/db_data/
+**/mysql_data/
+**/postgres_data/
+**/.env.local
+**/.env.*.local
+
+# ==========================================
+# DEVSECOPS & SÉCURITÉ CRITIQUE
+# ==========================================
+# Jamais de clés privées, certificats ou rapports de scans de sécurité sur Git
+**/*.pem
+**/*.key
+**/*.p12
+**/*.jks
+**/trivy-reports/
+**/snyk-reports/
+**/.sonar/
+**/.scannerwork/

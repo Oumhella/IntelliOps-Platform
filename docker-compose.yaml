@@ -1,0 +1,36 @@
+services:
+  gateway-service:
+    build: ./gateway_service
+    ports:
+      - "8080:8080"
+    networks:
+      - erp-network
+
+  user-service:
+    build: ./user_service
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    networks:
+      - erp-network
+
+  lead-service:
+    build: ./lead_service
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    networks:
+      - erp-network
+
+#  crm-frontend:
+#    build: ./crm-frontend
+#    ports:
+#      - "4200:80" # Map le port 80 de Nginx sur le 4200 de votre machine
+#    networks:
+#      - crm-network
+
+networks:
+  crm-network:
+    driver: bridge
