@@ -2,7 +2,7 @@ name: User Service CI (DevSecOps)
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, feature/identity-auth ]
     paths:
       - 'user_service/**' # Déclenche le pipeline SEULEMENT si ce dossier change
   pull_request:
@@ -24,6 +24,13 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
           cache: 'maven'
+
+
+      # 2. Télécharger toutes les dépendances localement sur le runner
+      - name: Resolve Maven Dependencies
+        run: |
+          cd user_service
+          mvn dependency:resolve
 
       # Étape DevSecOps 1 : Scan du code source (SAST) avant le build
       - name: Scan des vulnérabilités du code (Trivy FS)

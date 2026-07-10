@@ -1,4 +1,18 @@
 services:
+  erp-db:
+    image: postgres:15-alpine
+    container_name: erp-postgres-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=erp
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - erp-db-data:/var/lib/postgresql/data
+    networks:
+      - erp-network
+
   gateway-service:
     build: ./gateway_service
     ports:
@@ -10,8 +24,13 @@ services:
     build: ./user_service
     ports:
       - "8081:8081"
+    env_file:
+      - .env
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://erp-db:5432/erp
+    depends_on:
+      - erp-db
     networks:
       - erp-network
 
@@ -21,16 +40,22 @@ services:
       - "8082:8082"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://erp-db:5432/erp
+    depends_on:
+      - erp-db
     networks:
       - erp-network
 
 #  crm-frontend:
 #    build: ./crm-frontend
 #    ports:
-#      - "4200:80" # Map le port 80 de Nginx sur le 4200 de votre machine
+#      - "4200:80"
 #    networks:
-#      - crm-network
+#      - erp-network
 
 networks:
-  crm-network:
+  erp-network:
     driver: bridge
+
+volumes:
+  erp-db-data:

@@ -59,7 +59,7 @@ Thumbs.db
 **/postgres_data/
 **/.env.local
 **/.env.*.local
-
+.env
 # ==========================================
 # DEVSECOPS & SÉCURITÉ CRITIQUE
 # ==========================================
