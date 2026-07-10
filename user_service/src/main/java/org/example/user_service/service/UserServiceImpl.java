@@ -2,8 +2,10 @@ package org.example.user_service.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.user_service.config.JwtUtils;
+import org.example.user_service.dto.request.RegisterRequest;
 import org.example.user_service.dto.request.UserCreationRequest;
 import org.example.user_service.dto.response.UserResponse;
+import org.example.user_service.entity.Admin;
 import org.example.user_service.entity.User;
 import org.example.user_service.exception.ConflictException;
 import org.example.user_service.mapper.UserMapper;
@@ -12,7 +14,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.example.user_service.dto.response.AuthResponse;
 import org.example.user_service.dto.request.LoginRequest;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -24,6 +28,24 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
     private final JwtUtils jwtUtils; // <--- On injecte enfin notre utilitaire JWT !
+
+    @Override
+    @Transactional
+    public UserResponse register(RegisterRequest request) {
+        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+            throw new IllegalArgumentException("Cet email est déjà utilisé");
+        }
+
+        Long newEnterpriseId = System.currentTimeMillis();
+
+        // Utilisation du mapper dédié à l'Admin
+        Admin admin = userMapper.toAdminEntity(request, newEnterpriseId);
+        admin.setPassword(passwordEncoder.encode(admin.getPassword()));
+        admin.setCreatedAt(LocalDateTime.now());
+
+        User savedAdmin = userRepository.save(admin);
+        return userMapper.toResponse(savedAdmin);
+    }
 
     @Override
     public AuthResponse login(LoginRequest request) {

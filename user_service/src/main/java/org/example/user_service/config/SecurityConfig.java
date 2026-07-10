@@ -51,6 +51,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/users/login").permitAll() // URL standard pour l'authentification
                         .requestMatchers("/api/v1/users/staff").permitAll() // Si tu permets l'auto-inscription des admins
                         .requestMatchers("/api/v1/users/setup-admin").permitAll()
+                        .requestMatchers("/api/v1/users/register").permitAll()
                         .anyRequest().authenticated()
                 );
 

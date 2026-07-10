@@ -2,6 +2,7 @@ package org.example.user_service.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.example.user_service.dto.request.LoginRequest;
+import org.example.user_service.dto.request.RegisterRequest;
 import org.example.user_service.dto.request.UserCreationRequest;
 import org.example.user_service.dto.response.AuthResponse;
 import org.example.user_service.dto.response.UserResponse;
@@ -38,6 +39,12 @@ public class UserController {
     public ResponseEntity<UserResponse> setupFirstAdmin(@RequestBody UserCreationRequest creationRequest) {
         // On force l'enterprise_id à 1 pour ce premier admin global
         UserResponse response = userService.createUser(creationRequest, 1L);
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<UserResponse> register(@RequestBody RegisterRequest request) {
+        UserResponse response = userService.register(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
     /**
