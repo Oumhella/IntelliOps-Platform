@@ -2,7 +2,7 @@ name: User Service CI (DevSecOps)
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, feature/identity-auth ]
     paths:
       - 'user_service/**' # Déclenche le pipeline SEULEMENT si ce dossier change
   pull_request:
