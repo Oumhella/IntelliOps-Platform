@@ -22,7 +22,7 @@ public abstract class User {
     private String email;
 
     @Column(nullable = false)
-    private String password; // Sera haché avec BCrypt
+    private String password; // Hashed with BCrypt
 
     private String firstname;
     private String lastname;
@@ -31,12 +31,24 @@ public abstract class User {
     private boolean isActive = true;
 
     @Column(name = "enterprise_id", nullable = false)
-    private Long enterpriseId; // Isolation multi-tenant
+    private Long enterpriseId; // Multi-tenant isolation
 
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
-    // Méthode abstraite pour récupérer le rôle Spring Security
+
+    // JPA lifecycle callbacks for automatic timestamp management
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    // Abstract method to retrieve the Spring Security role
     @Transient
     public abstract Role getRole();
 

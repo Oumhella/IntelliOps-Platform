@@ -2,12 +2,15 @@ package org.example.user_service.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.user_service.config.JwtUtils;
+import org.example.user_service.dto.request.ChangePasswordRequest;
+import org.example.user_service.dto.request.ProfileUpdateRequest;
 import org.example.user_service.dto.request.RegisterRequest;
 import org.example.user_service.dto.request.UserCreationRequest;
 import org.example.user_service.dto.response.UserResponse;
 import org.example.user_service.entity.Admin;
 import org.example.user_service.entity.User;
 import org.example.user_service.exception.ConflictException;
+import org.example.user_service.exception.ResourceNotFoundException;
 import org.example.user_service.mapper.UserMapper;
 import org.example.user_service.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,7 +19,6 @@ import org.example.user_service.dto.response.AuthResponse;
 import org.example.user_service.dto.request.LoginRequest;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -27,21 +29,22 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
-    private final JwtUtils jwtUtils; // <--- On injecte enfin notre utilitaire JWT !
+    private final JwtUtils jwtUtils;
+
+    // ── Authentication ──────────────────────────────────────────────
 
     @Override
     @Transactional
     public UserResponse register(RegisterRequest request) {
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new IllegalArgumentException("Cet email est déjà utilisé");
+            throw new ConflictException("This email is already in use");
         }
 
         Long newEnterpriseId = System.currentTimeMillis();
 
-        // Utilisation du mapper dédié à l'Admin
         Admin admin = userMapper.toAdminEntity(request, newEnterpriseId);
         admin.setPassword(passwordEncoder.encode(admin.getPassword()));
-        admin.setCreatedAt(LocalDateTime.now());
+        // createdAt is now set automatically via @PrePersist
 
         User savedAdmin = userRepository.save(admin);
         return userMapper.toResponse(savedAdmin);
@@ -49,24 +52,19 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public AuthResponse login(LoginRequest request) {
-        // 1. Recherche de l'utilisateur par email
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("Identifiants incorrects"));
+                .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
 
-        // 2. Vérification du mot de passe haché (BCrypt)
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new IllegalArgumentException("Identifiants incorrects");
+            throw new IllegalArgumentException("Invalid credentials");
         }
 
-        // 3. Vérification du statut du compte
         if (!user.isActive()) {
-            throw new IllegalArgumentException("Ce compte est désactivé");
+            throw new IllegalArgumentException("This account is deactivated");
         }
 
-        // 4. PLUS DE MOCK ! Génération du vrai token sécurisé avec rôles et enterpriseId embarqués
         String realToken = jwtUtils.generateToken(user);
 
-        // 5. Retour de la réponse complète pour Angular
         return new AuthResponse(
                 realToken,
                 user.getEmail(),
@@ -77,22 +75,19 @@ public class UserServiceImpl implements UserService {
         );
     }
 
+    // ── Staff Management (CRUD) ─────────────────────────────────────
+
     @Override
+    @Transactional
     public UserResponse createUser(UserCreationRequest request, Long adminEnterpriseId) {
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new ConflictException("Cet e-mail est déjà utilisé");
+            throw new ConflictException("This email is already in use");
         }
 
-        // 1. Utilisation du Mapper pour transformer la requête en Entité
         User newUser = userMapper.toEntity(request, adminEnterpriseId);
-
-        // 2. Encodage sécurisé (SecOps) du mot de passe
         newUser.setPassword(passwordEncoder.encode(newUser.getPassword()));
 
-        // 3. Persistance
         User savedUser = userRepository.save(newUser);
-
-        // 4. Utilisation du Mapper pour retourner la Réponse
         return userMapper.toResponse(savedUser);
     }
 
@@ -100,7 +95,92 @@ public class UserServiceImpl implements UserService {
     public List<UserResponse> getUsersByEnterprise(Long enterpriseId) {
         return userRepository.findAllByEnterpriseId(enterpriseId)
                 .stream()
-                .map(userMapper::toResponse) // <--- Mapping ultra propre avec référence de méthode
+                .map(userMapper::toResponse)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public UserResponse getStaffMember(Long userId, Long enterpriseId) {
+        User user = userRepository.findByIdAndEnterpriseId(userId, enterpriseId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "User not found with id " + userId));
+        return userMapper.toResponse(user);
+    }
+
+    @Override
+    @Transactional
+    public UserResponse toggleUserStatus(Long userId, Long enterpriseId, boolean active) {
+        User user = userRepository.findByIdAndEnterpriseId(userId, enterpriseId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "User not found with id " + userId));
+
+        user.setActive(active);
+        User savedUser = userRepository.save(user);
+        return userMapper.toResponse(savedUser);
+    }
+
+    @Override
+    @Transactional
+    public void deleteUser(Long userId, Long enterpriseId) {
+        User user = userRepository.findByIdAndEnterpriseId(userId, enterpriseId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "User not found with id " + userId));
+
+        userRepository.delete(user);
+    }
+
+    // ── Profile Operations ──────────────────────────────────────────
+
+    @Override
+    public UserResponse getProfile(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "User not found with email " + email));
+        return userMapper.toResponse(user);
+    }
+
+    @Override
+    @Transactional
+    public UserResponse updateProfile(String email, ProfileUpdateRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "User not found with email " + email));
+
+        // Partial update: only update fields that are provided (non-null)
+        if (request.getFirstname() != null) {
+            user.setFirstname(request.getFirstname());
+        }
+        if (request.getLastname() != null) {
+            user.setLastname(request.getLastname());
+        }
+        if (request.getPhone() != null) {
+            user.setPhone(request.getPhone());
+        }
+        // updatedAt is set automatically via @PreUpdate
+
+        User savedUser = userRepository.save(user);
+        return userMapper.toResponse(savedUser);
+    }
+
+    @Override
+    @Transactional
+    public void changePassword(String email, ChangePasswordRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "User not found with email " + email));
+
+        // Verify current password
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("Current password is incorrect");
+        }
+
+        // Verify new password matches confirmation
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new IllegalArgumentException("New password and confirmation do not match");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+    }
 }
+
