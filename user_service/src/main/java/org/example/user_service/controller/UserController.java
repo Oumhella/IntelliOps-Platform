@@ -1,8 +1,8 @@
 package org.example.user_service.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.example.user_service.dto.request.LoginRequest;
-import org.example.user_service.dto.request.UserCreationRequest;
+import org.example.user_service.dto.request.*;
 import org.example.user_service.dto.response.AuthResponse;
 import org.example.user_service.dto.response.UserResponse;
 import org.example.user_service.service.UserService;
@@ -14,6 +14,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -21,56 +22,157 @@ import java.util.List;
 public class UserController {
     private final UserService userService;
 
+    // ══════════════════════════════════════════════════════════════════
+    //  PUBLIC ROUTES (no authentication required)
+    // ══════════════════════════════════════════════════════════════════
+
     /**
-     * 1. Route publique : Authentification d'un utilisateur
+     * Authenticate a user and return a JWT token.
      */
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest loginRequest) {
         AuthResponse response = userService.login(loginRequest);
         return ResponseEntity.ok(response);
     }
 
     /**
-     * ROUTE TEMPORAIRE : Permet de créer le premier administrateur système sans token.
-     * Tu pourras supprimer ou commenter cette méthode une fois le premier admin créé !
+     * Register a new admin with their enterprise.
+     */
+    @PostMapping("/register")
+    public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
+        UserResponse response = userService.register(request);
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
+    }
+
+    /**
+     * TEMPORARY ROUTE: Create the first system admin without a token.
+     * Can be removed or disabled once the first admin is created.
      */
     @PostMapping("/setup-admin")
-    public ResponseEntity<UserResponse> setupFirstAdmin(@RequestBody UserCreationRequest creationRequest) {
-        // On force l'enterprise_id à 1 pour ce premier admin global
+    public ResponseEntity<UserResponse> setupFirstAdmin(@Valid @RequestBody UserCreationRequest creationRequest) {
         UserResponse response = userService.createUser(creationRequest, 1L);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  PROFILE ROUTES (any authenticated user)
+    // ══════════════════════════════════════════════════════════════════
+
     /**
-     * 2. Route protégée : Création d'un agent (CSM ou Logistique) par l'Admin de l'entreprise.
-     * Seul un utilisateur avec le rôle ADMIN peut appeler cette route.
+     * Get the full profile of the currently authenticated user.
+     */
+    @GetMapping("/me")
+    public ResponseEntity<UserResponse> getMyProfile() {
+        String email = getCurrentUserEmail();
+        UserResponse response = userService.getProfile(email);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Update the profile of the currently authenticated user (partial update).
+     * Only non-null fields in the request body will be updated.
+     */
+    @PutMapping("/me")
+    public ResponseEntity<UserResponse> updateMyProfile(@Valid @RequestBody ProfileUpdateRequest request) {
+        String email = getCurrentUserEmail();
+        UserResponse response = userService.updateProfile(email, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Change the password of the currently authenticated user.
+     * Requires the current password for verification.
+     */
+    @PutMapping("/me/password")
+    public ResponseEntity<Map<String, String>> changeMyPassword(
+            @Valid @RequestBody ChangePasswordRequest request) {
+        String email = getCurrentUserEmail();
+        userService.changePassword(email, request);
+        return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  STAFF MANAGEMENT ROUTES (admin operations)
+    // ══════════════════════════════════════════════════════════════════
+
+    /**
+     * Create a new staff member (CSM or Logistic agent).
+     * Only accessible by users with ADMIN role.
      */
     @PostMapping("/staff")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<UserResponse> createStaffMember(
-            @RequestBody UserCreationRequest creationRequest,
-            @RequestAttribute("enterpriseId") Long enterpriseId // Récupéré depuis le filtre JWT
+            @Valid @RequestBody UserCreationRequest creationRequest,
+            @RequestAttribute("enterpriseId") Long enterpriseId
     ) {
         UserResponse response = userService.createUser(creationRequest, enterpriseId);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
+
     /**
-     * 3. Route protégée : Récupérer tous les collaborateurs de l'entreprise de l'utilisateur connecté.
-     * Accessible par l'Admin ou les agents pour la visibilité d'équipe.
+     * Get all staff members belonging to the authenticated user's enterprise.
      */
     @GetMapping("/staff")
     public ResponseEntity<List<UserResponse>> getEnterpriseStaff(
-            @RequestAttribute("enterpriseId") Long enterpriseId // Récupéré depuis le filtre JWT
+            @RequestAttribute("enterpriseId") Long enterpriseId
     ) {
         List<UserResponse> staffList = userService.getUsersByEnterprise(enterpriseId);
         return ResponseEntity.ok(staffList);
     }
+
     /**
-     * 4. Route optionnelle : Connaître les détails de l'utilisateur actuellement connecté
+     * Get a single staff member by ID (within the same enterprise).
      */
-    @GetMapping("/me")
-    public ResponseEntity<String> getConnectedUser() {
+    @GetMapping("/staff/{id}")
+    public ResponseEntity<UserResponse> getStaffMember(
+            @PathVariable Long id,
+            @RequestAttribute("enterpriseId") Long enterpriseId
+    ) {
+        UserResponse response = userService.getStaffMember(id, enterpriseId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Activate or deactivate a staff member's account.
+     * Only accessible by users with ADMIN role.
+     * Request body: { "active": true/false }
+     */
+    @PatchMapping("/staff/{id}/status")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    public ResponseEntity<UserResponse> toggleStaffStatus(
+            @PathVariable Long id,
+            @RequestAttribute("enterpriseId") Long enterpriseId,
+            @RequestBody Map<String, Boolean> body
+    ) {
+        boolean active = body.getOrDefault("active", true);
+        UserResponse response = userService.toggleUserStatus(id, enterpriseId, active);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Permanently delete a staff member from the database.
+     * Only accessible by users with ADMIN role.
+     */
+    @DeleteMapping("/staff/{id}")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    public ResponseEntity<Void> deleteStaffMember(
+            @PathVariable Long id,
+            @RequestAttribute("enterpriseId") Long enterpriseId
+    ) {
+        userService.deleteUser(id, enterpriseId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  PRIVATE HELPERS
+    // ══════════════════════════════════════════════════════════════════
+
+    /**
+     * Extract the email of the currently authenticated user from the SecurityContext.
+     */
+    private String getCurrentUserEmail() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String currentPrincipalName = authentication.getName(); // Retourne l'email
-        return ResponseEntity.ok("Utilisateur connecté : " + currentPrincipalName);
+        return authentication.getName();
     }
 }
+

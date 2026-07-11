@@ -8,8 +8,16 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class UserCreationRequest {
+public class RegisterRequest {
 
+    // Enterprise info (carried by Admin)
+    @NotBlank(message = "Company name is required")
+    private String companyName;
+
+    @NotBlank(message = "Activity type is required")
+    private String activityType;
+
+    // Admin personal info
     @NotBlank(message = "Email is required")
     @Email(message = "Email format is invalid")
     private String email;
@@ -25,7 +33,4 @@ public class UserCreationRequest {
     private String lastname;
 
     private String phone;
-
-    @NotBlank(message = "Role is required")
-    private String role; // "CSM" or "LOGISTIC"
 }

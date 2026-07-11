@@ -1,7 +1,9 @@
 package org.example.user_service.mapper;
 
+import org.example.user_service.dto.request.RegisterRequest;
 import org.example.user_service.dto.request.UserCreationRequest;
 import org.example.user_service.dto.response.UserResponse;
+import org.example.user_service.entity.Admin;
 import org.example.user_service.entity.AgentCSM;
 import org.example.user_service.entity.AgentLogistic;
 import org.example.user_service.entity.User;
@@ -36,6 +38,28 @@ public class UserMapper {
         user.setPassword(request.getPassword());
 
         return user;
+    }
+
+
+    public Admin toAdminEntity(RegisterRequest request, Long enterpriseId) {
+        if (request == null) {
+            return null;
+        }
+
+        Admin admin = new Admin();
+        admin.setEmail(request.getEmail());
+        admin.setFirstname(request.getFirstname());
+        admin.setLastname(request.getLastname());
+        admin.setPhone(request.getPhone());
+        admin.setPassword(request.getPassword()); // Sera haché dans le service
+        admin.setEnterpriseId(enterpriseId);
+        admin.setActive(true);
+
+        // Champs spécifiques à l'Admin / Entreprise
+        admin.setCompanyName(request.getCompanyName());
+        admin.setActivityType(request.getActivityType());
+
+        return admin;
     }
 
     /**
