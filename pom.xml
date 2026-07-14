@@ -8,10 +8,16 @@
     <artifactId>erp-parent</artifactId>
     <version>1.0.0</version>
     <packaging>pom</packaging>
-
+    <properties>
+        <java.version>24</java.version>
+        <!-- On définit la version de Lombok une seule fois ici -->
+        <lombok.version>1.18.38</lombok.version>
+    </properties>
     <modules>
         <module>user_service</module>
         <module>lead_service</module>
         <module>gateway_service</module>
+        <module>discovery-server</module>
+        <module>config-server</module>
         </modules>
 </project>

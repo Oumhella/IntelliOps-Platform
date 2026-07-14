@@ -13,15 +13,92 @@ services:
     networks:
       - erp-network
 
+    # --- INFRASTRUCTURE DE SÉCURITÉ & CONFIGURATION ---
+  vault:
+    image: hashicorp/vault:1.15.2
+    container_name: erp-vault
+    ports:
+      - "8200:8200"
+    networks:
+      - erp-network
+    volumes:
+      - ./vault/config:/vault/config
+      - ./vault/file:/vault/file
+    environment:
+      - VAULT_ADDR=http://0.0.0.0:8200
+      - VAULT_API_ADDR=http://0.0.0.0:8200
+    entrypoint: [ "vault", "server", "-config=/vault/config/vault-config.json" ]
+
+  vault-init:
+    image: hashicorp/vault:1.15.2
+    container_name: erp-vault-init
+    depends_on:
+      - vault
+    networks:
+      - erp-network
+    volumes:
+      - ./vault/file:/vault/file
+      - ./vault/init:/vault/init
+    env_file:
+      - .env # Injecte les secrets locaux de .env de manière sécurisée
+    environment:
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_UNKEY=${VAULT_LOCAL_UNKEY}
+      - VAULT_ROOT_TOKEN=${VAULT_LOCAL_ROOT_TOKEN}
+    entrypoint: [ "/bin/sh", "/vault/init/init-vault.sh" ]
+
+  config-server:
+    build:
+      context: .
+      dockerfile: ./config-server/Dockerfile
+    container_name: erp-config-server
+    ports:
+      - "8888:8888"
+    networks:
+      - erp-network
+    depends_on:
+      vault-init:
+        condition: service_completed_successfully
+    volumes:
+      - ./vault/file:/vault/file
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SPRING_PROFILES_ACTIVE=vault
+      - SPRING_CLOUD_VAULT_HOST=vault
+      - SPRING_CLOUD_VAULT_PORT=8200
+      - SPRING_CLOUD_VAULT_SCHEME=http
+      - SPRING_CLOUD_VAULT_AUTHENTICATION=APPROLE
+  # --- MICROSERVICES ARCHITECTURE ---
+  discovery-server:
+    build:
+      context: .
+      dockerfile: ./discovery-server/Dockerfile
+    container_name: erp-discovery-server
+    ports:
+      - "8761:8761"
+    networks:
+      - erp-network
+
   gateway-service:
-    build: ./gateway_service
+    build:
+      context: .
+      dockerfile: ./gateway_service/Dockerfile
+    container_name: erp-gateway-service
     ports:
       - "8080:8080"
     networks:
       - erp-network
+    env_file:
+      - .env
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+    depends_on:
+      - discovery-server
+      - config-server
 
   user-service:
     build: ./user_service
+    container_name: erp-user-service
     ports:
       - "8081:8081"
     env_file:
@@ -29,22 +106,27 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_DATASOURCE_URL=jdbc:postgresql://erp-db:5432/erp
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
     depends_on:
       - erp-db
+      - discovery-server
+      - config-server
     networks:
       - erp-network
 
-  lead-service:
-    build: ./lead_service
-    ports:
-      - "8082:8082"
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://erp-db:5432/erp
-    depends_on:
-      - erp-db
-    networks:
-      - erp-network
+#  lead-service:
+#    build: ./lead_service
+#    ports:
+#      - "8082:8082"
+#    environment:
+#      - SPRING_PROFILES_ACTIVE=docker
+#      - SPRING_DATASOURCE_URL=jdbc:postgresql://erp-db:5432/erp
+#    depends_on:
+#      - erp-db
+#    networks:
+#      - erp-network
+
+
 
 #  crm-frontend:
 #    build: ./crm-frontend

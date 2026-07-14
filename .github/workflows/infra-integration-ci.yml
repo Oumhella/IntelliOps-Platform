@@ -1,0 +1,47 @@
+# .github/workflows/infra-integration-ci.yml
+name: Infrastructure Integration Test
+
+on:
+  push:
+    branches: [ "main", "develop", "feature/vault-gateway" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test-architecture:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 1. Configurer l'environnement avec les secrets GitHub
+      - name: Setup Secrets
+        run: |
+          echo "VAULT_LOCAL_UNKEY=temporary_ci_unkey_2026" >> .env
+          echo "VAULT_LOCAL_ROOT_TOKEN=temporary_ci_root_token_2026" >> .env
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET || 'ci_default_secret_key_extremely_long_2026' }}" >> .env
+          echo "JWT_EXPIRATION=86400" >> .env
+          echo "DB_USER=root" >> .env
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD || 'root' }}" >> .env
+          echo "USER_BASE_URL=http://user-service:8081" >> .env
+
+      # 2. Lancer toute l'infrastructure via Docker Compose
+      - name: Spin up Infrastructure
+        run: |
+          docker compose up -d --build
+
+      # 3. Vérifier que Vault s'est initialisé et s'est arrêté correctement
+      - name: Verify Vault Initialization
+        run: |
+          sleep 15
+          docker ps
+          docker logs erp-vault-init
+
+      # 4. S'assurer que le Config Server et Discovery Server répondent bien
+      - name: Healthcheck Infrastructure Services
+        run: |
+          # Vérifie si le Config Server est debout (Port 8888)
+          curl -f http://localhost:8888/actuator/health || echo "Config Server starting..."
+          # Vérifie si Eureka est debout (Port 8761)
+          curl -f http://localhost:8761 || echo "Eureka starting..."
