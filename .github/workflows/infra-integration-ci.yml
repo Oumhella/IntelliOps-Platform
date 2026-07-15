@@ -73,7 +73,7 @@ jobs:
         timeout-minutes: 2
         run: |
           docker exec erp-vault vault status
-          SEALED=$(docker exec erp-vault vault status -format=json | grep -o '"sealed":[a-z]*' | cut -d: -f2)
+          SEALED=$(docker exec erp-vault vault status -format=json | jq -r '.sealed')
           if [ "$SEALED" != "false" ]; then
             echo "::error::Vault is still sealed - init/unseal failed"
             exit 1
