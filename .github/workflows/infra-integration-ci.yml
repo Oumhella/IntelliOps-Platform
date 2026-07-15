@@ -10,6 +10,10 @@ on:
 jobs:
   test-architecture:
     runs-on: ubuntu-latest
+    # Hard ceiling for the whole job - if something hangs badly enough that
+    # individual step timeouts don't catch it, this kills the job instead of
+    # burning your Actions minutes for hours.
+    timeout-minutes: 25
 
     steps:
       - name: Checkout Code
@@ -26,22 +30,93 @@ jobs:
           echo "DB_PASSWORD=${{ secrets.DB_PASSWORD || 'root' }}" >> .env
           echo "USER_BASE_URL=http://user-service:8081" >> .env
 
-      # 2. Lancer toute l'infrastructure via Docker Compose
+      # 2. Set up Buildx so we can use GitHub Actions cache for Docker layers.
+      #    This is what actually cuts your 36-minute Maven download time down
+      #    on repeat runs - only changed deps get re-fetched.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 3. Build images first, separately from starting them, so build
+      #    failures are clearly distinguished from runtime/startup failures
+      #    in the CI log.
+      - name: Build Images
+        timeout-minutes: 12
+        run: |
+          docker compose build
+
+      # 4. Start the stack. --wait makes Compose block only until containers
+      #    report healthy/running (not indefinitely), and returns non-zero
+      #    if that doesn't happen within wait-timeout. This is what prevents
+      #    the depends_on: service_completed_successfully hang from eating
+      #    your whole CI run if vault-init misbehaves.
       - name: Spin up Infrastructure
+        timeout-minutes: 6
         run: |
-          docker compose up -d --build
+          docker compose up -d --wait --wait-timeout 180
 
-      # 3. Vérifier que Vault s'est initialisé et s'est arrêté correctement
+      # 5. Always dump logs and container state after startup, whether it
+      #    succeeded or not - critical for diagnosing what actually happened
+      #    inside vault-init without needing to reproduce locally.
+      - name: Show Container Status
+        if: always()
+        run: |
+          docker ps -a
+          echo "--- vault logs ---"
+          docker logs erp-vault || true
+          echo "--- vault-init logs ---"
+          docker logs erp-vault-init || true
+
+      # 6. Verify Vault actually initialized and unsealed - fail explicitly
+      #    if not, rather than limping on to a healthcheck that will just
+      #    fail confusingly downstream.
       - name: Verify Vault Initialization
+        timeout-minutes: 2
         run: |
-          sleep 15
-          docker ps
-          docker logs erp-vault-init
+          docker exec erp-vault vault status
+          SEALED=$(docker exec erp-vault vault status -format=json | grep -o '"sealed":[a-z]*' | cut -d: -f2)
+          if [ "$SEALED" != "false" ]; then
+            echo "::error::Vault is still sealed - init/unseal failed"
+            exit 1
+          fi
+          echo "Vault is unsealed and ready."
 
-      # 4. S'assurer que le Config Server et Discovery Server répondent bien
+      # 7. S'assurer que le Config Server et Discovery Server répondent bien.
+      #    Retries with a short sleep instead of a single curl -f, since
+      #    Spring Boot services take 15-25s to finish starting even after
+      #    the container is "running".
       - name: Healthcheck Infrastructure Services
+        timeout-minutes: 3
         run: |
-          # Vérifie si le Config Server est debout (Port 8888)
-          curl -f http://localhost:8888/actuator/health || echo "Config Server starting..."
-          # Vérifie si Eureka est debout (Port 8761)
-          curl -f http://localhost:8761 || echo "Eureka starting..."
+          echo "Checking Config Server (8888)..."
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:8888/actuator/health; then
+              echo "Config Server is up."
+              break
+            fi
+            if [ "$i" -eq 15 ]; then
+              echo "::error::Config Server did not become healthy in time"
+              docker logs erp-config-server
+              exit 1
+            fi
+            sleep 5
+          done
+
+          echo "Checking Eureka (8761)..."
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:8761 > /dev/null; then
+              echo "Eureka is up."
+              break
+            fi
+            if [ "$i" -eq 15 ]; then
+              echo "::error::Eureka did not become healthy in time"
+              docker logs erp-discovery-server
+              exit 1
+            fi
+            sleep 5
+          done
+
+      # 8. Always tear down, even on failure, so nothing lingers on the runner.
+      - name: Tear Down
+        if: always()
+        run: |
+          docker compose down -v
