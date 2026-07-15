@@ -17,6 +17,8 @@ services:
   vault:
     image: hashicorp/vault:1.15.2
     container_name: erp-vault
+    cap_add:
+      - IPC_LOCK
     ports:
       - "8200:8200"
     networks:
