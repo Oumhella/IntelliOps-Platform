@@ -19,5 +19,7 @@
         <module>gateway_service</module>
         <module>discovery-server</module>
         <module>config-server</module>
-        </modules>
+        <module>abonnement_service</module>
+        <module>common_lib</module>
+    </modules>
 </project>

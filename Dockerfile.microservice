@@ -1,0 +1,27 @@
+# ============================================================
+# Shared Dockerfile for all Spring Boot microservices
+# Usage: Pass SERVICE_NAME and SERVICE_PORT as build args
+# ============================================================
+
+# Étape 1 : Build du JAR avec Maven
+FROM maven:3.9-eclipse-temurin-17 AS build
+ARG SERVICE_NAME
+WORKDIR /app
+
+# Copier et installer la librairie commune en premier
+COPY common_lib/pom.xml ./common_lib/pom.xml
+COPY common_lib/src ./common_lib/src
+RUN mvn -f common_lib/pom.xml clean install -DskipTests -q
+
+# Copier et builder le microservice
+COPY ${SERVICE_NAME}/pom.xml ./pom.xml
+COPY ${SERVICE_NAME}/src ./src
+RUN mvn clean package -DskipTests -q
+
+# Étape 2 : Exécution du JAR
+FROM eclipse-temurin:17-jre-alpine
+ARG SERVICE_PORT=8080
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
+EXPOSE ${SERVICE_PORT}
+ENTRYPOINT ["java", "-jar", "app.jar"]

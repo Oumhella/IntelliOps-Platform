@@ -1,10 +1,10 @@
 package org.example.user_service.config;
 
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -22,7 +22,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-     private final JwtUtils jwtUtils;
+    private final JwtUtils jwtUtils; // on la remet : nécessaire pour le fallback
 
     @Override
     protected void doFilterInternal(
@@ -31,59 +31,55 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
-        // 1. Extraire le header "Authorization"
-        final String authHeader = request.getHeader("Authorization");
-        final String jwt;
-        final String userEmail;
+        if (SecurityContextHolder.getContext().getAuthentication() == null) {
 
-        // 2. Vérifier si le header est présent et commence bien par "Bearer "
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            filterChain.doFilter(request, response); // On passe au filtre suivant (Spring bloquera si la route est protégée)
-            return;
-        }
+            // ── CHEMIN 1 : headers de confiance injectés par la gateway ──
+            final String headerEmail = request.getHeader("X-User-Email");
+            final String headerRole = request.getHeader("X-User-Role");
+            final String headerEnterpriseId = request.getHeader("X-Enterprise-Id");
 
-        // 3. Extraire le token (on retire les 7 caractères de "Bearer ")
-        jwt = authHeader.substring(7);
-
-
-         userEmail = jwtUtils.extractUsername(jwt);
-       // userEmail = "mock-email@domain.com"; // Simulation temporaire pour la compilation
-
-        // 4. Si l'email est extrait et que l'utilisateur n'est pas encore authentifié dans le contexte Spring
-        if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-
-
-             boolean isTokenValid = jwtUtils.isTokenValid(jwt);
-            //boolean isTokenValid = true; // Simulation temporaire
-
-            if (isTokenValid) {
-
-                String role = (String) jwtUtils.getClaimByName(jwt, "role");
-                Long enterpriseId = ((Number) jwtUtils.getClaimByName(jwt, "enterpriseId")).longValue();
-
-               // String mockRole = "ROLE_ADMIN";
-                List<SimpleGrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority(role));
-
-                // 5. Créer l'objet d'authentification requis par Spring Security
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                        userEmail,
-                        null, // Le mot de passe n'est pas nécessaire ici, le token fait foi
-                        authorities
-                );
-
-                // On peut attacher des détails supplémentaires de la requête HTTP
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                // 6. Injection CRITIQUE : On stocke l'utilisateur authentifié dans le contexte global de Spring
-                SecurityContextHolder.getContext().setAuthentication(authToken);
-
-                // Optionnel/Avancé DevSecOps : Stocker l'enterpriseId dans un attribut de la requête
-                // pour que tes contrôleurs puissent y accéder facilement
-                 request.setAttribute("enterpriseId", enterpriseId);
+            if (headerEmail != null && !headerEmail.isEmpty() && headerRole != null && !headerRole.isEmpty()) {
+                authenticate(headerEmail, headerRole, headerEnterpriseId, request);
+            } else {
+                // ── CHEMIN 2 : pas de headers gateway -> valider le JWT nous-mêmes ──
+                // (appel Feign direct entre services, ou appel de test hors gateway)
+                final String authHeader = request.getHeader("Authorization");
+                if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                    String jwt = authHeader.substring(7);
+                    try {
+                        if (jwtUtils.isTokenValid(jwt)) {
+                            String email = jwtUtils.extractUsername(jwt);
+                            String role = (String) jwtUtils.getClaimByName(jwt, "role");
+                            Object entIdClaim = jwtUtils.getClaimByName(jwt, "enterpriseId");
+                            String enterpriseId = entIdClaim != null ? entIdClaim.toString() : null;
+                            authenticate(email, role, enterpriseId, request);
+                        } else {
+                            System.out.println("=== JWT REJETÉ (fallback) : token invalide/expiré ===");
+                        }
+                    } catch (Exception e) {
+                        System.out.println("=== JWT EXTRACTION FAILED (fallback) : " + e.getClass().getSimpleName() + " - " + e.getMessage());
+                    }
+                }
             }
         }
 
-        // 7. Continuer la chaîne des filtres
         filterChain.doFilter(request, response);
+    }
+
+    private void authenticate(String email, String role, String enterpriseIdStr, HttpServletRequest request) {
+        List<SimpleGrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority(role));
+
+        UsernamePasswordAuthenticationToken authToken =
+                new UsernamePasswordAuthenticationToken(email, null, authorities);
+        authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+        SecurityContextHolder.getContext().setAuthentication(authToken);
+
+        if (enterpriseIdStr != null && !enterpriseIdStr.isEmpty()) {
+            try {
+                request.setAttribute("enterpriseId", Long.parseLong(enterpriseIdStr));
+            } catch (NumberFormatException ignored) {
+                // enterpriseId absent ou non numérique (ex. super-admin) — on ignore volontairement
+            }
+        }
     }
 }

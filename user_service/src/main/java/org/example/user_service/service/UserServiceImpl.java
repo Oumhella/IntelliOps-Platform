@@ -9,8 +9,8 @@ import org.example.user_service.dto.request.UserCreationRequest;
 import org.example.user_service.dto.response.UserResponse;
 import org.example.user_service.entity.Admin;
 import org.example.user_service.entity.User;
-import org.example.user_service.exception.ConflictException;
-import org.example.user_service.exception.ResourceNotFoundException;
+import org.example.common.exception.ConflictException;
+import org.example.common.exception.ResourceNotFoundException;
 import org.example.user_service.mapper.UserMapper;
 import org.example.user_service.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -182,5 +182,11 @@ public class UserServiceImpl implements UserService {
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
     }
-}
 
+    @Override
+    public UserResponse getUserById(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID " + userId));
+        return userMapper.toResponse(user);
+    }
+}

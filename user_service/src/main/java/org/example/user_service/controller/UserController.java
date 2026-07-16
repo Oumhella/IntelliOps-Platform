@@ -163,6 +163,15 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * Get a user by ID. Primarily used for inter-service communication.
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<UserResponse> getUserById(@PathVariable Long id) {
+        UserResponse response = userService.getUserById(id);
+        return ResponseEntity.ok(response);
+    }
+
     // ══════════════════════════════════════════════════════════════════
     //  PRIVATE HELPERS
     // ══════════════════════════════════════════════════════════════════

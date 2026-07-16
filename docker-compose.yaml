@@ -10,6 +10,7 @@ services:
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
       - erp-db-data:/var/lib/postgresql/data
+      - ./docker/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql
     networks:
       - erp-network
 
@@ -73,6 +74,12 @@ services:
       - SPRING_CLOUD_CONFIG_SERVER_VAULT_PORT=8200
       - SPRING_CLOUD_CONFIG_SERVER_VAULT_SCHEME=http
       - SPRING_CLOUD_VAULT_AUTHENTICATION=APPROLE
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8888/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
   # --- MICROSERVICES ARCHITECTURE ---
   discovery-server:
     build:
@@ -97,12 +104,20 @@ services:
       - .env
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - CONFIG_SERVER_URL=http://config-server:8888
     depends_on:
-      - discovery-server
-      - config-server
+      discovery-server:
+        condition: service_started
+      config-server:
+        condition: service_healthy
 
   user-service:
-    build: ./user_service
+    build:
+      context: .
+      dockerfile: Dockerfile.microservice
+      args:
+        SERVICE_NAME: user_service
+        SERVICE_PORT: 8081
     container_name: erp-user-service
     ports:
       - "8081:8081"
@@ -110,26 +125,62 @@ services:
       - .env
     environment:
       - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://erp-db:5432/erp
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://erp-db:5432/erp_users
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - CONFIG_SERVER_URL=http://config-server:8888
     depends_on:
-      - erp-db
-      - discovery-server
-      - config-server
+      erp-db:
+        condition: service_started
+      discovery-server:
+        condition: service_started
+      config-server:
+        condition: service_healthy
     networks:
       - erp-network
 
 #  lead-service:
-#    build: ./lead_service
+#    build:
+#      context: .
+#      dockerfile: Dockerfile.microservice
+#      args:
+#        SERVICE_NAME: lead_service
+#        SERVICE_PORT: 8082
 #    ports:
 #      - "8082:8082"
 #    environment:
 #      - SPRING_PROFILES_ACTIVE=docker
-#      - SPRING_DATASOURCE_URL=jdbc:postgresql://erp-db:5432/erp
+#      - SPRING_DATASOURCE_URL=jdbc:postgresql://erp-db:5432/erp_leads
 #    depends_on:
 #      - erp-db
 #    networks:
 #      - erp-network
+
+  abonnement-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.microservice
+      args:
+        SERVICE_NAME: abonnement_service
+        SERVICE_PORT: 8083
+    container_name: erp-abonnement-service
+    ports:
+      - "8083:8083"
+    env_file:
+      - .env
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://erp-db:5432/erp_abonnements
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - CONFIG_SERVER_URL=http://config-server:8888
+    depends_on:
+      erp-db:
+        condition: service_started
+      discovery-server:
+        condition: service_started
+      config-server:
+        condition: service_healthy
+    networks:
+      - erp-network
 
 
 
