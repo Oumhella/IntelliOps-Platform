@@ -31,5 +31,7 @@ public interface UserService {
     UserResponse toggleUserStatus(Long userId, Long enterpriseId, boolean active);
 
     void deleteUser(Long userId, Long enterpriseId);
+
+    UserResponse getUserById(Long userId);
 }
 

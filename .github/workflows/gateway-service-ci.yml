@@ -1,0 +1,59 @@
+name: Gateway Service CI (DevSecOps)
+
+on:
+  push:
+    branches: [ "main", "develop", "feature/identity-auth", "feature/vault-gateway" ]
+    paths:
+      - 'gateway_service/**' # Déclenche le pipeline SEULEMENT si la Gateway change
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'gateway_service/**'
+
+jobs:
+  build-and-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Configuration de Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'maven'
+
+      # 1. Télécharger les dépendances de la Gateway
+      - name: Resolve Maven Dependencies
+        run: |
+          cd gateway_service
+          mvn dependency:resolve
+
+      # Étape DevSecOps 1 : Scan du code source (SAST)
+      - name: Scan des vulnérabilités du code (Trivy FS)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './gateway_service'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+
+      # Étape Build du JAR
+      - name: Build avec Maven
+        run: |
+          cd gateway_service
+          mvn clean package -DskipTests
+
+      # Étape DevSecOps 2 : Build & Scan de l'image Docker (Container Security)
+      - name: Build de l'image Docker locale
+        run: |
+          docker build -t erp-gateway-service:latest -f ./gateway_service/Dockerfile .
+
+      - name: Scan de l'image Docker (Trivy Image)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'erp-gateway-service:latest'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'

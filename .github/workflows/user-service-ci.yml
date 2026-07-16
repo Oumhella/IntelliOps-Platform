@@ -2,18 +2,19 @@ name: User Service CI (DevSecOps)
 
 on:
   push:
-    branches: [ main, develop, feature/identity-auth ]
+    branches: [ "main", "develop", "feature/identity-auth", "feature/vault-gateway" ]
     paths:
-      - 'user_service/**' # Déclenche le pipeline SEULEMENT si ce dossier change
+      - 'user_service/**'
+      - 'common_lib/**'   # <-- déclenche aussi si la lib partagée change
   pull_request:
     branches: [ main ]
     paths:
       - 'user_service/**'
+      - 'common_lib/**'
 
 jobs:
   build-and-scan:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
@@ -25,14 +26,18 @@ jobs:
           java-version: '17'
           cache: 'maven'
 
+      # Étape critique : installer common_lib dans le .m2 du runner AVANT de builder user_service
+      - name: Build & install common_lib
+        run: |
+          cd common_lib
+          mvn clean install -DskipTests
 
-      # 2. Télécharger toutes les dépendances localement sur le runner
-      - name: Resolve Maven Dependencies
+      - name: Resolve Maven Dependencies (user_service)
         run: |
           cd user_service
           mvn dependency:resolve
 
-      # Étape DevSecOps 1 : Scan du code source (SAST) avant le build
+      # DevSecOps 1 : Scan du code source (SAST) avant le build
       - name: Scan des vulnérabilités du code (Trivy FS)
         uses: aquasecurity/trivy-action@master
         with:
@@ -41,18 +46,16 @@ jobs:
           format: 'table'
           severity: 'CRITICAL,HIGH'
 
-      # Étape Build
       - name: Build avec Maven
         run: |
           cd user_service
           mvn clean package -DskipTests
 
-      # Étape DevSecOps 2 : Scan de l'image Docker après le build (Container Security)
       - name: Build de l'image Docker locale
         run: |
           docker build -t erp-user-service:latest ./user_service
 
-        # On demande à Trivy de scanner l'image
+      # DevSecOps 2 : Scan de l'image Docker (Container Security)
       - name: Scan de l'image Docker (Trivy Image)
         uses: aquasecurity/trivy-action@master
         with:

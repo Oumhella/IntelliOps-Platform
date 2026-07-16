@@ -1,0 +1,61 @@
+name: Abonnement Service CI (DevSecOps)
+
+on:
+  push:
+    branches: [ "main", "develop", "feature/identity-auth", "feature/vault-gateway" ]
+    paths:
+      - 'abonnement_service/**'
+      - 'common_lib/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'abonnement_service/**'
+      - 'common_lib/**'
+
+jobs:
+  build-and-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Configuration de Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'maven'
+
+      - name: Build & install common_lib
+        run: |
+          cd common_lib
+          mvn clean install -DskipTests
+
+      - name: Resolve Maven Dependencies (abonnement_service)
+        run: |
+          cd abonnement_service
+          mvn dependency:resolve
+
+      - name: Scan des vulnérabilités du code (Trivy FS)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './abonnement_service'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Build avec Maven
+        run: |
+          cd abonnement_service
+          mvn clean package -DskipTests
+
+      - name: Build de l'image Docker locale
+        run: |
+          docker build -t erp-abonnement-service:latest ./abonnement_service
+
+      - name: Scan de l'image Docker (Trivy Image)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'erp-abonnement-service:latest'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'

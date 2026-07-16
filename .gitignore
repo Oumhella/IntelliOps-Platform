@@ -50,6 +50,21 @@ Thumbs.db
 **/.nyc_output/
 *.tsbuildinfo
 
+# Données persistantes de Vault (volume local)
+**/vault_data/
+**/vault/data/
+**/vault/logs/
+# ==========================================
+# VAULT & CONFIGURATION SECRETS
+# ==========================================
+# Fichiers contenant le Root Token ou les Unseal Keys générés à l'initialisation
+**/vault-keys.json
+**/vault-token.txt
+**/.vault-token
+**/init-vault-output.log
+
+# Scripts d'initialisation temporaires contenant des credentials en clair
+**/init-vault.local.sh
 # ==========================================
 # DOCKER & VOLUMES DE BASES DE DONNÉES
 # ==========================================
@@ -60,6 +75,9 @@ Thumbs.db
 **/.env.local
 **/.env.*.local
 .env
+.env.*
+!.env.example
+**/vault/file/
 # ==========================================
 # DEVSECOPS & SÉCURITÉ CRITIQUE
 # ==========================================
@@ -72,3 +90,7 @@ Thumbs.db
 **/snyk-reports/
 **/.sonar/
 **/.scannerwork/
+# Certificats et clés SSL/TLS locaux (HTTPS)
+**/*.crt
+**/*.der
+**/*.csr
