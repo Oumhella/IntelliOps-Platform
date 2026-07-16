@@ -1,15 +1,15 @@
-name: User Service CI (DevSecOps)
+name: Abonnement Service CI (DevSecOps)
 
 on:
   push:
     branches: [ "main", "develop", "feature/identity-auth", "feature/vault-gateway" ]
     paths:
-      - 'user_service/**'
-      - 'common_lib/**'   # <-- déclenche aussi si la lib partagée change
+      - 'abonnement_service/**'
+      - 'common_lib/**'
   pull_request:
     branches: [ main ]
     paths:
-      - 'user_service/**'
+      - 'abonnement_service/**'
       - 'common_lib/**'
 
 jobs:
@@ -26,39 +26,36 @@ jobs:
           java-version: '17'
           cache: 'maven'
 
-      # Étape critique : installer common_lib dans le .m2 du runner AVANT de builder user_service
       - name: Build & install common_lib
         run: |
           cd common_lib
           mvn clean install -DskipTests
 
-      - name: Resolve Maven Dependencies (user_service)
+      - name: Resolve Maven Dependencies (abonnement_service)
         run: |
-          cd user_service
+          cd abonnement_service
           mvn dependency:resolve
 
-      # DevSecOps 1 : Scan du code source (SAST) avant le build
       - name: Scan des vulnérabilités du code (Trivy FS)
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
-          scan-ref: './user_service'
+          scan-ref: './abonnement_service'
           format: 'table'
           severity: 'CRITICAL,HIGH'
 
       - name: Build avec Maven
         run: |
-          cd user_service
+          cd abonnement_service
           mvn clean package -DskipTests
 
       - name: Build de l'image Docker locale
         run: |
-          docker build -t erp-user-service:latest ./user_service
+          docker build -t erp-abonnement-service:latest ./abonnement_service
 
-      # DevSecOps 2 : Scan de l'image Docker (Container Security)
       - name: Scan de l'image Docker (Trivy Image)
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'erp-user-service:latest'
+          image-ref: 'erp-abonnement-service:latest'
           format: 'table'
           severity: 'CRITICAL,HIGH'
