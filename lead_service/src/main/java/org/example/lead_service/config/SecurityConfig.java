@@ -1,4 +1,5 @@
-package org.example.abonnement_service.config;
+package org.example.lead_service.config;
+
 
 import lombok.RequiredArgsConstructor;
 import org.example.common.security.JwtAuthenticationFilter;
@@ -14,7 +15,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthFilter; // <-- vient de common, injecte automatiquement
+    private final JwtAuthenticationFilter jwtAuthFilter; // <-- vient de common_lib, injecte automatiquement
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
