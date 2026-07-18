@@ -1,17 +1,17 @@
-name: User Service CI (DevSecOps)
+name: lead Service CI (DevSecOps)
 
 on:
   push:
     branches: [ "main", "develop", "feature/identity-auth", "feature/vault-gateway" ]
     paths:
-      - 'user_service/**'
+      - 'lead_service/**'
       - 'common_lib/**'
       - 'Dockerfile.microservice'
       - '.github/actions/build-and-scan-service/**'
   pull_request:
     branches: [ main ]
     paths:
-      - 'user_service/**'
+      - 'lead_service/**'
       - 'common_lib/**'
       - 'Dockerfile.microservice'
       - '.github/actions/build-and-scan-service/**'
@@ -23,9 +23,9 @@ jobs:
       - name: Checkout du code
         uses: actions/checkout@v4
 
-      - name: Build, scan & package user_service
+      - name: Build, scan & package lead_service
         uses: ./.github/actions/build-and-scan-service
         with:
-          service_name: user_service
-          service_port: 8081
-          image_name: erp-user-service
+          service_name: lead_service
+          service_port: 8082
+          image_name: erp-lead-service

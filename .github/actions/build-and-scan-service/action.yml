@@ -1,0 +1,69 @@
+name: 'Build & Scan Microservice (DevSecOps)'
+description: 'Builds common_lib, builds the target microservice, scans code and Docker image with Trivy'
+
+inputs:
+  service_name:
+    description: 'Nom du dossier/module du microservice (ex: user_service)'
+    required: true
+  service_port:
+    description: 'Port exposé par le microservice (ex: 8081)'
+    required: true
+  image_name:
+    description: 'Nom de l''image Docker à produire (ex: erp-user-service)'
+    required: true
+  java_version:
+    description: 'Version du JDK'
+    required: false
+    default: '17'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Configuration de Java ${{ inputs.java_version }}
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: ${{ inputs.java_version }}
+        cache: 'maven'
+
+    - name: Build & install common_lib
+      shell: bash
+      run: |
+        cd common_lib
+        mvn clean install -DskipTests
+
+    - name: Resolve Maven Dependencies (${{ inputs.service_name }})
+      shell: bash
+      run: |
+        cd ${{ inputs.service_name }}
+        mvn dependency:resolve
+
+    - name: Scan des vulnérabilités du code (Trivy FS)
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: './${{ inputs.service_name }}'
+        format: 'table'
+        severity: 'CRITICAL,HIGH'
+
+    - name: Build avec Maven (${{ inputs.service_name }})
+      shell: bash
+      run: |
+        cd ${{ inputs.service_name }}
+        mvn clean package -DskipTests
+
+    - name: Build de l'image Docker (${{ inputs.image_name }})
+      shell: bash
+      run: |
+        docker build \
+          -f Dockerfile.microservice \
+          --build-arg SERVICE_NAME=${{ inputs.service_name }} \
+          --build-arg SERVICE_PORT=${{ inputs.service_port }} \
+          -t ${{ inputs.image_name }}:latest .
+
+    - name: Scan de l'image Docker (Trivy Image)
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: '${{ inputs.image_name }}:latest'
+        format: 'table'
+        severity: 'CRITICAL,HIGH'

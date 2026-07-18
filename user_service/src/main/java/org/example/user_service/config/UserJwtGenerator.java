@@ -16,8 +16,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
-@Component
-public class JwtUtils {
+@Component("userJwtGenerator")
+public class UserJwtGenerator {
 
     @Value("${app.jwt.secret}")
     private String secretKeyString; // Injecté en premier par Spring
@@ -64,6 +64,7 @@ public class JwtUtils {
      */
     public String generateToken(User user) {
         Map<String, Object> extraClaims = new HashMap<>();
+        extraClaims.put("userId", user.getId());
         extraClaims.put("enterpriseId", user.getEnterpriseId()); // Isolation des données
         extraClaims.put("role", user.getRole().name());         // Rôle pour Spring Security & Angular
 
