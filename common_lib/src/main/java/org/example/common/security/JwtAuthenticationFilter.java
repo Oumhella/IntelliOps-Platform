@@ -49,33 +49,44 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String headerEmail = request.getHeader("X-User-Email");
             String headerRole = request.getHeader("X-User-Role");
             String headerEnterpriseId = request.getHeader("X-Enterprise-Id");
+            String headerUserId = request.getHeader("X-User-Id");
 
-            if (headerEmail != null && !headerEmail.isEmpty() && headerRole != null && !headerRole.isEmpty()) {
-                authenticate(headerEmail, headerRole, headerEnterpriseId, request);
+            if (headerEmail != null && !headerEmail.isEmpty()
+                    && headerRole != null && !headerRole.isEmpty()
+                    && headerUserId != null && !headerUserId.isEmpty()) {
+                authenticate(headerEmail, headerRole, headerEnterpriseId, headerUserId , request);
             } else {
-                String authHeader = request.getHeader("Authorization");
-                if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                    String jwt = authHeader.substring(7);
-                    try {
-                        if (jwtUtils.isTokenValid(jwt)) {
-                            String email = jwtUtils.extractUsername(jwt);
-                            String role = (String) jwtUtils.getClaimByName(jwt, "role");
-                            Object entIdClaim = jwtUtils.getClaimByName(jwt, "enterpriseId");
-                            authenticate(email, role, entIdClaim != null ? entIdClaim.toString() : null, request);
-                        } else {
-                            logger.warn("JWT rejete (fallback) : token invalide ou expire");
-                        }
-                    } catch (Exception e) {
-                        logger.warn("Echec extraction JWT (fallback) : " + e.getClass().getSimpleName() + " - " + e.getMessage());
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                String jwt = authHeader.substring(7);
+                try {
+                    if (jwtUtils.isTokenValid(jwt)) {
+                        String email = jwtUtils.extractUsername(jwt);
+                        String role = (String) jwtUtils.getClaimByName(jwt, "role");
+                        Object entIdClaim = jwtUtils.getClaimByName(jwt, "enterpriseId");
+                        Object userIdClaim = jwtUtils.getClaimByName(jwt, "userId");
+
+                        authenticate(
+                                email,
+                                role,
+                                entIdClaim != null ? entIdClaim.toString() : null,
+                                userIdClaim != null ? userIdClaim.toString() : null,
+                                request
+                        );
+                    } else {
+                        logger.warn("JWT rejete (fallback) : token invalide ou expire");
                     }
+                } catch (Exception e) {
+                    logger.warn("Echec extraction JWT (fallback) : " + e.getClass().getSimpleName() + " - " + e.getMessage());
                 }
             }
+        }
         }
 
         filterChain.doFilter(request, response);
     }
 
-    private void authenticate(String email, String role, String enterpriseIdStr, HttpServletRequest request) {
+    private void authenticate(String email, String role, String enterpriseIdStr, String userIdStr, HttpServletRequest request) {
         List<SimpleGrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority(role));
         UsernamePasswordAuthenticationToken authToken =
                 new UsernamePasswordAuthenticationToken(email, null, authorities);
@@ -88,6 +99,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             } catch (NumberFormatException ignored) {
                 // enterpriseId absent ou non numerique (ex. super-admin futur) -- ignore volontairement
             }
+        }
+        if (userIdStr != null && !userIdStr.isEmpty()) {
+            try { request.setAttribute("userId", Long.parseLong(userIdStr)); }
+            catch (NumberFormatException ignored) {}
         }
     }
 }

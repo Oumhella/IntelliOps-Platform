@@ -1,15 +1,15 @@
 package org.example.lead_service.controller;
 
+import org.example.lead_service.dto.*;
 import org.example.lead_service.entity.StatutLead;
 import org.example.lead_service.entity.TypeInteraction;
-import org.example.lead_service.dto.CommandeDTO;
-import org.example.lead_service.dto.LeadDTO;
-import org.example.lead_service.dto.NoteInteractionDTO;
 import org.example.lead_service.service.LeadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -21,8 +21,13 @@ public class LeadController {
     private final LeadService leadService;
 
     @PostMapping
-    public ResponseEntity<LeadDTO> creerLead(@RequestBody LeadDTO leadDTO) {
-        return new ResponseEntity<>(leadService.creerLead(leadDTO), HttpStatus.CREATED);
+    @PreAuthorize("hasRole('CSM')")
+    public ResponseEntity<LeadDTO> creerLead(
+            @RequestBody LeadDTO leadDTO,
+            @RequestAttribute("userId") Long agentId
+    ) {
+        leadDTO.setAgentId(agentId);
+        return ResponseEntity.ok(leadService.creerLead(leadDTO));
     }
 
     @GetMapping("/{idLead}")
@@ -41,18 +46,27 @@ public class LeadController {
     }
 
     @PostMapping("/{idLead}/interactions")
+    @PreAuthorize("hasRole('CSM')")
     public ResponseEntity<NoteInteractionDTO> enregistrerInteraction(
             @PathVariable Long idLead,
-            @RequestParam TypeInteraction type,
-            @RequestParam(required = false) StatutLead nouveauStatut,
-            @RequestBody String commentaire) {
+            @RequestBody NoteInteractionRequest requestDto) {
 
-        NoteInteractionDTO note = leadService.enregistrerInteraction(idLead, type, commentaire, nouveauStatut);
+        // On passe les données proprement extraites du JSON au service
+        NoteInteractionDTO note = leadService.enregistrerInteraction(
+                idLead,
+                requestDto.getTypeInteraction(),
+                requestDto.getCommentaireAgent(),
+                requestDto.getNouveauStatut()
+        );
+
         return new ResponseEntity<>(note, HttpStatus.CREATED);
     }
 
     @PostMapping("/{idLead}/convertir")
-    public ResponseEntity<CommandeDTO> convertirEnCommande(@PathVariable Long idLead) {
-        return new ResponseEntity<>(leadService.convertirEnCommande(idLead), HttpStatus.CREATED);
+    public ResponseEntity<CommandeDTO> convertirEnCommande(
+            @PathVariable Long idLead,
+            @RequestBody CreationCommandeRequest request) { // 📥 On récupère le JSON ici !
+
+        return new ResponseEntity<>(leadService.convertirEnCommande(idLead, request), HttpStatus.CREATED);
     }
 }

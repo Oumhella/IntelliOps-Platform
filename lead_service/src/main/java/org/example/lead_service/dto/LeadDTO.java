@@ -8,7 +8,7 @@ import org.example.lead_service.entity.StatutLead;
 public class LeadDTO {
     private Long idLead;
     private StatutLead statutLead;
-    private OrdrePriorite priorite;
+    private OrdrePriorite ordrePriorite;
     private CoordonneesClientDTO infosClient;
     private Long boutiqueId;
     private Long agentId;

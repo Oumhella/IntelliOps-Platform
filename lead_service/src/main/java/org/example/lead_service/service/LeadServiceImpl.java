@@ -3,6 +3,7 @@ package org.example.lead_service.service;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.example.lead_service.dto.CommandeDTO;
+import org.example.lead_service.dto.CreationCommandeRequest;
 import org.example.lead_service.dto.LeadDTO;
 import org.example.lead_service.dto.NoteInteractionDTO;
 import org.example.lead_service.entity.*;
@@ -74,7 +75,7 @@ public class LeadServiceImpl implements LeadService {
             lead.changerStatut(nouveauStatut);
         }
 
-        // Création de la note d'interaction liée (comme spécifié par la méthode +enregistrer du diagramme)
+        // Création de la note d'interaction
         NoteInteraction note = NoteInteraction.builder()
                 .lead(lead)
                 .ancienStatut(ancienStatutStr)
@@ -84,23 +85,48 @@ public class LeadServiceImpl implements LeadService {
                 .build();
 
         lead.getHistoriqueInteractions().add(note);
-        leadRepository.save(lead); // Sauvegarde le lead ainsi que la note en cascade
 
-        return leadMapper.toDto(note);
+        // 1. Sauvegarde l'ensemble via la cascade
+        Lead savedLead = leadRepository.save(lead);
+
+        // 2. On extrait la note qui vient d'être enregistrée (la dernière de la liste)
+        NoteInteraction savedNote = savedLead.getHistoriqueInteractions()
+                .stream()
+                .reduce((first, second) -> second) // Récupère le dernier élément de la liste
+                .orElseThrow(() -> new IllegalStateException("Erreur lors de la récupération de la note enregistrée"));
+
+        // 3. Appel de la méthode de mapping spécifique à NoteInteraction
+        return leadMapper.toDto(savedNote);
     }
 
     @Override
-    public CommandeDTO convertirEnCommande(Long idLead) {
+    @Transactional
+    public CommandeDTO convertirEnCommande(Long idLead, CreationCommandeRequest request) {
         Lead lead = leadRepository.findById(idLead)
                 .orElseThrow(() -> new EntityNotFoundException("Lead introuvable avec l'ID : " + idLead));
 
-        // Appel de la logique d'encapsulation métier du domaine
+        // 1. Initialise la commande avec le statut CONVERTED et copie les infos du client
         Commande nouvelleCommande = lead.convertirEnCommande();
 
-        // Persistance explicite de la commande générée
-        Commande commandeSauvegardee = commandeRepository.save(nouvelleCommande);
-        leadRepository.save(lead);
+        // 2. On utilise TES méthodes métier pour insérer proprement chaque ligne
+        if (request.getItems() != null) {
+            for (CreationCommandeRequest.ItemRequest item : request.getItems()) {
+                nouvelleCommande.ajouterLigne(
+                        item.getProductId(),
+                        item.getQuantity(),
+                        item.getUnitPrice()
+                );
+            }
+        }
 
-        return commandeMapper.toDto(commandeSauvegardee);
+        // 3. Juste au cas où le totalAmount du JSON doit surcharger le calcul (ou pour vérification)
+        // nouvelleCommande.setTotalPrix(request.getTotalAmount());
+        // Mais en théorie, ton nouvelleCommande.calculerTotal() appelé dans ajouterLigne() fait déjà le taf !
+
+        // 4. On sauvegarde le Lead (qui va propager la sauvegarde à Commande grâce à cascade = CascadeType.ALL)
+        Lead savedLead = leadRepository.save(lead);
+
+        // 5. On renvoie la commande persistée mappée en DTO
+        return commandeMapper.toDto(savedLead.getCommande());
     }
 }

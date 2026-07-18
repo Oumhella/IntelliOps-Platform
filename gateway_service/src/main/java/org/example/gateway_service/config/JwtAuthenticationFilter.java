@@ -44,6 +44,7 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
                         httpHeaders.remove("X-User-Email");
                         httpHeaders.remove("X-User-Role");
                         httpHeaders.remove("X-Enterprise-Id");
+                        httpHeaders.remove("X-User-Id");
                     })
                     .build();
             ServerWebExchange cleanedExchange = exchange.mutate().request(cleanedRequest).build();
@@ -81,6 +82,7 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
                         .parseClaimsJws(token)
                         .getBody();
 
+                String userId = claims.get("userId", String.class);
                 String email = claims.getSubject();
                 String role = claims.get("role", String.class);
                 Object enterpriseIdObj = claims.get("enterpriseId");
@@ -92,6 +94,7 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
                 ServerHttpRequest modifiedRequest = cleanedRequest.mutate()
                         .header("X-User-Email", email != null ? email : "")
                         .header("X-User-Role", role != null ? role : "")
+                        .header("X-User-Id", userId)
                         .header("X-Enterprise-Id", enterpriseId)
                         .build();
 

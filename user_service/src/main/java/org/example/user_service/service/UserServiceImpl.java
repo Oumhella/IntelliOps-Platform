@@ -1,7 +1,7 @@
 package org.example.user_service.service;
 
 import lombok.RequiredArgsConstructor;
-import org.example.user_service.config.JwtUtils;
+import org.example.user_service.config.UserJwtGenerator;
 import org.example.user_service.dto.request.ChangePasswordRequest;
 import org.example.user_service.dto.request.ProfileUpdateRequest;
 import org.example.user_service.dto.request.RegisterRequest;
@@ -29,7 +29,7 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
-    private final JwtUtils jwtUtils;
+    private final UserJwtGenerator userJwtGenerator;
 
     // ── Authentication ──────────────────────────────────────────────
 
@@ -63,7 +63,7 @@ public class UserServiceImpl implements UserService {
             throw new IllegalArgumentException("This account is deactivated");
         }
 
-        String realToken = jwtUtils.generateToken(user);
+        String realToken = userJwtGenerator.generateToken(user);
 
         return new AuthResponse(
                 realToken,
