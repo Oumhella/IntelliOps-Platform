@@ -54,7 +54,12 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
             log.info("Incoming request to path: {}", path);
             if (path.contains("/api/v1/users/register") ||
                     path.contains("/api/v1/users/login") ||
-                    path.contains("/api/v1/users/setup-admin")) {
+                    path.contains("/api/v1/users/setup-admin") ||
+                    path.contains("/v3/api-docs") ||
+                    path.contains("/swagger-ui.html") ||
+                    path.contains("/swagger-ui") ||
+                    path.contains("/webjars"))
+            {
                 log.info("Path {} bypassed security", path);
                 return chain.filter(cleanedExchange);
             }
