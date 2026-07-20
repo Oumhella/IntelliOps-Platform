@@ -82,7 +82,8 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
                         .parseClaimsJws(token)
                         .getBody();
 
-                String userId = claims.get("userId", String.class);
+                Object userIdObj = claims.get("userId");
+                String userId = (userIdObj != null) ? String.valueOf(userIdObj) : claims.getSubject();
                 String email = claims.getSubject();
                 String role = claims.get("role", String.class);
                 Object enterpriseIdObj = claims.get("enterpriseId");

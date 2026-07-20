@@ -192,6 +192,34 @@ services:
       - erp-network
 
 
+  stock-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.microservice
+      args:
+        SERVICE_NAME: stock_service
+        SERVICE_PORT: 8084
+    container_name: erp-stock-service
+    ports:
+      - "8084:8084"
+    env_file:
+      - .env
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://erp-db:5432/erp_stocks
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - CONFIG_SERVER_URL=http://config-server:8888
+    depends_on:
+      erp-db:
+        condition: service_started
+      discovery-server:
+        condition: service_started
+      config-server:
+        condition: service_healthy
+    networks:
+      - erp-network
+
+
 
 #  crm-frontend:
 #    build: ./crm-frontend

@@ -21,5 +21,6 @@
         <module>config-server</module>
         <module>abonnement_service</module>
         <module>common_lib</module>
+        <module>stock_service</module>
     </modules>
 </project>

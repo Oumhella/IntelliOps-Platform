@@ -1,0 +1,31 @@
+name: stock Service CI (DevSecOps)
+
+on:
+  push:
+    branches: [ "main", "develop", "feature/identity-auth", "feature/vault-gateway" ]
+    paths:
+      - 'stock_service/**'
+      - 'common_lib/**'
+      - 'Dockerfile.microservice'
+      - '.github/actions/build-and-scan-service/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'stock_service/**'
+      - 'common_lib/**'
+      - 'Dockerfile.microservice'
+      - '.github/actions/build-and-scan-service/**'
+
+jobs:
+  build-and-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Build, scan & package stock_service
+        uses: ./.github/actions/build-and-scan-service
+        with:
+          service_name: stock_service
+          service_port: 8082
+          image_name: erp-stock-service
