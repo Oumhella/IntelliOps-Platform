@@ -219,6 +219,36 @@ services:
     networks:
       - erp-network
 
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.microservice
+      args:
+        SERVICE_NAME: mcp-server
+        SERVICE_PORT: 8085
+    container_name: erp-mcp-server
+    # Internal only: clients reach its HTTP API through the secured gateway.
+    expose:
+      - "8085"
+    env_file:
+      - .env
+    environment:
+      - LEAD_SERVICE_URL=http://lead-service:8082
+      - STOCK_SERVICE_URL=http://stock-service:8084
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - CONFIG_SERVER_URL=http://config-server:8888
+    depends_on:
+      discovery-server:
+        condition: service_started
+      config-server:
+        condition: service_healthy
+      lead-service:
+        condition: service_started
+      stock-service:
+        condition: service_started
+    networks:
+      - erp-network
+
 
 
 #  crm-frontend:

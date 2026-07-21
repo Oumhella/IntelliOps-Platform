@@ -22,5 +22,6 @@
         <module>abonnement_service</module>
         <module>common_lib</module>
         <module>stock_service</module>
+        <module>mcp-server</module>
     </modules>
 </project>
