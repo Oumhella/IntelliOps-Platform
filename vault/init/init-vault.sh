@@ -55,6 +55,11 @@ vault kv put secret/abonnement-service \
 vault kv put secret/lead-service \
   spring.datasource.username="${DB_USER:-postgres}" \
   spring.datasource.password="${DB_PASSWORD:-changeme}"
+
+vault kv put secret/stock-service \
+  spring.datasource.username="${DB_USER:-postgres}" \
+  spring.datasource.password="${DB_PASSWORD:-changeme}"
+
 # Configuration de la politique et du rôle
 cat <<EOF > /tmp/config-server-policy.hcl
 path "secret/data/*" { capabilities = ["read"] }

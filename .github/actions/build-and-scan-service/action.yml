@@ -15,6 +15,14 @@ inputs:
     description: 'Version du JDK'
     required: false
     default: '17'
+  run_tests:
+    description: 'Run the service test suite instead of skipping tests during Maven packaging'
+    required: false
+    default: 'false'
+  fail_on_vulnerabilities:
+    description: 'Fail Trivy scans when matching vulnerabilities are found'
+    required: false
+    default: 'false'
 
 runs:
   using: 'composite'
@@ -45,12 +53,18 @@ runs:
         scan-ref: './${{ inputs.service_name }}'
         format: 'table'
         severity: 'CRITICAL,HIGH'
+        exit-code: '${{ inputs.fail_on_vulnerabilities }}'
+        ignore-unfixed: true
 
-    - name: Build avec Maven (${{ inputs.service_name }})
+    - name: Build and test with Maven (${{ inputs.service_name }})
       shell: bash
       run: |
         cd ${{ inputs.service_name }}
-        mvn clean package -DskipTests
+        if [ "${{ inputs.run_tests }}" = "true" ]; then
+          mvn clean verify
+        else
+          mvn clean package -DskipTests
+        fi
 
     - name: Build de l'image Docker (${{ inputs.image_name }})
       shell: bash
@@ -67,3 +81,5 @@ runs:
         image-ref: '${{ inputs.image_name }}:latest'
         format: 'table'
         severity: 'CRITICAL,HIGH'
+        exit-code: '${{ inputs.fail_on_vulnerabilities }}'
+        ignore-unfixed: true

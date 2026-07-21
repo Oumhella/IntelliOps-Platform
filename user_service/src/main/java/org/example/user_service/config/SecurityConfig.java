@@ -52,6 +52,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/users/staff").permitAll() // Si tu permets l'auto-inscription des admins
                         .requestMatchers("/api/v1/users/setup-admin").permitAll()
                         .requestMatchers("/api/v1/users/register").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .anyRequest().authenticated()
                 );
 

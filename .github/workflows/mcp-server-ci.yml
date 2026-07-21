@@ -1,0 +1,43 @@
+name: MCP Server CI (DevSecOps)
+
+on:
+  push:
+    branches: [main, develop, feature/identity-auth, feature/vault-gateway]
+    paths:
+      - 'mcp-server/**'
+      - 'common_lib/**'
+      - 'Dockerfile.microservice'
+      - 'docker-compose.yaml'
+      - '.github/workflows/mcp-server-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'mcp-server/**'
+      - 'common_lib/**'
+      - 'Dockerfile.microservice'
+      - 'docker-compose.yaml'
+      - '.github/workflows/mcp-server-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-and-scan:
+    name: Build, test and scan MCP server
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Reuse the shared pipeline, but opt into tests and blocking scans because
+      # the MCP confirmation boundary is a safety-critical service contract.
+      - name: Build, test and scan MCP server
+        uses: ./.github/actions/build-and-scan-service
+        with:
+          service_name: mcp-server
+          service_port: 8085
+          image_name: erp-mcp-server
+          run_tests: true
+          fail_on_vulnerabilities: true
