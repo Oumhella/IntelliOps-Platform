@@ -47,13 +47,13 @@ runs:
         mvn dependency:resolve
 
     - name: Scan des vulnérabilités du code (Trivy FS)
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@0.28.0
       with:
         scan-type: 'fs'
         scan-ref: './${{ inputs.service_name }}'
         format: 'table'
         severity: 'CRITICAL,HIGH'
-        exit-code: '${{ inputs.fail_on_vulnerabilities }}'
+        exit-code: ${{ inputs.fail_on_vulnerabilities == 'true' && '1' || '0' }}
         ignore-unfixed: true
 
     - name: Build and test with Maven (${{ inputs.service_name }})
@@ -76,10 +76,15 @@ runs:
           -t ${{ inputs.image_name }}:latest .
 
     - name: Scan de l'image Docker (Trivy Image)
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@0.28.0
       with:
         image-ref: '${{ inputs.image_name }}:latest'
         format: 'table'
         severity: 'CRITICAL,HIGH'
-        exit-code: '${{ inputs.fail_on_vulnerabilities }}'
+        exit-code: ${{ inputs.fail_on_vulnerabilities == 'true' && '1' || '0' }}
         ignore-unfixed: true
+
+    - name: Scan for hardcoded secrets (Gitleaks)
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITLEAKS_ENABLE_COMMENTS: false

@@ -23,5 +23,6 @@
         <module>common_lib</module>
         <module>stock_service</module>
         <module>mcp-server</module>
+        <module>paiement_service</module>
     </modules>
 </project>

@@ -249,7 +249,74 @@ services:
     networks:
       - erp-network
 
+  # ─────────────── MINIO SERVER ───────────────
+  minio:
+    image: minio/minio:RELEASE.2024-01-16T16-07-38Z # Ou tag récent
+    container_name: erp-minio
+    ports:
+      - "9000:9000"   # API S3
+      - "9001:9001"   # Console Web
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - erp-network
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
+  # ─────────────── AUTO-CREATION BUCKET ───────────────
+  createbuckets:
+    image: minio/mc
+    container_name: erp-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD;
+      /usr/bin/mc mb myminio/invoices-erp --ignore-existing;
+      /usr/bin/mc anonymous set download myminio/invoices-erp;
+      exit 0;
+      "
+    networks:
+      - erp-network
+  paiement-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.microservice
+      args:
+        SERVICE_NAME: paiement_service
+        SERVICE_PORT: 8086
+    container_name: erp-paiement-service
+    ports:
+      - "8086:8086"
+    env_file:
+      - .env
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://erp-db:5432/erp_paiement
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - CONFIG_SERVER_URL=http://config-server:8888
+    depends_on:
+      erp-db:
+        condition: service_started
+      discovery-server:
+        condition: service_started
+      config-server:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - erp-network
 
 #  crm-frontend:
 #    build: ./crm-frontend
@@ -264,3 +331,4 @@ networks:
 
 volumes:
   erp-db-data:
+  minio_data:

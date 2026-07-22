@@ -4,14 +4,14 @@ on:
   push:
     branches: [ "main", "develop", "feature/identity-auth", "feature/vault-gateway" ]
     paths:
-      - 'stock_service/**'
+      - 'paiement_service/**'
       - 'common_lib/**'
       - 'Dockerfile.microservice'
       - '.github/actions/build-and-scan-service/**'
   pull_request:
     branches: [ main ]
     paths:
-      - 'stock_service/**'
+      - 'paiement_service/**'
       - 'common_lib/**'
       - 'Dockerfile.microservice'
       - '.github/actions/build-and-scan-service/**'
@@ -23,9 +23,9 @@ jobs:
       - name: Checkout du code
         uses: actions/checkout@v4
 
-      - name: Build, scan & package stock_service
+      - name: Build, scan & package paiement_service
         uses: ./.github/actions/build-and-scan-service
         with:
-          service_name: stock_service
-          service_port: 8084
-          image_name: erp-stock-service
+          service_name: paiement_service
+          service_port: 8086
+          image_name: erp-paiement-service
