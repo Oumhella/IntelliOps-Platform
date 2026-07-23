@@ -155,6 +155,11 @@ vault kv put secret/stock-service \
   spring.datasource.username="${DB_USER:-postgres}" \
   spring.datasource.password="${DB_PASSWORD:-changeme}"
 
+vault kv put secret/mcp-server \
+  spring.ai.openai.api-key="${NVIDIA_API_KEY}" \
+  spring.ai.openai.chat.options.model="${NVIDIA_MODEL}"\
+  agent.llm.provider="${AGENT_LLM_PROVIDER:-none}" \
+
 vault kv put secret/paiement-service \
     spring.datasource.username="${DB_USER:-postgres}" \
     spring.datasource.password="${DB_PASSWORD:-changeme}" \
@@ -164,6 +169,9 @@ vault kv put secret/paiement-service \
     minio.secret-key="${MINIO_ROOT_PASSWORD}" \
     minio.bucket-name="invoices-erp"
 
+vault kv put secret/delivery-service \
+  spring.datasource.username="${DB_USER:-postgres}" \
+  spring.datasource.password="${DB_PASSWORD:-changeme}"
 # ============================================================
 # Policy + AppRole
 # ============================================================

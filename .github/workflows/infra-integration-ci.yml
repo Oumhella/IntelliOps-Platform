@@ -32,7 +32,6 @@ jobs:
           # boundary - anyone relying on this pipeline for anything beyond disposable CI
           # containers should configure the real GitHub secrets below instead.
           echo "DB_PASSWORD=${{ secrets.DB_PASSWORD || 'root' }}" >> .env
-          echo "USER_BASE_URL=http://user-service:8081" >> .env
           echo "STRIPE_API_KEY=${{ secrets.STRIPE_API_KEY || 'sk_test_ci_placeholder_key' }}" >> .env
           echo "MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER || 'ci_minio_user' }}" >> .env
           echo "MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD || 'ci_minio_password' }}" >> .env
@@ -59,7 +58,13 @@ jobs:
       - name: Spin up Infrastructure
         timeout-minutes: 6
         run: |
-          docker compose up -d --wait --wait-timeout 180
+          docker compose up -d
+          # Not using --wait here: Compose's --wait only recognizes "running" or
+          # "healthy" as success, but this stack intentionally has one-shot init
+          # containers (vault-init, minio-init) that are supposed to run once and
+          # exit 0. --wait treats that clean exit as "not ready" and fails the
+          # whole command. Real readiness is verified explicitly in the next
+          # steps instead (Vault unsealed, config-server/Eureka responding).
 
       # 5. Always dump logs and container state after startup, whether it
       #    succeeded or not - critical for diagnosing what actually happened
@@ -72,6 +77,16 @@ jobs:
           docker logs erp-vault || true
           echo "--- vault-init logs ---"
           docker logs erp-vault-init || true
+
+      - name: Verify one-shot init containers succeeded
+        run: |
+          VAULT_INIT_EXIT=$(docker inspect erp-vault-init --format='{{.State.ExitCode}}')
+          if [ "$VAULT_INIT_EXIT" != "0" ]; then
+            echo "::error::vault-init exited with code $VAULT_INIT_EXIT (expected 0)"
+            docker logs erp-vault-init
+            exit 1
+          fi
+          echo "vault-init completed successfully (exit 0)."
 
       # 6. Verify Vault actually initialized and unsealed - fail explicitly
       #    if not, rather than limping on to a healthcheck that will just
