@@ -1,17 +1,17 @@
-name: Abonnement Service CI (DevSecOps)
+name: delivery Service CI (DevSecOps)
 
 on:
   push:
     branches: [ "main", "develop", "feature/identity-auth", "feature/vault-gateway" ]
     paths:
-      - 'abonnement_service/**'
+      - 'delivery_service/**'
       - 'common_lib/**'
       - 'Dockerfile.microservice'
       - '.github/actions/build-and-scan-service/**'
   pull_request:
     branches: [ main ]
     paths:
-      - 'abonnement_service/**'
+      - 'delivery_service/**'
       - 'common_lib/**'
       - 'Dockerfile.microservice'
       - '.github/actions/build-and-scan-service/**'
@@ -23,9 +23,9 @@ jobs:
       - name: Checkout du code
         uses: actions/checkout@v4
 
-      - name: Build, scan & package abonnement_service
+      - name: Build, scan & package delivery_service
         uses: ./.github/actions/build-and-scan-service
         with:
-          service_name: abonnement_service
-          service_port: 8083
-          image_name: erp-abonnement-service
+          service_name: delivery_service
+          service_port: 8087
+          image_name: erp-delivery-service

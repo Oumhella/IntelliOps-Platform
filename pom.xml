@@ -24,5 +24,6 @@
         <module>stock_service</module>
         <module>mcp-server</module>
         <module>paiement_service</module>
+        <module>delivery_service</module>
     </modules>
 </project>
