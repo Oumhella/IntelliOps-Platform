@@ -22,9 +22,9 @@ jobs:
       # 1. Configurer l'environnement avec les secrets GitHub
       - name: Setup Secrets
         run: |
-          echo "VAULT_LOCAL_UNKEY=temporary_ci_unkey_2026" >> .env
-          echo "VAULT_LOCAL_ROOT_TOKEN=temporary_ci_root_token_2026" >> .env
-          echo "JWT_SECRET=${{ secrets.JWT_SECRET || 'ci_default_secret_key_extremely_long_2026' }}" >> .env
+          echo "VAULT_LOCAL_UNKEY=unused-ci-placeholder" >> .env
+          echo "VAULT_LOCAL_ROOT_TOKEN=unused-ci-placeholder" >> .env
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
           echo "JWT_EXPIRATION=86400" >> .env
           echo "DB_USER=root" >> .env
           # NOTE: these || fallbacks exist only so this workflow still runs for anyone who
@@ -32,9 +32,10 @@ jobs:
           # boundary - anyone relying on this pipeline for anything beyond disposable CI
           # containers should configure the real GitHub secrets below instead.
           echo "DB_PASSWORD=${{ secrets.DB_PASSWORD || 'root' }}" >> .env
-          echo "STRIPE_API_KEY=${{ secrets.STRIPE_API_KEY || 'sk_test_ci_placeholder_key' }}" >> .env
-          echo "MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER || 'ci_minio_user' }}" >> .env
-          echo "MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD || 'ci_minio_password' }}" >> .env
+          echo "USER_BASE_URL=http://user-service:8081" >> .env
+          echo "STRIPE_API_KEY=${{ secrets.STRIPE_API_KEY }}" >> .env
+          echo "MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER }}" >> .env
+          echo "MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }}" >> .env
 
       # 2. Set up Buildx so we can use GitHub Actions cache for Docker layers.
       #    This is what actually cuts your 36-minute Maven download time down
@@ -95,7 +96,7 @@ jobs:
         timeout-minutes: 2
         run: |
           docker exec erp-vault vault status
-          SEALED=$(docker exec erp-vault vault status -format=json | grep -o '"sealed":[a-z]*' | cut -d: -f2)
+          SEALED=$(docker exec erp-vault vault status -format=json | jq -r '.sealed')
           if [ "$SEALED" != "false" ]; then
             echo "::error::Vault is still sealed - init/unseal failed"
             exit 1
