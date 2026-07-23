@@ -47,7 +47,7 @@ runs:
         mvn dependency:resolve
 
     - name: Scan des vulnérabilités du code (Trivy FS)
-      uses: aquasecurity/trivy-action@0.28.0
+      uses: aquasecurity/trivy-action@v0.35.0
       with:
         scan-type: 'fs'
         scan-ref: './${{ inputs.service_name }}'
@@ -76,7 +76,7 @@ runs:
           -t ${{ inputs.image_name }}:latest .
 
     - name: Scan de l'image Docker (Trivy Image)
-      uses: aquasecurity/trivy-action@0.28.0
+      uses: aquasecurity/trivy-action@v0.35.0
       with:
         image-ref: '${{ inputs.image_name }}:latest'
         format: 'table'
