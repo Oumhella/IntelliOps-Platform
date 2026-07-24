@@ -172,6 +172,16 @@ vault kv put secret/paiement-service \
 vault kv put secret/delivery-service \
   spring.datasource.username="${DB_USER:-postgres}" \
   spring.datasource.password="${DB_PASSWORD:-changeme}"
+
+vault kv put secret/notification-service \
+    spring.datasource.username="${DB_USER:-postgres}" \
+    spring.datasource.password="${DB_PASSWORD:-changeme}" \
+    spring.mail.host="${MAIL_HOST}" \
+    spring.mail.port="${MAIL_PORT}" \
+    spring.mail.username="${MAIL_USERNAME}" \
+    spring.mail.password="${MAIL_PASSWORD}" \
+    spring.mail.properties.mail.smtp.auth="true" \
+    spring.mail.properties.mail.smtp.starttls.enable="true"
 # ============================================================
 # Policy + AppRole
 # ============================================================

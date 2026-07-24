@@ -7,6 +7,7 @@ import org.example.delivery_service.dto.response.LivraisonResponse;
 import org.example.delivery_service.entity.Livraison;
 import org.example.delivery_service.entity.StatutLivraison;
 import org.example.delivery_service.entity.TypeTransporteur;
+import org.example.delivery_service.event.LivraisonEventProducer;
 import org.example.delivery_service.mapper.LivraisonMapper;
 import org.example.delivery_service.repository.LivraisonRepository;
 import org.example.delivery_service.service.LivraisonService;
@@ -26,6 +27,7 @@ public class LivraisonServiceImpl implements LivraisonService {
     private final LivraisonRepository livraisonRepository;
     private final TransporteurStrategyFactory strategyFactory;
     private final LivraisonMapper livraisonMapper;
+    private final LivraisonEventProducer eventProducer;
 
     @Override
     @Transactional
@@ -51,6 +53,17 @@ public class LivraisonServiceImpl implements LivraisonService {
         strategy.executerLivraison(livraison);
 
         Livraison saved = livraisonRepository.save(livraison);
+        String emailSubject = "Expédition de votre commande #" + saved.getReferenceCommandeId();
+        String emailBody = String.format(
+                "Bonjour, votre commande #%d a été expédiée via %s ! Code de suivi: %s",
+                saved.getReferenceCommandeId(),
+                saved.getTypeTransporteur(),
+                saved.getCodeSuiviTracking()
+        );
+
+        // Send to client's email (Replace with actual customer email or test email)
+        eventProducer.sendNotificationEvent("abdellatifoum03@gmail.com", emailSubject, emailBody);
+
         return livraisonMapper.toResponse(saved);
     }
 
@@ -89,6 +102,13 @@ public class LivraisonServiceImpl implements LivraisonService {
 
         livraison.mettreAJourStatut(StatutLivraison.LIVREE);
         Livraison saved = livraisonRepository.save(livraison);
+
+        eventProducer.sendNotificationEvent(
+                "abdellatifoum03@gmail.com",
+                "Commande Livrée !",
+                "Votre commande #" + saved.getReferenceCommandeId() + " a bien été livrée. Merci !"
+        );
+
         return livraisonMapper.toResponse(saved);
     }
 }
