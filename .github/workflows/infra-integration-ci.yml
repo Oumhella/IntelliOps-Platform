@@ -22,13 +22,20 @@ jobs:
       # 1. Configurer l'environnement avec les secrets GitHub
       - name: Setup Secrets
         run: |
-          echo "VAULT_LOCAL_UNKEY=temporary_ci_unkey_2026" >> .env
-          echo "VAULT_LOCAL_ROOT_TOKEN=temporary_ci_root_token_2026" >> .env
-          echo "JWT_SECRET=${{ secrets.JWT_SECRET || 'ci_default_secret_key_extremely_long_2026' }}" >> .env
+          echo "VAULT_LOCAL_UNKEY=unused-ci-placeholder" >> .env
+          echo "VAULT_LOCAL_ROOT_TOKEN=unused-ci-placeholder" >> .env
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
           echo "JWT_EXPIRATION=86400" >> .env
           echo "DB_USER=root" >> .env
+          # NOTE: these || fallbacks exist only so this workflow still runs for anyone who
+          # forks the repo without configuring their own secrets. They are NOT a real security
+          # boundary - anyone relying on this pipeline for anything beyond disposable CI
+          # containers should configure the real GitHub secrets below instead.
           echo "DB_PASSWORD=${{ secrets.DB_PASSWORD || 'root' }}" >> .env
           echo "USER_BASE_URL=http://user-service:8081" >> .env
+          echo "STRIPE_API_KEY=${{ secrets.STRIPE_API_KEY }}" >> .env
+          echo "MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER }}" >> .env
+          echo "MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }}" >> .env
 
       # 2. Set up Buildx so we can use GitHub Actions cache for Docker layers.
       #    This is what actually cuts your 36-minute Maven download time down
@@ -52,7 +59,13 @@ jobs:
       - name: Spin up Infrastructure
         timeout-minutes: 6
         run: |
-          docker compose up -d --wait --wait-timeout 180
+          docker compose up -d
+          # Not using --wait here: Compose's --wait only recognizes "running" or
+          # "healthy" as success, but this stack intentionally has one-shot init
+          # containers (vault-init, minio-init) that are supposed to run once and
+          # exit 0. --wait treats that clean exit as "not ready" and fails the
+          # whole command. Real readiness is verified explicitly in the next
+          # steps instead (Vault unsealed, config-server/Eureka responding).
 
       # 5. Always dump logs and container state after startup, whether it
       #    succeeded or not - critical for diagnosing what actually happened
@@ -65,6 +78,16 @@ jobs:
           docker logs erp-vault || true
           echo "--- vault-init logs ---"
           docker logs erp-vault-init || true
+
+      - name: Verify one-shot init containers succeeded
+        run: |
+          VAULT_INIT_EXIT=$(docker inspect erp-vault-init --format='{{.State.ExitCode}}')
+          if [ "$VAULT_INIT_EXIT" != "0" ]; then
+            echo "::error::vault-init exited with code $VAULT_INIT_EXIT (expected 0)"
+            docker logs erp-vault-init
+            exit 1
+          fi
+          echo "vault-init completed successfully (exit 0)."
 
       # 6. Verify Vault actually initialized and unsealed - fail explicitly
       #    if not, rather than limping on to a healthcheck that will just

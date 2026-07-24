@@ -1,0 +1,31 @@
+name: delivery Service CI (DevSecOps)
+
+on:
+  push:
+    branches: [ "main", "develop", "feature/identity-auth", "feature/vault-gateway" ]
+    paths:
+      - 'delivery_service/**'
+      - 'common_lib/**'
+      - 'Dockerfile.microservice'
+      - '.github/actions/build-and-scan-service/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'delivery_service/**'
+      - 'common_lib/**'
+      - 'Dockerfile.microservice'
+      - '.github/actions/build-and-scan-service/**'
+
+jobs:
+  build-and-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Build, scan & package delivery_service
+        uses: ./.github/actions/build-and-scan-service
+        with:
+          service_name: delivery_service
+          service_port: 8087
+          image_name: erp-delivery-service

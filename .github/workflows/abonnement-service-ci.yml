@@ -27,5 +27,5 @@ jobs:
         uses: ./.github/actions/build-and-scan-service
         with:
           service_name: abonnement_service
-          service_port: 8082
+          service_port: 8083
           image_name: erp-abonnement-service
