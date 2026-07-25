@@ -1,6 +1,6 @@
 package org.example.notification_service.controller;
 
-import org.example.notification_service.dto.event.NotificationEvent;
+import org.example.common.event.NotificationEvent;
 import org.example.notification_service.entity.Notification;
 import org.example.notification_service.service.NotificationService;
 import jakarta.validation.Valid;

@@ -45,6 +45,7 @@ public class LivraisonServiceImpl implements LivraisonService {
                 .endpointApiUrl(request.getEndpointApiUrl())
                 .externalLivreurId(request.getExternalLivreurId())
                 .montantACollecterCoD(request.getMontantACollecterCoD())
+                .clientEmail(request.getClientEmail())
                 .shippingDate(LocalDateTime.now())
                 .build();
 
@@ -61,8 +62,9 @@ public class LivraisonServiceImpl implements LivraisonService {
                 saved.getCodeSuiviTracking()
         );
 
-        // Send to client's email (Replace with actual customer email or test email)
-        eventProducer.sendNotificationEvent("abdellatifoum03@gmail.com", emailSubject, emailBody);
+        if (saved.getClientEmail() != null && !saved.getClientEmail().isBlank()) {
+            eventProducer.sendNotificationEvent(saved.getClientEmail(), emailSubject, emailBody);
+        }
 
         return livraisonMapper.toResponse(saved);
     }
@@ -103,11 +105,13 @@ public class LivraisonServiceImpl implements LivraisonService {
         livraison.mettreAJourStatut(StatutLivraison.LIVREE);
         Livraison saved = livraisonRepository.save(livraison);
 
-        eventProducer.sendNotificationEvent(
-                "abdellatifoum03@gmail.com",
-                "Commande Livrée !",
-                "Votre commande #" + saved.getReferenceCommandeId() + " a bien été livrée. Merci !"
-        );
+        if (saved.getClientEmail() != null && !saved.getClientEmail().isBlank()) {
+            eventProducer.sendNotificationEvent(
+                    saved.getClientEmail(),
+                    "Commande Livrée !",
+                    "Votre commande #" + saved.getReferenceCommandeId() + " a bien été livrée. Merci !"
+            );
+        }
 
         return livraisonMapper.toResponse(saved);
     }
