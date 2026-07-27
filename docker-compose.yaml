@@ -245,8 +245,12 @@ services:
     env_file:
       - .env
     environment:
-      - LEAD_SERVICE_URL=http://lead-service:8082
-      - STOCK_SERVICE_URL=http://stock-service:8084
+      # Tool invocations return through the gateway so its JWT filter injects
+      # the user and enterprise identity before any downstream service call.
+      - GATEWAY_URL=http://gateway-service:8080
+      # Use the gateway address advertised to the MCP client when deployed
+      # behind an ingress; leave it empty locally to use the incoming host.
+      - MCP_PUBLIC_BASE_URL=${MCP_PUBLIC_BASE_URL:-}
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - CONFIG_SERVER_URL=http://config-server:8888
     depends_on:

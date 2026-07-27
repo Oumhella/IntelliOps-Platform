@@ -20,7 +20,8 @@
         <java.version>17</java.version>
         <spring-ai.version>1.0.0</spring-ai.version>
         <spring-cloud.version>2023.0.3</spring-cloud.version>
-        <tomcat.version>10.1.35</tomcat.version>
+        <!-- 10.1.36 fixes JreCompat startup failures on modern Java 17 builds. -->
+        <tomcat.version>10.1.36</tomcat.version>
     </properties>
 
     <dependencies>
@@ -49,10 +50,12 @@
             <artifactId>spring-ai-starter-mcp-server</artifactId>
         </dependency>
 
+
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-model-openai</artifactId>
         </dependency>
+
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
@@ -98,13 +101,6 @@
                 <groupId>com.thoughtworks.xstream</groupId>
                 <artifactId>xstream</artifactId>
                 <version>1.4.21</version>
-            </dependency>
-            <dependency>
-                <groupId>org.springframework.ai</groupId>
-                <artifactId>spring-ai-bom</artifactId>
-                <version>${spring-ai.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>

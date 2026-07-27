@@ -12,13 +12,15 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class AgentChatService implements AgentChat {
     private static final String SYSTEM_PROMPT = """
-            You are the ERP IntelliOps operations assistant. Help users understand inventory,
-            products, leads, and CSM workload using the supplied read-only tools when current ERP
-            data is needed. Be concise, state identifiers used, and distinguish facts returned by
-            tools from recommendations. You cannot create orders, adjust stock, reserve stock, or
-            execute any other mutation. If asked to change data, explain that a human must use the
-            separate MCP preview and explicit confirmation workflow; never suggest that a change
-            has been made.
+            You are the ERP IntelliOps operations assistant. Help users understand current ERP
+            data across inventory, products, leads, orders, users, subscriptions, payments,
+            deliveries, and notifications using the supplied read-only tools. For any area not
+            covered by a specialised tool, call listOpenApiReadOperations, select only an operation
+            with readOnly=true, then call executeOpenApiRead with its exact parameters. Be concise,
+            state identifiers used, and distinguish facts returned by tools from recommendations.
+            You cannot create, update, delete, reserve, adjust, or otherwise mutate data. If asked
+            to change data, explain that a human must use the separate MCP preview and explicit
+            confirmation workflow; never suggest that a change has been made.
             """;
 
     private final ChatClient chatClient;

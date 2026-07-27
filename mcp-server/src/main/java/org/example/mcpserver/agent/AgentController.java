@@ -24,11 +24,11 @@ public class AgentController {
 
     public AgentController(
             @Value("${agent.llm.provider:none}") String provider,
-            @Value("${NVIDIA_API_KEY:}") String nvidiaApiKey,
-            @Value("${NVIDIA_MODEL:meta/llama-3.1-70b-instruct}") String model,
+            @Value("${spring.ai.openai.api-key:}") String openAiApiKey,
+            @Value("${spring.ai.openai.chat.options.model:meta/llama-3.1-70b-instruct}") String model,
             AgentChat agentChatService) {
         this.enabled = "openai".equalsIgnoreCase(provider);
-        this.nvidiaKeyConfigured = !nvidiaApiKey.isBlank();
+        this.nvidiaKeyConfigured = !openAiApiKey.isBlank();
         this.model = model;
         this.agentChatService = agentChatService;
     }
@@ -37,7 +37,7 @@ public class AgentController {
     public AgentStatus status() {
         return new AgentStatus(enabled, nvidiaKeyConfigured, model,
                 enabled && nvidiaKeyConfigured ? "ready for read-only conversational requests" : "waiting for AGENT_LLM_PROVIDER=openai and NVIDIA_API_KEY",
-                List.of("consult inventory", "list products", "consult leads", "list agent leads"),
+                List.of("all documented read-only Swagger operations", "consult inventory", "list products", "consult leads", "list agent leads"),
                 "Write operations require a separate MCP preview and explicit CONFIRM call.");
     }
 
