@@ -16,7 +16,8 @@ jobs:
   devsecops-frontend:
     name: DevSecOps - Angular Frontend
     runs-on: ubuntu-latest
-
+    with:
+      fetch-depth: 0
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
