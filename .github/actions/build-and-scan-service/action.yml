@@ -102,8 +102,18 @@ runs:
     - name: Build de l'image Docker (${{ inputs.image_name }})
       shell: bash
       run: |
-        cd ${{ inputs.service_name }}
-        docker build -t ${{ inputs.image_name }}:latest .
+        # If project is Node/Angular, build using local Dockerfile
+        if [ "${{ inputs.project_type }}" = "node" ]; then
+          cd ${{ inputs.service_name }}
+          docker build -t ${{ inputs.image_name }}:latest .
+        else
+          # For Java microservices, build from repo root using Dockerfile.microservice
+          docker build \
+            -f Dockerfile.microservice \
+            --build-arg SERVICE_NAME=${{ inputs.service_name }} \
+            --build-arg SERVICE_PORT=${{ inputs.service_port }} \
+            -t ${{ inputs.image_name }}:latest .
+        fi
 
     - name: Scan de l'image Docker (Trivy Image)
       uses: aquasecurity/trivy-action@v0.35.0
