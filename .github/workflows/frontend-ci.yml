@@ -1,0 +1,32 @@
+name: Frontend CI Pipeline
+
+on:
+  push:
+    branches: [ "main", "develop", "feature/identity-auth", "feature/vault-gateway", "feature/frontend" ]
+    paths:
+      - 'frontend_service/**'
+      - '.github/workflows/frontend-ci.yml'
+      - '.github/actions/build-and-scan-service/**' # Path to your reusable composite action
+  pull_request:
+    branches: [ "main", "develop" ]
+    paths:
+      - 'frontend_service/**'
+
+jobs:
+  devsecops-frontend:
+    name: DevSecOps - Angular Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Reusing your existing Composite Action with project_type: 'node'
+      - name: Build & Scan Frontend Service
+        uses: ./.github/actions/build-and-scan-service # Path to your parameterized action file
+        with:
+          project_type: 'node'
+          service_name: 'frontend_service'
+          image_name: 'erp-frontend-service'
+          run_tests: 'false'
+          fail_on_vulnerabilities: 'false'

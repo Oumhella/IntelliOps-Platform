@@ -419,12 +419,19 @@ services:
         condition: service_started
     networks:
       - erp-network
-#  crm-frontend:
-#    build: ./crm-frontend
-#    ports:
-#      - "4200:80"
-#    networks:
-#      - erp-network
+
+  frontend:
+    build:
+      context: ./frontend_service
+      dockerfile: Dockerfile
+    container_name: erp-frontend-service
+    ports:
+      - "4200:80"
+    depends_on:
+      - gateway-service
+    networks:
+      - erp-network
+    restart: always
 
 networks:
   erp-network:

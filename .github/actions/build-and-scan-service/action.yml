@@ -2,6 +2,10 @@ name: 'Build & Scan Microservice (DevSecOps)'
 description: 'Builds common_lib, builds the target microservice, scans code and Docker image with Trivy'
 
 inputs:
+  project_type:
+    description: 'Type de projet : java ou node'
+    required: false
+    default: 'java'
   service_name:
     description: 'Nom du dossier/module du microservice (ex: user_service)'
     required: true
@@ -65,6 +69,20 @@ runs:
         else
           mvn clean package -DskipTests
         fi
+        
+      # --- NODE / ANGULAR STEPS (Only run if project_type == 'node') ---
+      - name: Configuration de Node.js
+        if: inputs.project_type == 'node'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 19
+
+      - name: Install & Build Node Service
+        if: inputs.project_type == 'node'
+        shell: bash
+        run: |
+          cd ${{ inputs.service_name }}
+          npm ci
 
     - name: Build de l'image Docker (${{ inputs.image_name }})
       shell: bash
