@@ -1,33 +1,42 @@
 name: 'Build & Scan Microservice (DevSecOps)'
-description: 'Builds common_lib, builds the target microservice, scans code and Docker image with Trivy'
+description: 'Builds target microservice (Java or Node), scans code and Docker image with Trivy'
 
 inputs:
+  project_type:
+    description: 'Type de projet : java ou node'
+    required: false
+    default: 'java'
   service_name:
-    description: 'Nom du dossier/module du microservice (ex: user_service)'
+    description: 'Nom du dossier/module du microservice'
     required: true
   service_port:
-    description: 'Port exposé par le microservice (ex: 8081)'
-    required: true
+    description: 'Port exposé par le microservice'
+    required: false
+    default: '8080'
   image_name:
-    description: 'Nom de l''image Docker à produire (ex: erp-user-service)'
+    description: 'Nom de l''image Docker à produire'
     required: true
   java_version:
     description: 'Version du JDK'
     required: false
     default: '17'
   run_tests:
-    description: 'Run the service test suite instead of skipping tests during Maven packaging'
+    description: 'Run unit tests'
     required: false
     default: 'false'
   fail_on_vulnerabilities:
-    description: 'Fail Trivy scans when matching vulnerabilities are found'
+    description: 'Fail Trivy scans when vulnerabilities are found'
     required: false
     default: 'false'
 
 runs:
   using: 'composite'
   steps:
+    # -------------------------------------------------------------
+    # JAVA / MAVEN STEPS
+    # -------------------------------------------------------------
     - name: Configuration de Java ${{ inputs.java_version }}
+      if: inputs.project_type == 'java'
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
@@ -35,17 +44,51 @@ runs:
         cache: 'maven'
 
     - name: Build & install common_lib
+      if: inputs.project_type == 'java'
       shell: bash
       run: |
-        cd common_lib
-        mvn clean install -DskipTests
+        if [ -d "common_lib" ]; then
+          cd common_lib
+          mvn clean install -DskipTests
+        fi
 
     - name: Resolve Maven Dependencies (${{ inputs.service_name }})
+      if: inputs.project_type == 'java'
       shell: bash
       run: |
         cd ${{ inputs.service_name }}
         mvn dependency:resolve
 
+    - name: Build and test with Maven (${{ inputs.service_name }})
+      if: inputs.project_type == 'java'
+      shell: bash
+      run: |
+        cd ${{ inputs.service_name }}
+        if [ "${{ inputs.run_tests }}" = "true" ]; then
+          mvn clean verify
+        else
+          mvn clean package -DskipTests
+        fi
+
+    # -------------------------------------------------------------
+    # NODE / ANGULAR STEPS
+    # -------------------------------------------------------------
+    - name: Configuration de Node.js
+      if: inputs.project_type == 'node'
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install NPM Dependencies (${{ inputs.service_name }})
+      if: inputs.project_type == 'node'
+      shell: bash
+      run: |
+        cd ${{ inputs.service_name }}
+        npm ci
+
+    # -------------------------------------------------------------
+    # SHARED DEVSECOPS STEPS
+    # -------------------------------------------------------------
     - name: Scan des vulnérabilités du code (Trivy FS)
       uses: aquasecurity/trivy-action@v0.35.0
       with:
@@ -56,24 +99,11 @@ runs:
         exit-code: ${{ inputs.fail_on_vulnerabilities == 'true' && '1' || '0' }}
         ignore-unfixed: true
 
-    - name: Build and test with Maven (${{ inputs.service_name }})
-      shell: bash
-      run: |
-        cd ${{ inputs.service_name }}
-        if [ "${{ inputs.run_tests }}" = "true" ]; then
-          mvn clean verify
-        else
-          mvn clean package -DskipTests
-        fi
-
     - name: Build de l'image Docker (${{ inputs.image_name }})
       shell: bash
       run: |
-        docker build \
-          -f Dockerfile.microservice \
-          --build-arg SERVICE_NAME=${{ inputs.service_name }} \
-          --build-arg SERVICE_PORT=${{ inputs.service_port }} \
-          -t ${{ inputs.image_name }}:latest .
+        cd ${{ inputs.service_name }}
+        docker build -t ${{ inputs.image_name }}:latest .
 
     - name: Scan de l'image Docker (Trivy Image)
       uses: aquasecurity/trivy-action@v0.35.0

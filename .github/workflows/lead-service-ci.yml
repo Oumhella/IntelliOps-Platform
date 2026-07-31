@@ -22,7 +22,8 @@ jobs:
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
-
+        with:
+          fetch-depth: 0
       - name: Build, scan & package lead_service
         uses: ./.github/actions/build-and-scan-service
         with:
