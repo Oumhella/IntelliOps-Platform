@@ -128,6 +128,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://erp-db:5432/erp_users
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - CONFIG_SERVER_URL=http://config-server:8888
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=erp-kafka:29092
     depends_on:
       erp-db:
         condition: service_started
@@ -135,6 +136,8 @@ services:
         condition: service_started
       config-server:
         condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
       - erp-network
 
@@ -154,6 +157,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://erp-db:5432/erp_leads
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - CONFIG_SERVER_URL=http://config-server:8888
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=erp-kafka:29092
     depends_on:
       erp-db:
         condition: service_started
@@ -161,6 +165,8 @@ services:
         condition: service_started
       config-server:
         condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
       - erp-network
 
@@ -181,6 +187,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://erp-db:5432/erp_abonnements
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - CONFIG_SERVER_URL=http://config-server:8888
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=erp-kafka:29092
     depends_on:
       erp-db:
         condition: service_started
@@ -188,6 +195,8 @@ services:
         condition: service_started
       config-server:
         condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
       - erp-network
 
@@ -209,6 +218,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://erp-db:5432/erp_stocks
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - CONFIG_SERVER_URL=http://config-server:8888
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=erp-kafka:29092
     depends_on:
       erp-db:
         condition: service_started
@@ -216,6 +226,8 @@ services:
         condition: service_started
       config-server:
         condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
       - erp-network
 
@@ -233,8 +245,12 @@ services:
     env_file:
       - .env
     environment:
-      - LEAD_SERVICE_URL=http://lead-service:8082
-      - STOCK_SERVICE_URL=http://stock-service:8084
+      # Tool invocations return through the gateway so its JWT filter injects
+      # the user and enterprise identity before any downstream service call.
+      - GATEWAY_URL=http://gateway-service:8080
+      # Use the gateway address advertised to the MCP client when deployed
+      # behind an ingress; leave it empty locally to use the incoming host.
+      - MCP_PUBLIC_BASE_URL=${MCP_PUBLIC_BASE_URL:-}
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - CONFIG_SERVER_URL=http://config-server:8888
     depends_on:
@@ -306,6 +322,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://erp-db:5432/erp_paiement
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - CONFIG_SERVER_URL=http://config-server:8888
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=erp-kafka:29092
     depends_on:
       erp-db:
         condition: service_started
@@ -315,6 +332,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
       - erp-network
 
@@ -385,7 +404,7 @@ services:
       - "8089:8089"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://erp-db:5432/erp_deliveries
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://erp-db:5432/erp_notifications
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - CONFIG_SERVER_URL=http://config-server:8888
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=erp-kafka:29092

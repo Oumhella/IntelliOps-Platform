@@ -2,7 +2,7 @@ package org.example.notification_service.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.example.notification_service.dto.event.NotificationEvent;
+import org.example.common.event.NotificationEvent;
 import org.example.notification_service.entity.Notification;
 import org.example.notification_service.entity.StatutNotification;
 import org.example.notification_service.repository.NotificationRepository;
@@ -24,8 +24,11 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     @Transactional
     public Notification processAndSend(NotificationEvent event) {
+        org.example.notification_service.entity.TypeNotification entityType =
+                org.example.notification_service.entity.TypeNotification.valueOf(event.getType().name());
+
         Notification notification = Notification.builder()
-                .type(event.getType())
+                .type(entityType)
                 .recipientContact(event.getRecipientContact())
                 .subject(event.getSubject())
                 .contenu(event.getContenu())
@@ -35,7 +38,7 @@ public class NotificationServiceImpl implements NotificationService {
         notification = notificationRepository.save(notification);
 
         try {
-            NotificationChannelStrategy strategy = channelFactory.getStrategy(event.getType());
+            NotificationChannelStrategy strategy = channelFactory.getStrategy(entityType);
             boolean success = strategy.send(notification);
 
             if (success) {

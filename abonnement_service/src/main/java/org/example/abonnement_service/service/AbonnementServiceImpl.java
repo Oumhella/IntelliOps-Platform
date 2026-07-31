@@ -19,6 +19,8 @@ import java.util.List;
 
 import static org.example.abonnement_service.entity.DureeOffre.ANNUEL;
 
+import org.example.abonnement_service.event.AbonnementEventProducer;
+
 @Service
 @RequiredArgsConstructor
 public class AbonnementServiceImpl implements AbonnementService {
@@ -29,6 +31,7 @@ public class AbonnementServiceImpl implements AbonnementService {
     private final DesactivationRepository desactivationRepository;
     private final AbonnementMapper abonnementMapper;
     private final org.example.abonnement_service.client.UserClient userClient;
+    private final AbonnementEventProducer eventProducer;
 
     @Override
     @Transactional
@@ -69,6 +72,13 @@ public class AbonnementServiceImpl implements AbonnementService {
                 .build();
 
         Abonnement savedAbonnement = abonnementRepository.save(abonnement);
+
+        // Notify user about subscription activation
+        eventProducer.sendSubscriptionNotification(
+                "user" + request.getUserId() + "@intelliops.local",
+                "Bienvenue ! Votre abonnement " + plan.getNomPlan() + " est actif",
+                "Félicitations, votre abonnement au plan '" + plan.getNomPlan() + "' a été activé jusqu'au " + dateFin.toString() + "."
+        );
 
         // 5. Retourner le DTO de réponse
         return abonnementMapper.toResponse(savedAbonnement);

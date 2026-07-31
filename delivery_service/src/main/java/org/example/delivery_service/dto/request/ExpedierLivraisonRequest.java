@@ -17,6 +17,8 @@ public class ExpedierLivraisonRequest {
     @PositiveOrZero(message = "montantACollecterCoD must be >= 0")
     private double montantACollecterCoD;
 
+    private String clientEmail;
+
     // Optional depending on strategy chosen
     private String nomSociete;
     private String endpointApiUrl;

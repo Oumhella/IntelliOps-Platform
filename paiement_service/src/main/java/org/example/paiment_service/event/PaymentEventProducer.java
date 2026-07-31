@@ -1,10 +1,10 @@
-package org.example.delivery_service.event;
+package org.example.paiment_service.event;
 
-import org.example.common.event.NotificationEvent;
-import org.example.common.event.TypeNotification;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.common.event.NotificationEvent;
+import org.example.common.event.TypeNotification;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class LivraisonEventProducer {
+public class PaymentEventProducer {
 
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
@@ -20,7 +20,12 @@ public class LivraisonEventProducer {
     @Value("${app.kafka.topic.notifications:notifications-topic}")
     private String topicName;
 
-    public void sendNotificationEvent(String recipientEmail, String subject, String content) {
+    public void sendPaymentNotification(String recipientEmail, String subject, String content) {
+        if (recipientEmail == null || recipientEmail.isBlank()) {
+            log.warn("Recipient email is empty, skipping payment notification event.");
+            return;
+        }
+
         try {
             NotificationEvent event = NotificationEvent.builder()
                     .type(TypeNotification.EMAIL)
@@ -30,11 +35,11 @@ public class LivraisonEventProducer {
                     .build();
 
             String jsonPayload = objectMapper.writeValueAsString(event);
-            log.info("Publishing notification event to Kafka topic '{}': {}", topicName, jsonPayload);
+            log.info("Publishing Payment Notification event to Kafka topic '{}': {}", topicName, jsonPayload);
 
             kafkaTemplate.send(topicName, jsonPayload);
         } catch (Exception e) {
-            log.error("Failed to publish notification event to Kafka", e);
+            log.error("Failed to publish payment notification event to Kafka", e);
         }
     }
 }

@@ -43,6 +43,8 @@ public class Livraison {
     private LocalDateTime shippingDate;
     private LocalDateTime deliveryDate;
 
+    private String clientEmail;
+
     @Column(nullable = false)
     private double montantACollecterCoD;
 

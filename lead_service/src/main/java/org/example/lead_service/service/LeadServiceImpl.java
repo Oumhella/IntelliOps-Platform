@@ -12,6 +12,10 @@ import org.example.lead_service.mapper.LeadMapper;
 import org.example.lead_service.repository.CommandeRepository;
 import org.example.lead_service.repository.LeadRepository;
 import org.springframework.stereotype.Service;
+import org.example.lead_service.client.StockClient;
+import org.example.lead_service.dto.StockProductDTO;
+import org.example.lead_service.event.OrderEventProducer;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -26,9 +30,18 @@ public class LeadServiceImpl implements LeadService {
     private final CommandeRepository commandeRepository;
     private final LeadMapper leadMapper;
     private final CommandeMapper commandeMapper;
+    private final StockClient stockClient;
+    private final OrderEventProducer orderEventProducer;
 
     @Override
     public LeadDTO creerLead(LeadDTO leadDTO) {
+        if (leadDTO.getBoutiqueId() != null) {
+            try {
+                stockClient.obtenirBoutique(leadDTO.getBoutiqueId());
+            } catch (Exception e) {
+                throw new org.example.common.exception.ResourceNotFoundException("Boutique not found with ID : " + leadDTO.getBoutiqueId());
+            }
+        }
         Lead lead = leadMapper.toEntity(leadDTO);
         // Un nouveau lead commence toujours à l'état initial défini
         if (lead.getStatutLead() == null) {
@@ -108,13 +121,26 @@ public class LeadServiceImpl implements LeadService {
         // 1. Initialise la commande avec le statut CONVERTED et copie les infos du client
         Commande nouvelleCommande = lead.convertirEnCommande();
 
-        // 2. On utilise TES méthodes métier pour insérer proprement chaque ligne
+        // 2. On utilise TES méthodes métier pour insérer proprement chaque ligne après validation avec le Stock Client
         if (request.getItems() != null) {
             for (CreationCommandeRequest.ItemRequest item : request.getItems()) {
+                double applyPrice = item.getUnitPrice();
+                try {
+                    StockProductDTO produit = stockClient.obtenirProduit(item.getProductId());
+                    if (produit != null && applyPrice <= 0) {
+                        applyPrice = produit.getPrixVente();
+                    }
+                    if (lead.getBoutiqueId() != null) {
+                        stockClient.reserverStock(lead.getBoutiqueId(), item.getProductId(), item.getQuantity());
+                    }
+                } catch (Exception e) {
+                    // Si appel feign échoue, on conserve la fallback price
+                }
+
                 nouvelleCommande.ajouterLigne(
                         item.getProductId(),
                         item.getQuantity(),
-                        item.getUnitPrice()
+                        applyPrice
                 );
             }
         }
@@ -125,6 +151,15 @@ public class LeadServiceImpl implements LeadService {
 
         // 4. On sauvegarde le Lead (qui va propager la sauvegarde à Commande grâce à cascade = CascadeType.ALL)
         Lead savedLead = leadRepository.save(lead);
+
+        // Send order creation notification via Kafka
+        if (savedLead.getInfosClient() != null && savedLead.getInfosClient().getEmail() != null) {
+            orderEventProducer.sendOrderNotification(
+                    savedLead.getInfosClient().getEmail(),
+                    "Confirmation de votre commande #" + savedLead.getCommande().getIdCommande(),
+                    "Votre commande #" + savedLead.getCommande().getIdCommande() + " a été créée avec succès pour un montant total de " + savedLead.getCommande().getTotalPrix() + " DH."
+            );
+        }
 
         // 5. On renvoie la commande persistée mappée en DTO
         return commandeMapper.toDto(savedLead.getCommande());

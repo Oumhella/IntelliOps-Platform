@@ -18,6 +18,8 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.example.paiment_service.event.PaymentEventProducer;
+
 @Service
 @RequiredArgsConstructor
 public class PaymentServiceImpl implements PaymentService {
@@ -25,7 +27,9 @@ public class PaymentServiceImpl implements PaymentService {
     private final TransactionPaiementRepository transactionRepository;
     private final PaymentMapper paymentMapper;
     private final PaymentGatewayFactory gatewayFactory;
-    private final InvoicePdfService invoicePdfService; // Injecté via constructeur
+    private final InvoicePdfService invoicePdfService;
+    private final PaymentEventProducer paymentEventProducer;
+
     @Override
     @Transactional
     public TransactionPaiementResponseDTO initierPaiement(InitierPaiementRequestDTO request) {
@@ -69,6 +73,15 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         TransactionPaiement saved = transactionRepository.save(transaction);
+
+        if (saved.getStatut() == StatutPaiement.COMPLETED) {
+            paymentEventProducer.sendPaymentNotification(
+                    "customer@example.com",
+                    "Confirmation de votre paiement #" + saved.getId(),
+                    "Votre paiement de " + saved.getMontant() + " MAD a été confirmé avec succès."
+            );
+        }
+
         return paymentMapper.toResponse(saved);
     }
 

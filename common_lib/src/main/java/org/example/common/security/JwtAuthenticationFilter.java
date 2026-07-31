@@ -83,7 +83,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         }
 
-        filterChain.doFilter(request, response);
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            TenantContext.clear();
+        }
     }
 
     private void authenticate(String email, String role, String enterpriseIdStr, String userIdStr, HttpServletRequest request) {
@@ -95,13 +99,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (enterpriseIdStr != null && !enterpriseIdStr.isEmpty()) {
             try {
-                request.setAttribute("enterpriseId", Long.parseLong(enterpriseIdStr));
+                Long entId = Long.parseLong(enterpriseIdStr);
+                request.setAttribute("enterpriseId", entId);
+                TenantContext.setEnterpriseId(entId);
             } catch (NumberFormatException ignored) {
                 // enterpriseId absent ou non numerique (ex. super-admin futur) -- ignore volontairement
             }
         }
         if (userIdStr != null && !userIdStr.isEmpty()) {
-            try { request.setAttribute("userId", Long.parseLong(userIdStr)); }
+            try {
+                Long uId = Long.parseLong(userIdStr);
+                request.setAttribute("userId", uId);
+                TenantContext.setUserId(uId);
+            }
             catch (NumberFormatException ignored) {}
         }
     }

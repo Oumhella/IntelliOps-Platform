@@ -2,6 +2,7 @@ package org.example.mcpserver.config;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
@@ -13,16 +14,13 @@ import org.springframework.http.HttpRequest;
 @Configuration
 public class RestClientConfig {
 
-    @Value("${services.lead-service.url}")
-    private String leadServiceUrl;
-
-    @Value("${services.stock-service.url}")
-    private String stockServiceUrl;
+    @Value("${services.gateway.url}")
+    private String gatewayUrl;
 
     @Bean
-    public RestClient leadServiceClient() {
+    public RestClient gatewayClient() {
         return RestClient.builder()
-                .baseUrl(leadServiceUrl)
+                .baseUrl(gatewayUrl)
                 .requestInterceptor((request, body, execution) -> {
                     propagateHeaders(request);
                     return execution.execute(request, body);
@@ -31,14 +29,13 @@ public class RestClientConfig {
     }
 
     @Bean
-    public RestClient stockServiceClient() {
-        return RestClient.builder()
-                .baseUrl(stockServiceUrl)
-                .requestInterceptor((request, body, execution) -> {
-                    propagateHeaders(request);
-                    return execution.execute(request, body);
-                })
-                .build();
+    public RestClient leadServiceClient(@Qualifier("gatewayClient") RestClient gatewayClient) {
+        return gatewayClient;
+    }
+
+    @Bean
+    public RestClient stockServiceClient(@Qualifier("gatewayClient") RestClient gatewayClient) {
+        return gatewayClient;
     }
 
     private void propagateHeaders(HttpRequest request) {

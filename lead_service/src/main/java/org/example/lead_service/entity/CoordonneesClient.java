@@ -14,6 +14,7 @@ import lombok.NoArgsConstructor;
 public class CoordonneesClient {
 
     private String nomComplet;
+    private String email;
     private String telephone;
     private String adresseLivraison;
     private String ville;
