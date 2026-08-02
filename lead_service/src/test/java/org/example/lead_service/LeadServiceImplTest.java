@@ -11,6 +11,7 @@ import org.example.lead_service.repository.CommandeRepository;
 import org.example.lead_service.repository.LeadRepository;
 import org.example.lead_service.service.LeadServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -24,6 +25,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import org.example.common.security.TenantContext;
 
 @ExtendWith(MockitoExtension.class)
 class LeadServiceImplTest {
@@ -45,6 +47,8 @@ class LeadServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        TenantContext.setEnterpriseId(7L);
+        TenantContext.setUserId(42L);
         mockCoords = CoordonneesClient.builder()
                 .nomComplet("John Doe")
                 .telephone("+212600000000")
@@ -58,14 +62,20 @@ class LeadServiceImplTest {
                 .ordrePriorite(OrdrePriorite.HIGH)
                 .infosClient(mockCoords)
                 .boutiqueId(10L)
+                .enterpriseId(7L)
                 .historiqueInteractions(new ArrayList<>())
                 .build();
+    }
+
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
     }
 
     @Test
     void assignerAgent_DevraitMettreAJourAgentId() {
         // Arrange
-        when(leadRepository.findById(1L)).thenReturn(Optional.of(mockLead));
+        when(leadRepository.findByIdLeadAndEnterpriseId(1L, 7L)).thenReturn(Optional.of(mockLead));
         when(leadRepository.save(any(Lead.class))).thenReturn(mockLead);
         when(leadMapper.toDto(any(Lead.class))).thenReturn(new LeadDTO());
 
@@ -80,7 +90,7 @@ class LeadServiceImplTest {
     @Test
     void enregistrerInteraction_DevraitMettreAJourStatutEtAjouterNote() {
         // Arrange
-        when(leadRepository.findById(1L)).thenReturn(Optional.of(mockLead));
+        when(leadRepository.findByIdLeadAndEnterpriseId(1L, 7L)).thenReturn(Optional.of(mockLead));
 
         // Simule le comportement de la sauvegarde : renvoie le lead fourni en entrée
         when(leadRepository.save(any(Lead.class))).thenAnswer(invocation -> {
@@ -115,7 +125,7 @@ class LeadServiceImplTest {
     @Test
     void convertirEnCommande_DevraitCreerCommandeEtChangerStatutEnConverted() {
         // Arrange
-        when(leadRepository.findById(1L)).thenReturn(Optional.of(mockLead));
+        when(leadRepository.findByIdLeadAndEnterpriseId(1L, 7L)).thenReturn(Optional.of(mockLead));
         when(leadRepository.save(any(Lead.class))).thenReturn(mockLead);
         when(commandeMapper.toDto(any(Commande.class))).thenReturn(new CommandeDTO());
 

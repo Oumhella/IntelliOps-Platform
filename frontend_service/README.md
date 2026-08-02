@@ -1,5 +1,7 @@
 # FrontendService
 
+The typed gateway connection layer is documented in [docs/backend-api-layer.md](docs/backend-api-layer.md). It covers authentication, error handling, environments, model conventions, usage examples, and every currently exposed backend endpoint.
+
 This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 19.2.15.
 
 ## Development server

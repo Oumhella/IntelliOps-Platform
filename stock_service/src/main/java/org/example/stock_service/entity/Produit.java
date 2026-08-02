@@ -4,7 +4,10 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "produits")
+@Table(
+        name = "produits",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"enterprise_id", "global_sku"})
+)
 @Getter
 @Setter
 @Builder
@@ -22,8 +25,11 @@ public class Produit {
     private double prixAchat;
     private double prixVente;
 
-    @Column(unique = true, nullable = false)
+    @Column(name = "global_sku", nullable = false)
     private String globalSku;
+
+    @Column(name = "enterprise_id", nullable = false)
+    private Long enterpriseId;
 
     // Méthode métier
     public boolean estEnRupture(int totalQuantiteDisponible) {

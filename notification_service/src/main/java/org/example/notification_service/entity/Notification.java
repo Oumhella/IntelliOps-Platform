@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "notifications")
@@ -17,6 +18,10 @@ public class Notification {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long idNotification;
+
+    @JsonIgnore
+    @Column(name = "enterprise_id", nullable = false)
+    private Long enterpriseId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

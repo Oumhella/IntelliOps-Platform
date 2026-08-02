@@ -20,6 +20,9 @@ public class Abonnement {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long idAbonnement;
 
+    @Column(name = "enterprise_id", nullable = false)
+    private Long enterpriseId;
+
     @Column(nullable = false)
     private LocalDate dateDebut;
 

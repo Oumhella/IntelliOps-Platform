@@ -7,13 +7,20 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Repository
 public interface AbonnementRepository extends JpaRepository<Abonnement, Long> {
 
-    List<Abonnement> findByUserId(Long userId);
+    List<Abonnement> findByUserIdAndEnterpriseId(Long userId, Long enterpriseId);
 
-    Optional<Abonnement> findByUserIdAndStatut(Long userId, StatutAbonnement statut);
+    Optional<Abonnement> findByIdAbonnementAndEnterpriseId(Long idAbonnement, Long enterpriseId);
 
-    boolean existsByUserIdAndStatut(Long userId, StatutAbonnement statut);
+    boolean existsByUserIdAndStatutAndEnterpriseId(Long userId, StatutAbonnement statut, Long enterpriseId);
+
+    Page<Abonnement> findAllByEnterpriseIdAndStatut(
+            Long enterpriseId, StatutAbonnement statut, Pageable pageable);
+
+    Page<Abonnement> findAllByEnterpriseId(Long enterpriseId, Pageable pageable);
 }

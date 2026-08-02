@@ -43,8 +43,35 @@ public class PlanAbonnementServiceImpl implements PlanAbonnementService {
     @Override
     @Transactional(readOnly = true)
     public PlanAbonnementResponse getPlanById(Long id) {
-        PlanAbonnement plan = planAbonnementRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Plan d'abonnement introuvable avec l'ID : " + id));
-        return abonnementMapper.toPlanResponse(plan);
+        return abonnementMapper.toPlanResponse(findPlan(id));
+    }
+
+    @Override
+    @Transactional
+    public PlanAbonnementResponse modifierPlan(Long id, PlanAbonnementRequest request) {
+        PlanAbonnement plan = findPlan(id);
+        plan.setNomPlan(request.getNomPlan());
+        plan.setDescription(request.getDescription());
+        plan.setPrix(request.getPrix());
+        plan.setDuree(request.getDuree());
+        plan.setMinJoursEntreDesactivation(request.getMinJoursEntreDesactivation());
+        plan.setMaxPeriodeDesactivation(request.getMaxPeriodeDesactivation());
+        plan.setEstActif(request.getEstActif());
+        plan.setLimiteCommandesMois(request.getLimiteCommandesMois());
+        return abonnementMapper.toPlanResponse(planAbonnementRepository.save(plan));
+    }
+
+    @Override
+    @Transactional
+    public void supprimerPlan(Long id) {
+        PlanAbonnement plan = findPlan(id);
+        plan.setEstActif(StatutOffre.SUPPRIME);
+        planAbonnementRepository.save(plan);
+    }
+
+    private PlanAbonnement findPlan(Long id) {
+        return planAbonnementRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Plan d'abonnement introuvable avec l'ID : " + id));
     }
 }

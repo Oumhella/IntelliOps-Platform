@@ -12,6 +12,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import org.example.common.dto.PageResponse;
 
 @RestController
 @RequestMapping("/api/v1/leads")
@@ -33,6 +34,15 @@ public class LeadController {
     @GetMapping("/{idLead}")
     public ResponseEntity<LeadDTO> obtenirLeadParId(@PathVariable Long idLead) {
         return ResponseEntity.ok(leadService.obtenirLeadParId(idLead));
+    }
+
+    @GetMapping
+    public ResponseEntity<PageResponse<LeadDTO>> rechercherLeads(
+            @RequestParam(required = false) StatutLead statut,
+            @RequestParam(required = false) Long agentId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(leadService.rechercherLeads(statut, agentId, page, size));
     }
 
     @GetMapping("/agent/{agentId}")

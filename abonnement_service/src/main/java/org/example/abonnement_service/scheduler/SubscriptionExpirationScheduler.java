@@ -38,6 +38,7 @@ public class SubscriptionExpirationScheduler {
                 log.info("Subscription ID {} has expired.", sub.getIdAbonnement());
 
                 eventProducer.sendSubscriptionNotification(
+                        sub.getEnterpriseId(),
                         "user" + sub.getUserId() + "@intelliops.local",
                         "Alerte : Votre abonnement a expiré",
                         "Votre abonnement au plan " + sub.getPlanAbonnement().getNomPlan() + " a expiré le " + sub.getDateFin() + ". Veuillez le renouveler."

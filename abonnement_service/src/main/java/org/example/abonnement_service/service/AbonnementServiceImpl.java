@@ -20,6 +20,11 @@ import java.util.List;
 import static org.example.abonnement_service.entity.DureeOffre.ANNUEL;
 
 import org.example.abonnement_service.event.AbonnementEventProducer;
+import org.example.common.dto.PageResponse;
+import org.example.common.security.TenantContext;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +41,7 @@ public class AbonnementServiceImpl implements AbonnementService {
     @Override
     @Transactional
     public AbonnementResponse souscrire(AbonnementRequest request) {
+        Long enterpriseId = TenantContext.requireEnterpriseId();
         // 0. Vérifier si l'utilisateur existe
         try {
             userClient.getUserById(request.getUserId());
@@ -44,7 +50,8 @@ public class AbonnementServiceImpl implements AbonnementService {
         }
 
         // 1. Vérifier si l'utilisateur n'a pas déjà un abonnement actif
-        if (abonnementRepository.existsByUserIdAndStatut(request.getUserId(), StatutAbonnement.ACTIF)) {
+        if (abonnementRepository.existsByUserIdAndStatutAndEnterpriseId(
+                request.getUserId(), StatutAbonnement.ACTIF, enterpriseId)) {
             throw new IllegalStateException("L'utilisateur a déjà un abonnement actif.");
         }
 
@@ -62,6 +69,7 @@ public class AbonnementServiceImpl implements AbonnementService {
 
         // 4. Créer et sauvegarder l'abonnement
         Abonnement abonnement = Abonnement.builder()
+                .enterpriseId(enterpriseId)
                 .userId(request.getUserId())
                 .planAbonnement(plan)
                 .dateDebut(dateDebut)
@@ -198,8 +206,23 @@ public class AbonnementServiceImpl implements AbonnementService {
     @Override
     @Transactional(readOnly = true)
     public List<AbonnementResponse> getHistoriqueUtilisateur(Long userId) {
-        List<Abonnement> historique = abonnementRepository.findByUserId(userId);
+        List<Abonnement> historique = abonnementRepository.findByUserIdAndEnterpriseId(
+                userId, TenantContext.requireEnterpriseId());
         return abonnementMapper.toResponseList(historique);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<AbonnementResponse> search(StatutAbonnement statut, int page, int size) {
+        PageRequest pageable = PageRequest.of(
+                Math.max(0, page),
+                Math.min(Math.max(1, size), 100),
+                Sort.by(Sort.Direction.DESC, "dateDebut"));
+        Long enterpriseId = TenantContext.requireEnterpriseId();
+        Page<Abonnement> result = statut == null
+                ? abonnementRepository.findAllByEnterpriseId(enterpriseId, pageable)
+                : abonnementRepository.findAllByEnterpriseIdAndStatut(enterpriseId, statut, pageable);
+        return PageResponse.from(result, abonnementMapper::toResponse);
     }
 
     // ==========================================
@@ -210,7 +233,8 @@ public class AbonnementServiceImpl implements AbonnementService {
      * Méthode d'aide interne pour récupérer l'entité JPA sans l'exposer à l'extérieur du service.
      */
     private Abonnement findEntityById(Long idAbonnement) {
-        return abonnementRepository.findById(idAbonnement)
+        return abonnementRepository.findByIdAbonnementAndEnterpriseId(
+                        idAbonnement, TenantContext.requireEnterpriseId())
                 .orElseThrow(() -> new EntityNotFoundException("Abonnement introuvable avec l'ID : " + idAbonnement));
     }
 

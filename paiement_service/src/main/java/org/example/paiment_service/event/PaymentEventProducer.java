@@ -8,6 +8,7 @@ import org.example.common.event.TypeNotification;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
+import org.example.common.security.TenantContext;
 
 @Slf4j
 @Component
@@ -28,6 +29,7 @@ public class PaymentEventProducer {
 
         try {
             NotificationEvent event = NotificationEvent.builder()
+                    .enterpriseId(TenantContext.getEnterpriseId())
                     .type(TypeNotification.EMAIL)
                     .recipientContact(recipientEmail)
                     .subject(subject)

@@ -7,6 +7,7 @@ import org.example.stock_service.dto.response.InventaireResponseDTO;
 import org.example.stock_service.entity.*;
 import org.example.stock_service.mapper.StockMapper;
 import org.example.stock_service.repository.*;
+import org.example.common.security.TenantContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,7 +59,8 @@ public class InventaireServiceImpl implements InventaireService {
     @Transactional(readOnly = true)
     @Override
     public List<InventaireResponseDTO> obtenirInventairesParBoutique(Long idBoutique) {
-        return inventaireRepository.findByBoutiqueIdBoutique(idBoutique).stream()
+        return inventaireRepository.findByBoutiqueIdBoutiqueAndBoutiqueEnterpriseId(
+                        idBoutique, TenantContext.requireEnterpriseId()).stream()
                 .map(stockMapper::toResponse)
                 .toList();
     }
@@ -66,7 +68,8 @@ public class InventaireServiceImpl implements InventaireService {
     @Transactional
     @Override
     public InventaireResponseDTO configurerRegleApprovisionnement(Long idInventaire, RegleApprovisionnementRequestDTO request) {
-        Inventaire inventaire = inventaireRepository.findById(idInventaire)
+        Inventaire inventaire = inventaireRepository.findByIdAndBoutiqueEnterpriseId(
+                        idInventaire, TenantContext.requireEnterpriseId())
                 .orElseThrow(() -> new EntityNotFoundException("Inventaire introuvable avec l'ID : " + idInventaire));
 
         if (inventaire.getRegleApprovisionnement() == null) {
@@ -90,11 +93,13 @@ public class InventaireServiceImpl implements InventaireService {
      * puis initialise un nouvel inventaire avec une quantité initiale de 0.
      */
     private Inventaire obtenirOuCreerInventaire(Long idBoutique, Long idProduit) {
-        return inventaireRepository.findByBoutiqueIdBoutiqueAndProduitIdProduit(idBoutique, idProduit)
+        Long enterpriseId = TenantContext.requireEnterpriseId();
+        return inventaireRepository.findByBoutiqueIdBoutiqueAndProduitIdProduitAndBoutiqueEnterpriseId(
+                        idBoutique, idProduit, enterpriseId)
                 .orElseGet(() -> {
-                    Boutique boutique = boutiqueRepository.findById(idBoutique)
+                    Boutique boutique = boutiqueRepository.findByIdBoutiqueAndEnterpriseId(idBoutique, enterpriseId)
                             .orElseThrow(() -> new EntityNotFoundException("Boutique introuvable avec l'ID : " + idBoutique));
-                    Produit produit = produitRepository.findById(idProduit)
+                    Produit produit = produitRepository.findByIdProduitAndEnterpriseId(idProduit, enterpriseId)
                             .orElseThrow(() -> new EntityNotFoundException("Produit introuvable avec l'ID : " + idProduit));
 
                     Inventaire nouvelInventaire = new Inventaire();
@@ -107,7 +112,8 @@ public class InventaireServiceImpl implements InventaireService {
     }
 
     private Inventaire trouverInventaireOuLeverException(Long idBoutique, Long idProduit) {
-        return inventaireRepository.findByBoutiqueIdBoutiqueAndProduitIdProduit(idBoutique, idProduit)
+        return inventaireRepository.findByBoutiqueIdBoutiqueAndProduitIdProduitAndBoutiqueEnterpriseId(
+                        idBoutique, idProduit, TenantContext.requireEnterpriseId())
                 .orElseThrow(() -> new EntityNotFoundException(
                         "Inventaire introuvable pour la boutique " + idBoutique + " et le produit " + idProduit));
     }

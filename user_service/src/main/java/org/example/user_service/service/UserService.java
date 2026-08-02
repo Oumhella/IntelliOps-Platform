@@ -32,6 +32,6 @@ public interface UserService {
 
     void deleteUser(Long userId, Long enterpriseId);
 
-    UserResponse getUserById(Long userId);
+    UserResponse getUserById(Long userId, Long enterpriseId);
 }
 

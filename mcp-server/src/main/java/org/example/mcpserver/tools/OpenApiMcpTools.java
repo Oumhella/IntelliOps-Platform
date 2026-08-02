@@ -39,7 +39,7 @@ public class OpenApiMcpTools {
             "notification", "/notification-service/v3/api-docs"
     );
     private static final Set<String> BLOCKED_PATHS = Set.of(
-            "/api/v1/users/login", "/api/v1/users/register", "/api/v1/users/setup-admin"
+            "/api/v1/users/login", "/api/v1/users/register"
     );
 
     private final RestClient gatewayClient;

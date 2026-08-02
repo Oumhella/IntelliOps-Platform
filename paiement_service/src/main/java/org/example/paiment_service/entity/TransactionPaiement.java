@@ -4,7 +4,10 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "transactions_paiement")
+@Table(
+        name = "transactions_paiement",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"enterprise_id", "idempotency_key"})
+)
 @Getter
 @Setter
 @Builder
@@ -16,8 +19,11 @@ public class TransactionPaiement {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(name = "idempotency_key", nullable = false)
     private String idempotencyKey; // Anti-double débit
+
+    @Column(name = "enterprise_id", nullable = false)
+    private Long enterpriseId;
 
     @Column(nullable = false)
     private Long referenceSourceId; // Order ID ou Subscription ID
