@@ -16,7 +16,13 @@ FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
 # Sécurité : Éviter de tourner en ROOT
-RUN addgroup -S spring && adduser -S spring -G spring
+RUN for attempt in 1 2 3; do \
+      apk upgrade --no-cache && break; \
+      if [ "$attempt" = "3" ]; then exit 1; fi; \
+      sleep $((attempt * 5)); \
+    done \
+    && addgroup -S spring \
+    && adduser -S spring -G spring
 USER spring:spring
 
 # On récupère le JAR compilé dans le dossier cible du sous-module

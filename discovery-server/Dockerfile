@@ -25,7 +25,13 @@ FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
 # Créer un groupe et un utilisateur "spring" pour ne pas exécuter l'application en tant que root
-RUN addgroup -S spring && adduser -S spring -G spring
+RUN for attempt in 1 2 3; do \
+      apk upgrade --no-cache && break; \
+      if [ "$attempt" = "3" ]; then exit 1; fi; \
+      sleep $((attempt * 5)); \
+    done \
+    && addgroup -S spring \
+    && adduser -S spring -G spring
 USER spring:spring
 
 # Copier le fichier JAR compilé depuis l'étape précédente

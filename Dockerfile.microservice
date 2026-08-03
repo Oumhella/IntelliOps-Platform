@@ -39,7 +39,13 @@ RUN --mount=type=cache,target=/root/.m2,sharing=locked \
 FROM eclipse-temurin:17-jre-alpine
 ARG SERVICE_PORT=8080
 WORKDIR /app
-RUN addgroup -S spring && adduser -S spring -G spring
+RUN for attempt in 1 2 3; do \
+      apk upgrade --no-cache && break; \
+      if [ "$attempt" = "3" ]; then exit 1; fi; \
+      sleep $((attempt * 5)); \
+    done \
+    && addgroup -S spring \
+    && adduser -S spring -G spring
 COPY --from=build --chown=spring:spring /app/target/*.jar app.jar
 USER spring:spring
 EXPOSE ${SERVICE_PORT}
