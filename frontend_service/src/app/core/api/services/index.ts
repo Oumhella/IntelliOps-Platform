@@ -4,6 +4,7 @@ export * from './crm-api.service';
 export * from './deliveries-api.service';
 export * from './notifications-api.service';
 export * from './payments-api.service';
+export * from './platform-api.service';
 export * from './stock-api.service';
 export * from './subscriptions-api.service';
 export * from './users-api.service';

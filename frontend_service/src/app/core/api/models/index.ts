@@ -4,6 +4,7 @@ export * from './crm.models';
 export * from './delivery.models';
 export * from './notification.models';
 export * from './payment.models';
+export * from './platform.models';
 export * from './stock.models';
 export * from './subscription.models';
 export * from './user.models';

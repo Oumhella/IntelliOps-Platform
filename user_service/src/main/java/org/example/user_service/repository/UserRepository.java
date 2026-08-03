@@ -3,6 +3,7 @@ package org.example.user_service.repository;
 import org.example.user_service.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
 import java.util.Optional;
@@ -19,4 +20,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     //Utile pour l'Admin : Vérifier si un email existe déjà dans le système avant création
     boolean existsByEmail(String email);
+
+    @Query("select count(distinct u.enterpriseId) from User u where u.enterpriseId <> 0")
+    long countBusinessEnterprises();
+
+    @Query("select count(u) from User u where u.enterpriseId <> 0")
+    long countBusinessUsers();
+
+    @Query("select count(u) from User u where u.enterpriseId <> 0 and u.isActive = true")
+    long countActiveBusinessUsers();
+
+    long countByEnterpriseId(Long enterpriseId);
 }

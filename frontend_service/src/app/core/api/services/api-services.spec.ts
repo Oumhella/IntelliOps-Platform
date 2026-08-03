@@ -6,6 +6,7 @@ import { PaymentsApiService } from './payments-api.service';
 import { StockApiService } from './stock-api.service';
 import { SubscriptionsApiService } from './subscriptions-api.service';
 import { CrmApiService } from './crm-api.service';
+import { PlatformApiService } from './platform-api.service';
 
 describe('API services transport details', () => {
   let httpTesting: HttpTestingController;
@@ -63,5 +64,18 @@ describe('API services transport details', () => {
     expect(request.request.params.get('statut')).toBe('IN_PROGRESS');
     expect(request.request.params.get('agentId')).toBe('44');
     request.flush({ content: [] });
+  });
+
+  it('loads the secured platform overview from the gateway', () => {
+    TestBed.inject(PlatformApiService).getOverview().subscribe();
+
+    const request = httpTesting.expectOne('http://gateway:8080/api/v1/platform/overview');
+    expect(request.request.method).toBe('GET');
+    request.flush({
+      generatedAt: '2026-08-02T12:00:00Z',
+      totals: { enterprises: 0, users: 0, activeUsers: 0, onlineServices: 0, totalServices: 9 },
+      tenants: [],
+      services: [],
+    });
   });
 });
