@@ -44,16 +44,6 @@ public class UserController {
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
-    /**
-     * TEMPORARY ROUTE: Create the first system admin without a token.
-     * Can be removed or disabled once the first admin is created.
-     */
-    @PostMapping("/setup-admin")
-    public ResponseEntity<UserResponse> setupFirstAdmin(@Valid @RequestBody UserCreationRequest creationRequest) {
-        UserResponse response = userService.createUser(creationRequest, 1L);
-        return new ResponseEntity<>(response, HttpStatus.CREATED);
-    }
-
     // ══════════════════════════════════════════════════════════════════
     //  PROFILE ROUTES (any authenticated user)
     // ══════════════════════════════════════════════════════════════════
@@ -100,7 +90,7 @@ public class UserController {
      * Only accessible by users with ADMIN role.
      */
     @PostMapping("/staff")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserResponse> createStaffMember(
             @Valid @RequestBody UserCreationRequest creationRequest,
             @RequestAttribute("enterpriseId") Long enterpriseId
@@ -138,7 +128,7 @@ public class UserController {
      * Request body: { "active": true/false }
      */
     @PatchMapping("/staff/{id}/status")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserResponse> toggleStaffStatus(
             @PathVariable Long id,
             @RequestAttribute("enterpriseId") Long enterpriseId,
@@ -154,7 +144,7 @@ public class UserController {
      * Only accessible by users with ADMIN role.
      */
     @DeleteMapping("/staff/{id}")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteStaffMember(
             @PathVariable Long id,
             @RequestAttribute("enterpriseId") Long enterpriseId
@@ -167,8 +157,10 @@ public class UserController {
      * Get a user by ID. Primarily used for inter-service communication.
      */
     @GetMapping("/{id}")
-    public ResponseEntity<UserResponse> getUserById(@PathVariable Long id) {
-        UserResponse response = userService.getUserById(id);
+    public ResponseEntity<UserResponse> getUserById(
+            @PathVariable Long id,
+            @RequestAttribute("enterpriseId") Long enterpriseId) {
+        UserResponse response = userService.getUserById(id, enterpriseId);
         return ResponseEntity.ok(response);
     }
 

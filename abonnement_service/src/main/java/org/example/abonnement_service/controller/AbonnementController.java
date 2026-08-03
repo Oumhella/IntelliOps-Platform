@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.*;
 import org.example.abonnement_service.service.AbonnementService;
 
 import java.util.List;
+import org.example.common.dto.PageResponse;
+import org.example.abonnement_service.entity.StatutAbonnement;
 
 @RestController
 @RequestMapping("/api/v1/abonnements")
@@ -17,6 +19,14 @@ import java.util.List;
 public class AbonnementController {
 
     private final AbonnementService abonnementService;
+
+    @GetMapping
+    public ResponseEntity<PageResponse<AbonnementResponse>> rechercher(
+            @RequestParam(required = false) StatutAbonnement statut,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(abonnementService.search(statut, page, size));
+    }
 
     /**
      * Souscrire à un nouvel abonnement.

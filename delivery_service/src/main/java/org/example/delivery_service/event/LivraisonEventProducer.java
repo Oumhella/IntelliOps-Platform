@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
+import org.example.common.security.TenantContext;
 
 @Slf4j
 @Component
@@ -23,6 +24,7 @@ public class LivraisonEventProducer {
     public void sendNotificationEvent(String recipientEmail, String subject, String content) {
         try {
             NotificationEvent event = NotificationEvent.builder()
+                    .enterpriseId(TenantContext.getEnterpriseId())
                     .type(TypeNotification.EMAIL)
                     .recipientContact(recipientEmail)
                     .subject(subject)

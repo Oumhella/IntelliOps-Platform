@@ -18,4 +18,7 @@ public interface ProduitService {
 
     @Transactional
     ProduitResponseDTO modifierProduit(Long idProduit, ProduitRequestDTO request);
+
+    @Transactional
+    void supprimerProduit(Long idProduit);
 }

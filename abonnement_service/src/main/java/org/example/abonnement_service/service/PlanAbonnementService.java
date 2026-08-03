@@ -13,4 +13,8 @@ public interface PlanAbonnementService {
     List<PlanAbonnementResponse> getTousLesPlans(StatutOffre statut);
 
     PlanAbonnementResponse getPlanById(Long id);
+
+    PlanAbonnementResponse modifierPlan(Long id, PlanAbonnementRequest request);
+
+    void supprimerPlan(Long id);
 }

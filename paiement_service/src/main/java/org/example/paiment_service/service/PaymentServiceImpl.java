@@ -9,6 +9,12 @@ import org.example.paiment_service.gateway.PaymentGatewayFactory;
 import org.example.paiment_service.gateway.PaymentGatewayProvider;
 import org.example.paiment_service.mapper.PaymentMapper;
 import org.example.paiment_service.repository.TransactionPaiementRepository;
+import org.example.paiment_service.repository.FactureRepository;
+import org.example.paiment_service.dto.response.FactureResponseDTO;
+import org.example.common.dto.PageResponse;
+import org.example.common.security.TenantContext;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.example.paiment_service.service.InvoicePdfService;
@@ -25,6 +31,7 @@ import org.example.paiment_service.event.PaymentEventProducer;
 public class PaymentServiceImpl implements PaymentService {
 
     private final TransactionPaiementRepository transactionRepository;
+    private final FactureRepository factureRepository;
     private final PaymentMapper paymentMapper;
     private final PaymentGatewayFactory gatewayFactory;
     private final InvoicePdfService invoicePdfService;
@@ -34,13 +41,16 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional
     public TransactionPaiementResponseDTO initierPaiement(InitierPaiementRequestDTO request) {
         // 1. Contrôle d'Idempotence (Anti-double débit)
-        Optional<TransactionPaiement> existing = transactionRepository.findByIdempotencyKey(request.getIdempotencyKey());
+        Long enterpriseId = TenantContext.requireEnterpriseId();
+        Optional<TransactionPaiement> existing = transactionRepository.findByIdempotencyKeyAndEnterpriseId(
+                request.getIdempotencyKey(), enterpriseId);
         if (existing.isPresent()) {
             return paymentMapper.toResponse(existing.get()); // Renvoie directement le résultat précédent sans relancer la transaction
         }
 
         TransactionPaiement transaction = paymentMapper.toEntity(request);
         transaction.setIdempotencyKey(request.getIdempotencyKey());
+        transaction.setEnterpriseId(enterpriseId);
 
         // 2. Traitement via Gateway de Paiement
         if (request.getMode() == ModePaiement.CREDIT_CARD) {
@@ -88,8 +98,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional
     @Override
     public TransactionPaiementResponseDTO rembourserPaiement(Long idTransaction, RemboursementRequestDTO request) {
-        TransactionPaiement transaction = transactionRepository.findById(idTransaction)
-                .orElseThrow(() -> new EntityNotFoundException("Transaction introuvable : " + idTransaction));
+        TransactionPaiement transaction = findTransaction(idTransaction);
 
         if (transaction.getMode() == ModePaiement.CREDIT_CARD) {
             PaymentGatewayProvider provider = gatewayFactory.getProvider(ModePaiement.CREDIT_CARD);
@@ -103,10 +112,59 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional
     @Override
     public TransactionPaiementResponseDTO annulerPaiement(Long idTransaction) {
-        TransactionPaiement transaction = transactionRepository.findById(idTransaction)
-                .orElseThrow(() -> new EntityNotFoundException("Transaction introuvable"));
+        TransactionPaiement transaction = findTransaction(idTransaction);
 
         transaction.annuler();
         return paymentMapper.toResponse(transactionRepository.save(transaction));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TransactionPaiementResponseDTO getTransaction(Long idTransaction) {
+        return paymentMapper.toResponse(findTransaction(idTransaction));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<TransactionPaiementResponseDTO> searchTransactions(
+            StatutPaiement statut, Contexte contexte, int page, int size) {
+        PageRequest pageable = pageRequest(page, size, "id");
+        return PageResponse.from(
+                transactionRepository.search(TenantContext.requireEnterpriseId(), statut, contexte, pageable),
+                paymentMapper::toResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public FactureResponseDTO getInvoice(Long idFacture) {
+        return paymentMapper.toResponse(findInvoice(idFacture));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<FactureResponseDTO> getInvoices(int page, int size) {
+        return PageResponse.from(
+                factureRepository.findAllByTransactionPaiementEnterpriseId(
+                        TenantContext.requireEnterpriseId(), pageRequest(page, size, "dateEmission")),
+                paymentMapper::toResponse);
+    }
+
+    private TransactionPaiement findTransaction(Long idTransaction) {
+        return transactionRepository.findByIdAndEnterpriseId(
+                        idTransaction, TenantContext.requireEnterpriseId())
+                .orElseThrow(() -> new EntityNotFoundException("Transaction introuvable : " + idTransaction));
+    }
+
+    private Facture findInvoice(Long idFacture) {
+        return factureRepository.findByIdAndTransactionPaiementEnterpriseId(
+                        idFacture, TenantContext.requireEnterpriseId())
+                .orElseThrow(() -> new EntityNotFoundException("Facture introuvable : " + idFacture));
+    }
+
+    private PageRequest pageRequest(int page, int size, String sortProperty) {
+        return PageRequest.of(
+                Math.max(0, page),
+                Math.min(Math.max(1, size), 100),
+                Sort.by(Sort.Direction.DESC, sortProperty));
     }
 }

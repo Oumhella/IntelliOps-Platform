@@ -8,6 +8,7 @@ import org.example.common.event.TypeNotification;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
+import org.example.common.security.TenantContext;
 
 @Slf4j
 @Component
@@ -21,6 +22,11 @@ public class AbonnementEventProducer {
     private String topicName;
 
     public void sendSubscriptionNotification(String recipientEmail, String subject, String content) {
+        sendSubscriptionNotification(TenantContext.getEnterpriseId(), recipientEmail, subject, content);
+    }
+
+    public void sendSubscriptionNotification(
+            Long enterpriseId, String recipientEmail, String subject, String content) {
         if (recipientEmail == null || recipientEmail.isBlank()) {
             log.warn("Recipient email is empty, skipping subscription notification event.");
             return;
@@ -28,6 +34,7 @@ public class AbonnementEventProducer {
 
         try {
             NotificationEvent event = NotificationEvent.builder()
+                    .enterpriseId(enterpriseId)
                     .type(TypeNotification.EMAIL)
                     .recipientContact(recipientEmail)
                     .subject(subject)

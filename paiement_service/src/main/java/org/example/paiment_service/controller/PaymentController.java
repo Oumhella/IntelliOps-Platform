@@ -1,12 +1,13 @@
 package org.example.paiment_service.controller;
 
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.example.common.dto.PageResponse;
 import org.example.paiment_service.dto.request.InitierPaiementRequestDTO;
 import org.example.paiment_service.dto.request.RemboursementRequestDTO;
+import org.example.paiment_service.dto.response.FactureResponseDTO;
 import org.example.paiment_service.dto.response.TransactionPaiementResponseDTO;
-import org.example.paiment_service.entity.Facture;
-import org.example.paiment_service.repository.FactureRepository;
+import org.example.paiment_service.entity.Contexte;
+import org.example.paiment_service.entity.StatutPaiement;
 import org.example.paiment_service.service.InvoicePdfService;
 import org.example.paiment_service.service.PaymentService;
 import org.springframework.http.HttpStatus;
@@ -20,7 +21,20 @@ public class PaymentController {
 
     private final PaymentService paymentService;
     private final InvoicePdfService invoicePdfService;
-    private final FactureRepository factureRepository;
+
+    @GetMapping
+    public ResponseEntity<PageResponse<TransactionPaiementResponseDTO>> rechercherTransactions(
+            @RequestParam(required = false) StatutPaiement statut,
+            @RequestParam(required = false) Contexte contexte,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(paymentService.searchTransactions(statut, contexte, page, size));
+    }
+
+    @GetMapping("/{idTransaction}")
+    public ResponseEntity<TransactionPaiementResponseDTO> getTransaction(@PathVariable Long idTransaction) {
+        return ResponseEntity.ok(paymentService.getTransaction(idTransaction));
+    }
 
     @PostMapping("/initier")
     public ResponseEntity<TransactionPaiementResponseDTO> initierPaiement(@RequestBody InitierPaiementRequestDTO request) {
@@ -38,12 +52,23 @@ public class PaymentController {
     public ResponseEntity<TransactionPaiementResponseDTO> annuler(@PathVariable Long idTransaction) {
         return ResponseEntity.ok(paymentService.annulerPaiement(idTransaction));
     }
-    @GetMapping("/factures/{idFacture}/download-url")
-    public ResponseEntity<String> TelechargerFactureUrl(@PathVariable Long idFacture) {
-        Facture facture = factureRepository.findById(idFacture)
-                .orElseThrow(() -> new EntityNotFoundException("Facture non trouvée"));
 
-        String presignedUrl = invoicePdfService.obtenirUrlTelechargementTemporaire(facture.getCheminFichierPdf());
-        return ResponseEntity.ok(presignedUrl);
+    @GetMapping("/factures")
+    public ResponseEntity<PageResponse<FactureResponseDTO>> getInvoices(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(paymentService.getInvoices(page, size));
+    }
+
+    @GetMapping("/factures/{idFacture}")
+    public ResponseEntity<FactureResponseDTO> getInvoice(@PathVariable Long idFacture) {
+        return ResponseEntity.ok(paymentService.getInvoice(idFacture));
+    }
+
+    @GetMapping("/factures/{idFacture}/download-url")
+    public ResponseEntity<String> telechargerFactureUrl(@PathVariable Long idFacture) {
+        FactureResponseDTO facture = paymentService.getInvoice(idFacture);
+        return ResponseEntity.ok(
+                invoicePdfService.obtenirUrlTelechargementTemporaire(facture.getCheminFichierPdf()));
     }
 }

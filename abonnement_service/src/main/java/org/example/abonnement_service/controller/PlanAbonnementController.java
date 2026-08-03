@@ -11,6 +11,7 @@ import org.example.abonnement_service.repository.PlanAbonnementRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 
@@ -25,6 +26,7 @@ public class PlanAbonnementController {
      * Créer un nouveau plan d'abonnement.
      */
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<PlanAbonnementResponse> creerPlan(@Valid @RequestBody PlanAbonnementRequest request) {
         PlanAbonnementResponse response = planAbonnementService.creerPlan(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
@@ -46,5 +48,20 @@ public class PlanAbonnementController {
     @GetMapping("/{id}")
     public ResponseEntity<PlanAbonnementResponse> getPlanById(@PathVariable Long id) {
         return ResponseEntity.ok(planAbonnementService.getPlanById(id));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<PlanAbonnementResponse> modifierPlan(
+            @PathVariable Long id,
+            @Valid @RequestBody PlanAbonnementRequest request) {
+        return ResponseEntity.ok(planAbonnementService.modifierPlan(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> supprimerPlan(@PathVariable Long id) {
+        planAbonnementService.supprimerPlan(id);
+        return ResponseEntity.noContent().build();
     }
 }

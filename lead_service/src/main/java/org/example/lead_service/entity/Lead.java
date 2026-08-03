@@ -32,6 +32,9 @@ public class Lead {
 
     private Long boutiqueId;
     private  Long agentId;
+
+    @Column(name = "enterprise_id", nullable = false)
+    private Long enterpriseId;
     @OneToOne(mappedBy = "lead", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @ToString.Exclude
     private Commande commande;

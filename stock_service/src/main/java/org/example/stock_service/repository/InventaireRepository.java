@@ -9,6 +9,9 @@ import java.util.List;
 
 @Repository
 public interface InventaireRepository extends JpaRepository<Inventaire, Long> {
-    Optional<Inventaire> findByBoutiqueIdBoutiqueAndProduitIdProduit(Long idBoutique, Long idProduit);
-    List<Inventaire> findByBoutiqueIdBoutique(Long idBoutique);
+    Optional<Inventaire> findByBoutiqueIdBoutiqueAndProduitIdProduitAndBoutiqueEnterpriseId(
+            Long idBoutique, Long idProduit, Long enterpriseId);
+    Optional<Inventaire> findByIdAndBoutiqueEnterpriseId(Long id, Long enterpriseId);
+    List<Inventaire> findByBoutiqueIdBoutiqueAndBoutiqueEnterpriseId(Long idBoutique, Long enterpriseId);
+    boolean existsByProduitIdProduit(Long idProduit);
 }

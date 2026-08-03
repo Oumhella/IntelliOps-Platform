@@ -7,6 +7,7 @@ import org.example.lead_service.dto.NoteInteractionDTO;
 import org.example.lead_service.entity.StatutLead;
 import org.example.lead_service.entity.TypeInteraction;
 import org.springframework.transaction.annotation.Transactional;
+import org.example.common.dto.PageResponse;
 
 import java.util.List;
 
@@ -14,6 +15,7 @@ public interface LeadService {
     LeadDTO creerLead(LeadDTO leadDTO);
     LeadDTO obtenirLeadParId(Long idLead);
     List<LeadDTO> obtenirLeadsParAgent(Long agentId);
+    PageResponse<LeadDTO> rechercherLeads(StatutLead statut, Long agentId, int page, int size);
 
     LeadDTO assignerAgent(Long idLead, Long agentId);
 

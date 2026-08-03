@@ -7,6 +7,8 @@ import org.example.lead_service.mapper.CommandeMapper;
 import org.example.lead_service.repository.CommandeRepository;
 import org.example.lead_service.service.CommandeServiceImpl;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -18,6 +20,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import org.example.common.security.TenantContext;
 
 @ExtendWith(MockitoExtension.class)
 class CommandeServiceImplTest {
@@ -30,6 +33,16 @@ class CommandeServiceImplTest {
     @InjectMocks
     private CommandeServiceImpl commandeService;
 
+    @BeforeEach
+    void setUp() {
+        TenantContext.setEnterpriseId(7L);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TenantContext.clear();
+    }
+
     @Test
     void ajouterProduitACommande_DevraitAjouterLigneEtRecalculerTotal() {
         // Arrange
@@ -41,7 +54,8 @@ class CommandeServiceImplTest {
                 .totalPrix(0.0)
                 .build();
 
-        when(commandeRepository.findById(1L)).thenReturn(Optional.of(commande));
+        when(commandeRepository.findByIdCommandeAndLeadEnterpriseId(1L, 7L))
+                .thenReturn(Optional.of(commande));
         when(commandeRepository.save(any(Commande.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(commandeMapper.toDto(any(Commande.class))).thenReturn(new CommandeDTO());
 

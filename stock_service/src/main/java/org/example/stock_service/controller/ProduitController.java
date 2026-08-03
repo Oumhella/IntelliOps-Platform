@@ -38,4 +38,10 @@ public class ProduitController {
             @RequestBody ProduitRequestDTO request) {
         return ResponseEntity.ok(produitService.modifierProduit(idProduit, request));
     }
+
+    @DeleteMapping("/{idProduit}")
+    public ResponseEntity<Void> supprimerProduit(@PathVariable Long idProduit) {
+        produitService.supprimerProduit(idProduit);
+        return ResponseEntity.noContent().build();
+    }
 }

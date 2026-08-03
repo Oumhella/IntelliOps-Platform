@@ -8,5 +8,4 @@ public class BoutiqueRequestDTO {
     private String nomBoutique;
     private TypePlateforme plateformeType;
     private String cleApi;
-    private Long adminId;
 }

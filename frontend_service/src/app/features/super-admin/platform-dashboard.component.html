@@ -1,0 +1,131 @@
+<div class="app-shell" [class.sidebar-open]="sidebarOpen">
+  <button class="sidebar-backdrop" type="button" aria-label="Close navigation" (click)="closeSidebar()"></button>
+
+  <aside class="sidebar" aria-label="Platform administration navigation">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 5.5h12v4H6zM6 14.5h5v4H6zM14 14.5h4v4h-4z" /></svg></span>
+      <span class="brand-copy"><strong>IntelliOps</strong><small>Platform control</small></span>
+      <button class="sidebar-close" type="button" aria-label="Close navigation" (click)="closeSidebar()"><svg viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17" /></svg></button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <p class="nav-label">Platform</p>
+      <a class="nav-item active" href="#overview" aria-current="page">
+        <svg viewBox="0 0 24 24"><path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z" /></svg><span>Overview</span>
+      </a>
+      <a class="nav-item" href="#tenants">
+        <svg viewBox="0 0 24 24"><path d="M4 20V7l8-4 8 4v13M8 10h2m4 0h2m-8 4h2m4 0h2M3 20h18" /></svg><span>Enterprises</span>
+        @if (overview(); as data) { <span class="nav-count">{{ data.totals.enterprises }}</span> }
+      </a>
+      <a class="nav-item" href="#services">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v5H4V5Zm0 9h16v5H4v-5Zm3-6h.01M7 17h.01" /></svg><span>Services</span>
+        <span class="status-dot" [class.status-dot-success]="overview()?.totals?.onlineServices === overview()?.totals?.totalServices"></span>
+      </a>
+
+      <p class="nav-label nav-label-spaced">Administration</p>
+      <span class="nav-item nav-item-disabled">
+        <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5V4Zm4 5h6m-6 4h6m-6 4h4" /></svg><span>Audit log</span><small>Soon</small>
+      </span>
+      <span class="nav-item nav-item-disabled">
+        <svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.4-3.5a7.8 7.8 0 0 0-.1-1l2-1.5-2-3.4-2.4 1a8 8 0 0 0-1.7-1L15 3.5h-4l-.3 2.6a8 8 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.5a7.8 7.8 0 0 0 0 2l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 1.7 1l.3 2.6h4l.3-2.6a8 8 0 0 0 1.7-1l2.4 1 2-3.4-2-1.5a7.8 7.8 0 0 0 .1-1Z" /></svg><span>Platform settings</span><small>Soon</small>
+      </span>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="environment-card">
+        <span class="environment-icon"><span class="status-dot status-dot-success"></span></span>
+        <span><strong>Eureka registry</strong><small>{{ overview()?.totals?.onlineServices ?? 0 }} services registered</small></span>
+      </div>
+      <p>Platform administration <span>Secure</span></p>
+    </div>
+  </aside>
+
+  <section class="workspace">
+    <header class="topbar">
+      <div class="topbar-leading">
+        <button class="icon-button mobile-menu" type="button" aria-label="Open navigation" (click)="openSidebar()"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" /></svg></button>
+        <label class="global-search">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg>
+          <span class="sr-only">Search enterprises and services</span>
+          <input type="search" placeholder="Search enterprises and services..." [value]="searchTerm()" (input)="updateSearch($event)" />
+        </label>
+      </div>
+      <div class="topbar-actions">
+        <span class="platform-role">Super admin</span>
+        <span class="topbar-divider"></span>
+        <button class="profile-button" type="button" (click)="logout()" aria-label="Sign out">
+          <span class="avatar">{{ currentUser()?.firstname?.[0] || 'S' }}{{ currentUser()?.lastname?.[0] || 'A' }}</span>
+          <span class="profile-copy"><strong>{{ currentUser()?.firstname }} {{ currentUser()?.lastname }}</strong><small>Sign out</small></span>
+        </button>
+      </div>
+    </header>
+
+    <main class="content" id="overview">
+      <div class="page-heading">
+        <div><p class="eyebrow"><span>Platform</span><b>/</b> Control center</p><h1>Platform overview</h1><p>Real tenant, user, and service-registry data across IntelliOps.</p></div>
+        <div class="page-actions">
+          @if (overview(); as data) { <span class="sync-state"><span class="status-dot status-dot-success"></span>{{ data.generatedAt | date:'mediumTime' }}</span> }
+          <button class="secondary-button" type="button" (click)="loadOverview()" [disabled]="loading()">
+            <svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" /></svg>{{ loading() ? 'Refreshing...' : 'Refresh data' }}
+          </button>
+        </div>
+      </div>
+
+      @if (errorMessage()) {
+        <section class="platform-error" role="alert"><div><strong>Platform data is unavailable</strong><p>{{ errorMessage() }}</p></div><button class="secondary-button" type="button" (click)="loadOverview()">Try again</button></section>
+      }
+
+      @if (loading() && !overview()) {
+        <section class="dashboard-loading" aria-label="Loading platform data">
+          @for (item of [1, 2, 3, 4]; track item) { <span class="loading-card"></span> }
+        </section>
+      } @else {
+        @if (overview(); as data) {
+        <section class="metric-grid" aria-label="Platform totals">
+          <article class="surface-card metric-card">
+            <div class="metric-topline"><span class="metric-icon metric-icon-indigo"><svg viewBox="0 0 24 24"><path d="M4 20V7l8-4 8 4v13M8 10h2m4 0h2m-8 4h2m4 0h2M3 20h18" /></svg></span><span class="metric-source">PostgreSQL</span></div>
+            <p>Enterprises</p><div class="metric-value"><strong>{{ data.totals.enterprises }}</strong></div><small>Registered business tenants</small>
+          </article>
+          <article class="surface-card metric-card">
+            <div class="metric-topline"><span class="metric-icon metric-icon-sky"><svg viewBox="0 0 24 24"><path d="M16 20v-1.7c0-1.8-1.5-3.3-3.3-3.3H7.3A3.3 3.3 0 0 0 4 18.3V20m6-9a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7-1 1.5 1.5L21 9" /></svg></span><span class="metric-source">PostgreSQL</span></div>
+            <p>Business users</p><div class="metric-value"><strong>{{ data.totals.users }}</strong></div><small>Across every enterprise</small>
+          </article>
+          <article class="surface-card metric-card">
+            <div class="metric-topline"><span class="metric-icon metric-icon-emerald"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" /></svg></span><span class="metric-source">{{ activeUserPercentage() }}% active</span></div>
+            <p>Active accounts</p><div class="metric-value"><strong>{{ data.totals.activeUsers }}</strong><span>/ {{ data.totals.users }}</span></div><small>Currently enabled accounts</small>
+          </article>
+          <article class="surface-card metric-card">
+            <div class="metric-topline"><span class="metric-icon" [class.metric-icon-emerald]="data.totals.onlineServices === data.totals.totalServices" [class.metric-icon-amber]="data.totals.onlineServices !== data.totals.totalServices"><svg viewBox="0 0 24 24"><path d="M4 5h16v5H4V5Zm0 9h16v5H4v-5Zm3-6h.01M7 17h.01" /></svg></span><span class="metric-source">Eureka</span></div>
+            <p>Online services</p><div class="metric-value"><strong>{{ data.totals.onlineServices }}</strong><span>/ {{ data.totals.totalServices }}</span></div><small>Registered service instances</small>
+          </article>
+        </section>
+
+        <section class="platform-sections">
+          <article class="surface-card service-panel" id="services">
+            <header class="card-header"><div><div class="card-title-row"><h2>Service registry</h2><span class="status-badge" [class.status-badge-success]="data.totals.onlineServices === data.totals.totalServices" [class.status-badge-warning]="data.totals.onlineServices !== data.totals.totalServices"><span></span>{{ data.totals.onlineServices }} of {{ data.totals.totalServices }} online</span></div><p>Availability is read directly from Eureka registrations.</p></div></header>
+            <div class="table-wrap"><table><thead><tr><th>Service</th><th>Status</th><th>Instances</th><th>Source</th></tr></thead><tbody>
+              @for (service of filteredServices(); track service.serviceId) {
+                <tr><td><div class="service-name"><span class="service-monogram">{{ serviceMonogram(service) }}</span><span><strong>{{ service.name }}</strong><small>{{ service.serviceId }}</small></span></div></td>
+                  <td><span class="status-badge" [class.status-badge-success]="service.status === 'ONLINE'" [class.status-badge-critical]="service.status === 'OFFLINE'"><span></span>{{ service.status === 'ONLINE' ? 'Online' : 'Offline' }}</span></td>
+                  <td><strong class="availability">{{ service.instanceCount }}</strong></td><td><span class="micro-tag">EUREKA</span></td></tr>
+              } @empty { <tr><td colspan="4" class="empty-row">No services match your search.</td></tr> }
+            </tbody></table></div>
+          </article>
+
+          <article class="surface-card service-panel" id="tenants">
+            <header class="card-header"><div><div class="card-title-row"><h2>Registered enterprises</h2><span class="record-count">{{ data.totals.enterprises }} records</span></div><p>Tenant records and account counts from the identity database.</p></div></header>
+            <div class="table-wrap"><table><thead><tr><th>Enterprise</th><th>Activity</th><th>Users</th><th>Status</th><th>Registered</th></tr></thead><tbody>
+              @for (tenant of filteredTenants(); track tenant.enterpriseId) {
+                <tr><td><div class="tenant-name"><span class="tenant-monogram">{{ (tenant.companyName?.[0] || 'E').toUpperCase() }}</span><span><strong>{{ tenant.companyName || 'Unnamed enterprise' }}</strong><small>ID {{ tenant.enterpriseId }}</small></span></div></td>
+                  <td>{{ tenant.activityType || 'Not specified' }}</td><td><strong class="availability">{{ tenant.userCount }}</strong></td>
+                  <td><span class="status-badge" [class.status-badge-success]="tenant.active" [class.status-badge-critical]="!tenant.active"><span></span>{{ tenant.active ? 'Active' : 'Suspended' }}</span></td>
+                  <td>{{ tenant.createdAt | date:'mediumDate' }}</td></tr>
+              } @empty { <tr><td colspan="5" class="empty-row">{{ searchTerm() ? 'No enterprises match your search.' : 'No business enterprises are registered yet.' }}</td></tr> }
+            </tbody></table></div>
+          </article>
+        </section>
+        }
+      }
+    </main>
+  </section>
+</div>

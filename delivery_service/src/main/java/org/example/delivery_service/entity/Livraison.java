@@ -19,6 +19,9 @@ public class Livraison {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long idLivraison;
 
+    @Column(name = "enterprise_id", nullable = false)
+    private Long enterpriseId;
+
     @Column(nullable = false, unique = true)
     private Long referenceCommandeId;
 

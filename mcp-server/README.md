@@ -42,7 +42,7 @@ requiring a Java method per controller:
    `DELETE` operation; `confirmerMutationOpenApi` sends that exact request only
    after a separate `CONFIRM` call.
 
-Authentication/bootstrap operations (`login`, `register`, and `setup-admin`)
+Authentication operations (`login` and `register`)
 are deliberately excluded. All requests remain subject to gateway JWT
 validation and downstream role/enterprise authorization.
 

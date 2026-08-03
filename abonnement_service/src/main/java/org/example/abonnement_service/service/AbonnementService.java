@@ -5,6 +5,8 @@ import org.example.abonnement_service.dto.response.AbonnementResponse;
 import org.example.abonnement_service.entity.Abonnement;
 
 import java.util.List;
+import org.example.common.dto.PageResponse;
+import org.example.abonnement_service.entity.StatutAbonnement;
 
 public interface AbonnementService {
 
@@ -18,4 +20,5 @@ public interface AbonnementService {
 
     AbonnementResponse getAbonnementById(Long idAbonnement);
     List<AbonnementResponse> getHistoriqueUtilisateur(Long userId);
+    PageResponse<AbonnementResponse> search(StatutAbonnement statut, int page, int size);
 }

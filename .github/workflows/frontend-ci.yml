@@ -29,5 +29,5 @@ jobs:
           project_type: 'node'
           service_name: 'frontend_service'
           image_name: 'erp-frontend-service'
-          run_tests: 'false'
+          run_tests: 'true'
           fail_on_vulnerabilities: 'false'

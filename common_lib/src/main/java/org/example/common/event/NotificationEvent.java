@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class NotificationEvent {
+    private Long enterpriseId;
     private TypeNotification type;
     private String recipientContact;
     private String subject;

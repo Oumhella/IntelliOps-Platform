@@ -1,4 +1,5 @@
 export const environment = {
-    production: false,
-    apiUrl: 'http://localhost:8080' // Points directly to local Gateway
+  production: false,
+  // Same-origin /api calls are forwarded to the gateway by proxy.conf.json.
+  apiUrl: '',
 };

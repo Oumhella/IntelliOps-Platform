@@ -8,9 +8,11 @@ import org.example.paiment_service.entity.StatutPaiement;
 @Data
 public class TransactionPaiementResponseDTO {
     private Long id;
+    private String idempotencyKey;
     private Long referenceSourceId;
     private Contexte typeContexte;
     private double montant;
+    private double montantRembourse;
     private ModePaiement mode;
     private StatutPaiement statut;
     private FactureResponseDTO facture;

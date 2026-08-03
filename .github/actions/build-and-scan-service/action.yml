@@ -78,6 +78,8 @@ runs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: '${{ inputs.service_name }}/package-lock.json'
 
     - name: Install NPM Dependencies (${{ inputs.service_name }})
       if: inputs.project_type == 'node'
@@ -85,6 +87,18 @@ runs:
       run: |
         cd ${{ inputs.service_name }}
         npm ci
+
+    - name: Run Node tests (${{ inputs.service_name }})
+      if: inputs.project_type == 'node' && inputs.run_tests == 'true'
+      shell: bash
+      run: |
+        cd ${{ inputs.service_name }}
+        export CHROME_BIN="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium-browser || command -v chromium)"
+        if [ -z "$CHROME_BIN" ]; then
+          echo "No Chrome or Chromium executable was found on the CI runner."
+          exit 1
+        fi
+        npm run test:ci
 
     # -------------------------------------------------------------
     # SHARED DEVSECOPS STEPS

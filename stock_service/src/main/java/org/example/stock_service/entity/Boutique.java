@@ -28,6 +28,9 @@ public class Boutique {
     private String cleApi;
     private Long adminId;
 
+    @Column(name = "enterprise_id", nullable = false)
+    private Long enterpriseId;
+
     @OneToMany(mappedBy = "boutique", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     @ToString.Exclude

@@ -15,8 +15,11 @@ import org.springframework.stereotype.Service;
 import org.example.lead_service.client.StockClient;
 import org.example.lead_service.dto.StockProductDTO;
 import org.example.lead_service.event.OrderEventProducer;
-import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.example.common.dto.PageResponse;
+import org.example.common.security.TenantContext;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -43,6 +46,7 @@ public class LeadServiceImpl implements LeadService {
             }
         }
         Lead lead = leadMapper.toEntity(leadDTO);
+        lead.setEnterpriseId(TenantContext.requireEnterpriseId());
         // Un nouveau lead commence toujours à l'état initial défini
         if (lead.getStatutLead() == null) {
             lead.setStatutLead(StatutLead.NEW_LEAD);
@@ -54,23 +58,33 @@ public class LeadServiceImpl implements LeadService {
     @Override
     @Transactional(readOnly = true)
     public LeadDTO obtenirLeadParId(Long idLead) {
-        Lead lead = leadRepository.findById(idLead)
-                .orElseThrow(() -> new EntityNotFoundException("Lead introuvable avec l'ID : " + idLead));
+        Lead lead = findLead(idLead);
         return leadMapper.toDto(lead);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<LeadDTO> obtenirLeadsParAgent(Long agentId) {
-        return leadRepository.findByAgentId(agentId).stream()
+        return leadRepository.findByAgentIdAndEnterpriseId(agentId, TenantContext.requireEnterpriseId()).stream()
                 .map(leadMapper::toDto)
                 .collect(Collectors.toList());
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public PageResponse<LeadDTO> rechercherLeads(StatutLead statut, Long agentId, int page, int size) {
+        PageRequest pageable = PageRequest.of(
+                Math.max(0, page),
+                Math.min(Math.max(1, size), 100),
+                Sort.by(Sort.Direction.DESC, "idLead"));
+        return PageResponse.from(
+                leadRepository.search(TenantContext.requireEnterpriseId(), statut, agentId, pageable),
+                leadMapper::toDto);
+    }
+
+    @Override
     public LeadDTO assignerAgent(Long idLead, Long agentId) {
-        Lead lead = leadRepository.findById(idLead)
-                .orElseThrow(() -> new EntityNotFoundException("Lead introuvable avec l'ID : " + idLead));
+        Lead lead = findLead(idLead);
 
         lead.assignerAgent(agentId);
         return leadMapper.toDto(leadRepository.save(lead));
@@ -78,8 +92,7 @@ public class LeadServiceImpl implements LeadService {
 
     @Override
     public NoteInteractionDTO enregistrerInteraction(Long idLead, TypeInteraction type, String commentaire, StatutLead nouveauStatut) {
-        Lead lead = leadRepository.findById(idLead)
-                .orElseThrow(() -> new EntityNotFoundException("Lead introuvable avec l'ID : " + idLead));
+        Lead lead = findLead(idLead);
 
         String ancienStatutStr = lead.getStatutLead().name();
 
@@ -115,8 +128,7 @@ public class LeadServiceImpl implements LeadService {
     @Override
     @Transactional
     public CommandeDTO convertirEnCommande(Long idLead, CreationCommandeRequest request) {
-        Lead lead = leadRepository.findById(idLead)
-                .orElseThrow(() -> new EntityNotFoundException("Lead introuvable avec l'ID : " + idLead));
+        Lead lead = findLead(idLead);
 
         // 1. Initialise la commande avec le statut CONVERTED et copie les infos du client
         Commande nouvelleCommande = lead.convertirEnCommande();
@@ -163,5 +175,10 @@ public class LeadServiceImpl implements LeadService {
 
         // 5. On renvoie la commande persistée mappée en DTO
         return commandeMapper.toDto(savedLead.getCommande());
+    }
+
+    private Lead findLead(Long idLead) {
+        return leadRepository.findByIdLeadAndEnterpriseId(idLead, TenantContext.requireEnterpriseId())
+                .orElseThrow(() -> new EntityNotFoundException("Lead introuvable avec l'ID : " + idLead));
     }
 }
