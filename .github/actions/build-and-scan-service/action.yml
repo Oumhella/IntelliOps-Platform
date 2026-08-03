@@ -24,11 +24,31 @@ inputs:
     description: 'Run unit tests'
     required: false
     default: 'false'
+  build_common_lib:
+    description: 'Build and install common_lib before building a Java service'
+    required: false
+    default: 'true'
+  dockerfile:
+    description: 'Dockerfile path for Java services; defaults to the shared Dockerfile'
+    required: false
+    default: 'Dockerfile.microservice'
+  push_image:
+    description: 'Push the image to Docker Hub after successful scans'
+    required: false
+    default: 'false'
   fail_on_vulnerabilities:
     description: 'Fail Trivy scans when vulnerabilities are found'
     required: false
     default: 'false'
-
+  # --- DOCKER HUB INPUTS ---
+  dockerhub_username:
+    description: 'Nom d''utilisateur Docker Hub'
+    required: false
+    default: ''
+  dockerhub_token:
+    description: 'Token ou mot de passe Docker Hub'
+    required: false
+    default: ''
 runs:
   using: 'composite'
   steps:
@@ -44,7 +64,7 @@ runs:
         cache: 'maven'
 
     - name: Build & install common_lib
-      if: inputs.project_type == 'java'
+      if: inputs.project_type == 'java' && inputs.build_common_lib == 'true'
       shell: bash
       run: |
         if [ -d "common_lib" ]; then
@@ -120,12 +140,18 @@ runs:
         if [ "${{ inputs.project_type }}" = "node" ]; then
           cd ${{ inputs.service_name }}
           docker build -t ${{ inputs.image_name }}:latest .
-        else
-          # For Java microservices, build from repo root using Dockerfile.microservice
+        elif [ "${{ inputs.dockerfile }}" = "Dockerfile.microservice" ]; then
+          # Standard Java services use the shared Dockerfile from the repo root.
           docker build \
             -f Dockerfile.microservice \
             --build-arg SERVICE_NAME=${{ inputs.service_name }} \
             --build-arg SERVICE_PORT=${{ inputs.service_port }} \
+            --build-arg BUILD_COMMON_LIB=${{ inputs.build_common_lib }} \
+            -t ${{ inputs.image_name }}:latest .
+        else
+          # Infrastructure services may need a service-specific entrypoint.
+          docker build \
+            -f "${{ inputs.dockerfile }}" \
             -t ${{ inputs.image_name }}:latest .
         fi
 
@@ -142,3 +168,28 @@ runs:
       uses: gitleaks/gitleaks-action@v2
       env:
         GITLEAKS_ENABLE_COMMENTS: false
+
+    # -------------------------------------------------------------
+    # 7. DOCKER HUB LOGIN & PUSH (Immutable Git SHA tagging)
+    # -------------------------------------------------------------
+    - name: Connexion à Docker Hub
+      if: inputs.push_image == 'true'
+      uses: docker/login-action@v3
+      with:
+        username: ${{ inputs.dockerhub_username }}
+        password: ${{ inputs.dockerhub_token }}
+
+    - name: Push vers Docker Hub (Git SHA Tag Only)
+      if: inputs.push_image == 'true'
+      shell: bash
+      run: |
+        FULL_IMAGE_NAME="${{ inputs.dockerhub_username }}/${{ inputs.image_name }}"
+        IMAGE_TAG="${{ github.sha }}"
+
+        # Use the complete commit SHA: it is immutable and avoids short-SHA collisions.
+        docker tag "${{ inputs.image_name }}:latest" "$FULL_IMAGE_NAME:$IMAGE_TAG"
+
+        # Push unique image tag to Docker Hub
+        docker push "$FULL_IMAGE_NAME:$IMAGE_TAG"
+
+        echo "Pushed immutable image: $FULL_IMAGE_NAME:$IMAGE_TAG"

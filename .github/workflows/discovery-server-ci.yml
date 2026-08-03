@@ -1,37 +1,39 @@
-name: Abonnement Service CI (DevSecOps)
+name: Discovery Server CI (DevSecOps)
 
 on:
   push:
-    branches: [ "main", "develop", "feature/**" ]
+    branches: [main, develop, feature/**]
     paths:
-      - 'abonnement_service/**'
-      - 'common_lib/**'
+      - 'discovery-server/**'
       - 'Dockerfile.microservice'
       - '.github/actions/build-and-scan-service/**'
-      - '.github/workflows/abonnement-service-ci.yml'
+      - '.github/workflows/discovery-server-ci.yml'
   pull_request:
-    branches: [ main ]
+    branches: [main]
     paths:
-      - 'abonnement_service/**'
-      - 'common_lib/**'
+      - 'discovery-server/**'
       - 'Dockerfile.microservice'
       - '.github/actions/build-and-scan-service/**'
-      - '.github/workflows/abonnement-service-ci.yml'
+      - '.github/workflows/discovery-server-ci.yml'
+
+permissions:
+  contents: read
 
 jobs:
   build-and-scan:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout du code
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Build, scan & package abonnement_service
+      - name: Build, scan & package discovery-server
         uses: ./.github/actions/build-and-scan-service
         with:
-          service_name: abonnement_service
-          service_port: 8083
-          image_name: erp-abonnement-service
+          service_name: discovery-server
+          service_port: 8761
+          image_name: erp-discovery-server
+          build_common_lib: 'false'
           push_image: ${{ github.event_name == 'push' }}
           dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}

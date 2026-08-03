@@ -2,13 +2,14 @@ name: MCP Server CI (DevSecOps)
 
 on:
   push:
-    branches: [main, develop, feature/identity-auth, feature/vault-gateway]
+    branches: [main, develop, feature/**]
     paths:
       - 'mcp-server/**'
       - 'common_lib/**'
       - 'Dockerfile.microservice'
       - 'docker-compose.yaml'
       - '.github/workflows/mcp-server-ci.yml'
+      - '.github/actions/build-and-scan-service/**'
   pull_request:
     branches: [main]
     paths:
@@ -17,6 +18,7 @@ on:
       - 'Dockerfile.microservice'
       - 'docker-compose.yaml'
       - '.github/workflows/mcp-server-ci.yml'
+      - '.github/actions/build-and-scan-service/**'
 
 permissions:
   contents: read
@@ -40,5 +42,9 @@ jobs:
           service_name: mcp-server
           service_port: 8085
           image_name: erp-mcp-server
-          run_tests: true
-          fail_on_vulnerabilities: true
+          build_common_lib: 'false'
+          run_tests: 'true'
+          fail_on_vulnerabilities: 'true'
+          push_image: ${{ github.event_name == 'push' }}
+          dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
