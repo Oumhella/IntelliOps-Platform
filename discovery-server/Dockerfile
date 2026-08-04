@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Étape 1 : Utiliser une image de build temporaire pour compiler l'application
 FROM maven:3.9.9-eclipse-temurin-17-alpine AS builder
 WORKDIR /app
@@ -11,14 +12,26 @@ COPY discovery-server/src /app/discovery-server/src
 
 # Compiler et packager l'application en ignorant les tests pour accélérer le build de l'image
 WORKDIR /app/discovery-server
-RUN mvn clean package -DskipTests
+RUN --mount=type=cache,target=/root/.m2,sharing=locked \
+    for attempt in 1 2 3; do \
+      mvn -B -ntp -Dmaven.wagon.http.retryHandler.count=5 clean package -DskipTests && exit 0; \
+      echo "Discovery Server Maven build failed (attempt $attempt/3)"; \
+      sleep $((attempt * 5)); \
+    done; \
+    exit 1
 
 # Étape 2 : Image finale d'exécution (Production-ready)
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
 # Créer un groupe et un utilisateur "spring" pour ne pas exécuter l'application en tant que root
-RUN addgroup -S spring && adduser -S spring -G spring
+RUN for attempt in 1 2 3; do \
+      apk upgrade --no-cache && break; \
+      if [ "$attempt" = "3" ]; then exit 1; fi; \
+      sleep $((attempt * 5)); \
+    done \
+    && addgroup -S spring \
+    && adduser -S spring -G spring
 USER spring:spring
 
 # Copier le fichier JAR compilé depuis l'étape précédente

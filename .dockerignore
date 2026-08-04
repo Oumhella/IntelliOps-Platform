@@ -1,0 +1,10 @@
+.git
+.github
+.idea
+.agents
+.env
+**/target
+**/node_modules
+**/dist
+docs
+vault/file

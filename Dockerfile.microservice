@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # ============================================================
 # Shared Dockerfile for all Spring Boot microservices
 # Usage: Pass SERVICE_NAME and SERVICE_PORT as build args
@@ -6,22 +7,46 @@
 # Étape 1 : Build du JAR avec Maven
 FROM maven:3.9-eclipse-temurin-17 AS build
 ARG SERVICE_NAME
+ARG BUILD_COMMON_LIB=true
 WORKDIR /app
 
 # Copier et installer la librairie commune en premier
 COPY common_lib/pom.xml ./common_lib/pom.xml
 COPY common_lib/src ./common_lib/src
-RUN mvn -f common_lib/pom.xml clean install -DskipTests -q
+RUN --mount=type=cache,target=/root/.m2,sharing=locked \
+    if [ "$BUILD_COMMON_LIB" = "true" ]; then \
+      for attempt in 1 2 3; do \
+        mvn -B -ntp -Dmaven.wagon.http.retryHandler.count=5 \
+          -f common_lib/pom.xml clean install -DskipTests && exit 0; \
+        echo "common_lib Maven build failed (attempt $attempt/3)"; \
+        sleep $((attempt * 5)); \
+      done; \
+      exit 1; \
+    fi
 
 # Copier et builder le microservice
 COPY ${SERVICE_NAME}/pom.xml ./pom.xml
 COPY ${SERVICE_NAME}/src ./src
-RUN mvn clean package -DskipTests -q
+RUN --mount=type=cache,target=/root/.m2,sharing=locked \
+    for attempt in 1 2 3; do \
+      mvn -B -ntp -Dmaven.wagon.http.retryHandler.count=5 clean package -DskipTests && exit 0; \
+      echo "${SERVICE_NAME} Maven build failed (attempt $attempt/3)"; \
+      sleep $((attempt * 5)); \
+    done; \
+    exit 1
 
 # Étape 2 : Exécution du JAR
 FROM eclipse-temurin:17-jre-alpine
 ARG SERVICE_PORT=8080
 WORKDIR /app
-COPY --from=build /app/target/*.jar app.jar
+RUN for attempt in 1 2 3; do \
+      apk upgrade --no-cache && break; \
+      if [ "$attempt" = "3" ]; then exit 1; fi; \
+      sleep $((attempt * 5)); \
+    done \
+    && addgroup -S spring \
+    && adduser -S spring -G spring
+COPY --from=build --chown=spring:spring /app/target/*.jar app.jar
+USER spring:spring
 EXPOSE ${SERVICE_PORT}
 ENTRYPOINT ["java", "-jar", "app.jar"]

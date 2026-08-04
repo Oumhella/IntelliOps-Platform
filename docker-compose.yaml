@@ -94,7 +94,11 @@ services:
   gateway-service:
     build:
       context: .
-      dockerfile: ./gateway_service/Dockerfile
+      dockerfile: Dockerfile.microservice
+      args:
+        SERVICE_NAME: gateway_service
+        SERVICE_PORT: 8080
+        BUILD_COMMON_LIB: "false"
     container_name: erp-gateway-service
     ports:
       - "8080:8080"

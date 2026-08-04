@@ -3,7 +3,7 @@ name: Infrastructure Integration Test
 
 on:
   push:
-    branches: [ "main", "develop", "feature/vault-gateway" ]
+    branches: [ "main", "develop", "feature/**" ]
   pull_request:
     branches: [ "main" ]
 
@@ -13,7 +13,7 @@ jobs:
     # Hard ceiling for the whole job - if something hangs badly enough that
     # individual step timeouts don't catch it, this kills the job instead of
     # burning your Actions minutes for hours.
-    timeout-minutes: 25
+    timeout-minutes: 35
 
     steps:
       - name: Checkout Code
@@ -48,9 +48,11 @@ jobs:
       #    failures are clearly distinguished from runtime/startup failures
       #    in the CI log.
       - name: Build Images
-        timeout-minutes: 12
+        timeout-minutes: 20
         run: |
-          docker compose build
+          # Limit concurrent Maven downloads; excessive parallel builds can cause
+          # truncated artifacts from Maven Central on shared runners.
+          docker compose --parallel 4 build
 
       # 4. Start the stack. --wait makes Compose block only until containers
       #    report healthy/running (not indefinitely), and returns non-zero

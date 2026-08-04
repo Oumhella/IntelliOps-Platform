@@ -1,37 +1,38 @@
-name: Gateway Service CI (DevSecOps)
+name: Config Server CI (DevSecOps)
 
 on:
   push:
-    branches: [ "main", "develop", "feature/**" ]
+    branches: [main, develop, feature/**]
     paths:
-      - 'gateway_service/**'
-      - 'Dockerfile.microservice'
+      - 'config-server/**'
       - '.github/actions/build-and-scan-service/**'
-      - '.github/workflows/gateway-service-ci.yml'
+      - '.github/workflows/config-server-ci.yml'
   pull_request:
-    branches: [ main ]
+    branches: [main]
     paths:
-      - 'gateway_service/**'
-      - 'Dockerfile.microservice'
+      - 'config-server/**'
       - '.github/actions/build-and-scan-service/**'
-      - '.github/workflows/gateway-service-ci.yml'
+      - '.github/workflows/config-server-ci.yml'
+
+permissions:
+  contents: read
 
 jobs:
   build-and-scan:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout du code
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Build, scan & package gateway_service
+      - name: Build, scan & package config-server
         uses: ./.github/actions/build-and-scan-service
         with:
-          service_name: gateway_service
-          service_port: 8080
-          image_name: erp-gateway-service
+          service_name: config-server
+          service_port: 8888
+          image_name: erp-config-server
           build_common_lib: 'false'
+          dockerfile: config-server/Dockerfile
           push_image: ${{ github.event_name == 'push' }}
           dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}

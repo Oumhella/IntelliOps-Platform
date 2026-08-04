@@ -15,6 +15,11 @@ RUN mvn clean package -DskipTests
 # Étape 2 : Exécution du JAR
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
+RUN for attempt in 1 2 3; do \
+      apk upgrade --no-cache && break; \
+      if [ "$attempt" = "3" ]; then exit 1; fi; \
+      sleep $((attempt * 5)); \
+    done
 COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8081
 ENTRYPOINT ["java", "-jar", "app.jar"]
