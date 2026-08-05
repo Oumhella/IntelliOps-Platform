@@ -36,3 +36,14 @@ jobs:
           push_image: ${{ github.event_name == 'push' }}
           dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  update-gitops:
+    name: Promote frontend image to dev
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/GitOps-setup'
+    needs: devsecops-frontend
+    uses: ./.github/workflows/update-gitops-image.yml
+    with:
+      image_name: erp-frontend-service
+      image_tag: ${{ github.sha }}
+    secrets:
+      gitops_token: ${{ secrets.GITOPS_TOKEN }}
