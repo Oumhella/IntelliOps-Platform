@@ -7,12 +7,14 @@ on:
       - 'frontend_service/**'
       - '.github/workflows/frontend-ci.yml'
       - '.github/actions/build-and-scan-service/**' # Path to your reusable composite action
+      - '.github/workflows/update-gitops-image.yml'
   pull_request:
     branches: [ "main", "develop" ]
     paths:
       - 'frontend_service/**'
       - '.github/workflows/frontend-ci.yml'
       - '.github/actions/build-and-scan-service/**'
+      - '.github/workflows/update-gitops-image.yml'
 
 jobs:
   devsecops-frontend:

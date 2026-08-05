@@ -7,6 +7,7 @@ on:
       - 'discovery-server/**'
       - 'Dockerfile.microservice'
       - '.github/actions/build-and-scan-service/**'
+      - '.github/workflows/update-gitops-image.yml'
       - '.github/workflows/discovery-server-ci.yml'
   pull_request:
     branches: [main]
@@ -14,6 +15,7 @@ on:
       - 'discovery-server/**'
       - 'Dockerfile.microservice'
       - '.github/actions/build-and-scan-service/**'
+      - '.github/workflows/update-gitops-image.yml'
       - '.github/workflows/discovery-server-ci.yml'
 
 permissions:

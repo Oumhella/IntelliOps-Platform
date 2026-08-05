@@ -6,12 +6,14 @@ on:
     paths:
       - 'config-server/**'
       - '.github/actions/build-and-scan-service/**'
+      - '.github/workflows/update-gitops-image.yml'
       - '.github/workflows/config-server-ci.yml'
   pull_request:
     branches: [main]
     paths:
       - 'config-server/**'
       - '.github/actions/build-and-scan-service/**'
+      - '.github/workflows/update-gitops-image.yml'
       - '.github/workflows/config-server-ci.yml'
 
 permissions:

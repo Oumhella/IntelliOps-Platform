@@ -8,6 +8,7 @@ on:
       - 'common_lib/**'
       - 'Dockerfile.microservice'
       - '.github/actions/build-and-scan-service/**'
+      - '.github/workflows/update-gitops-image.yml'
       - '.github/workflows/paiement-service-ci.yml'
   pull_request:
     branches: [ main ]
@@ -16,6 +17,7 @@ on:
       - 'common_lib/**'
       - 'Dockerfile.microservice'
       - '.github/actions/build-and-scan-service/**'
+      - '.github/workflows/update-gitops-image.yml'
       - '.github/workflows/paiement-service-ci.yml'
 
 jobs:
