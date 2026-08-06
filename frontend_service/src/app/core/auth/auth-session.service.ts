@@ -1,6 +1,6 @@
 import { computed, inject, Injectable, PLATFORM_ID, signal } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { AuthResponse } from '../api/models';
+import { AuthResponse, UserResponse } from '../api/models';
 
 const SESSION_STORAGE_KEY = 'intelliops.auth';
 
@@ -15,6 +15,7 @@ export class AuthSessionService {
     return session === null
       ? null
       : {
+          id: session.id,
           email: session.email,
           firstname: session.firstname,
           lastname: session.lastname,
@@ -36,6 +37,18 @@ export class AuthSessionService {
     if (isPlatformBrowser(this.platformId)) {
       localStorage.removeItem(SESSION_STORAGE_KEY);
     }
+  }
+
+  updateIdentity(profile: UserResponse): void {
+    const session = this.sessionState();
+    if (session === null) return;
+    this.setSession({
+      ...session,
+      email: profile.email,
+      firstname: profile.firstname,
+      lastname: profile.lastname,
+      role: profile.role,
+    });
   }
 
   getToken(): string | null {

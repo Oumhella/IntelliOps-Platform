@@ -8,9 +8,6 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AbonnementRequest {
-    @NotNull(message = "L'ID de l'utilisateur est obligatoire")
-    private Long userId;
-
     @NotNull(message = "L'ID du plan est obligatoire")
     private Long planId;
 

@@ -160,10 +160,18 @@ vault kv put secret/mcp-server \
   spring.ai.openai.chat.options.model="${NVIDIA_MODEL}"\
   agent.llm.provider="${AGENT_LLM_PROVIDER:-none}" \
 
+STRIPE_PUBLISHABLE_KEY_VALUE="${STRIPE_PUBLISHABLE_KEY:-}"
+if [ -z "$STRIPE_PUBLISHABLE_KEY_VALUE" ]; then
+  # Preserve a key configured directly in Vault instead of erasing it when the
+  # optional local .env value is absent during a later init-container restart.
+  STRIPE_PUBLISHABLE_KEY_VALUE="$(vault kv get -field=stripe.publishable-key secret/paiement-service 2>/dev/null || true)"
+fi
+
 vault kv put secret/paiement-service \
     spring.datasource.username="${DB_USER:-postgres}" \
     spring.datasource.password="${DB_PASSWORD:-changeme}" \
     stripe.api-key="${STRIPE_API_KEY}" \
+    stripe.publishable-key="$STRIPE_PUBLISHABLE_KEY_VALUE" \
     minio.url="http://minio:9000" \
     minio.access-key="${MINIO_ROOT_USER}" \
     minio.secret-key="${MINIO_ROOT_PASSWORD}" \

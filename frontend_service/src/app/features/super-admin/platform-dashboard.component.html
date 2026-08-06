@@ -21,6 +21,10 @@
         <svg viewBox="0 0 24 24"><path d="M4 5h16v5H4V5Zm0 9h16v5H4v-5Zm3-6h.01M7 17h.01" /></svg><span>Services</span>
         <span class="status-dot" [class.status-dot-success]="overview()?.totals?.onlineServices === overview()?.totals?.totalServices"></span>
       </a>
+      <a class="nav-item" href="#plans">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16v12H4V6Zm4 4h8m-8 4h5" /></svg><span>Plan catalogue</span>
+        <span class="nav-count">{{ plans().length }}</span>
+      </a>
 
       <p class="nav-label nav-label-spaced">Administration</p>
       <span class="nav-item nav-item-disabled">
@@ -124,8 +128,45 @@
             </tbody></table></div>
           </article>
         </section>
+
+        <section class="surface-card service-panel plan-catalogue" id="plans">
+          <header class="card-header">
+            <div><div class="card-title-row"><h2>Global plan catalogue</h2><span class="record-count">{{ plans().length }} offers</span></div><p>Commercial plans are platform products shared by every enterprise. Tenant administrators can select active offers but cannot edit them.</p></div>
+            <button class="primary-button" type="button" (click)="openPlan()">Create plan</button>
+          </header>
+          @if (planNotice()) { <p class="plan-notice" role="status">{{ planNotice() }}</p> }
+          <div class="table-wrap"><table><thead><tr><th>Plan</th><th>Billing period</th><th>Price</th><th>Monthly orders</th><th>Status</th><th></th></tr></thead><tbody>
+            @if (planLoading()) { <tr><td colspan="6" class="empty-row">Loading the global catalogue...</td></tr> }
+            @for (plan of plans(); track plan.idPlan) {
+              <tr><td><div class="tenant-name"><span class="tenant-monogram">{{ plan.nomPlan[0].toUpperCase() }}</span><span><strong>{{ plan.nomPlan }}</strong><small>{{ plan.description || 'No description' }}</small></span></div></td>
+                <td>{{ planLabel(plan.duree) }}</td><td><strong class="availability">{{ plan.prix }} MAD</strong></td><td>{{ plan.limiteCommandesMois > 0 ? plan.limiteCommandesMois : 'Unlimited' }}</td>
+                <td><span class="status-badge" [class]="'status-badge status-badge-' + planTone(plan.estActif)"><span></span>{{ planLabel(plan.estActif) }}</span></td>
+                <td><div class="row-actions"><button class="action-button" type="button" (click)="openPlan(plan)">Edit</button><button class="action-button action-button-danger" type="button" (click)="archivePlan(plan)" [disabled]="plan.estActif === 'SUPPRIME'">Archive</button></div></td></tr>
+            } @empty { @if (!planLoading()) { <tr><td colspan="6" class="empty-row">No commercial plans exist yet.</td></tr> } }
+          </tbody></table></div>
+        </section>
         }
       }
     </main>
   </section>
 </div>
+
+@if (planPanelOpen) {
+  <button class="drawer-backdrop" type="button" aria-label="Close plan editor" (click)="closePlan()"></button>
+  <aside class="form-drawer" aria-label="Plan editor">
+    <header class="drawer-header"><div><h2>{{ editingPlan ? 'Edit global plan' : 'Create global plan' }}</h2><p>This offer becomes part of the platform-wide catalogue.</p></div><button class="drawer-close" type="button" (click)="closePlan()">×</button></header>
+    <form (ngSubmit)="savePlan()">
+      <div class="form-grid">
+        <label class="form-field form-field-full"><span>Plan name</span><input name="name" [(ngModel)]="planForm.nomPlan" required /></label>
+        <label class="form-field form-field-full"><span>Description</span><textarea name="description" [(ngModel)]="planForm.description"></textarea></label>
+        <label class="form-field"><span>Price (MAD)</span><input name="price" type="number" min="0" step="0.01" [(ngModel)]="planForm.prix" required /></label>
+        <label class="form-field"><span>Billing period</span><select name="duration" [(ngModel)]="planForm.duree">@for (duration of durations; track duration) { <option [value]="duration">{{ planLabel(duration) }}</option> }</select></label>
+        <label class="form-field"><span>Minimum days before pause</span><input name="minimumPause" type="number" min="0" [(ngModel)]="planForm.minJoursEntreDesactivation" /></label>
+        <label class="form-field"><span>Maximum pause duration</span><input name="maximumPause" type="number" min="0" [(ngModel)]="planForm.maxPeriodeDesactivation" /></label>
+        <label class="form-field"><span>Monthly order limit</span><input name="orderLimit" type="number" min="0" [(ngModel)]="planForm.limiteCommandesMois" /><small class="form-help">Use 0 for unlimited orders.</small></label>
+        <label class="form-field"><span>Commercial status</span><select name="status" [(ngModel)]="planForm.estActif">@for (status of offerStatuses; track status) { <option [value]="status">{{ planLabel(status) }}</option> }</select></label>
+      </div>
+      <div class="form-actions"><button class="primary-button" type="submit" [disabled]="savingPlan">{{ savingPlan ? 'Saving...' : 'Save plan' }}</button></div>
+    </form>
+  </aside>
+}

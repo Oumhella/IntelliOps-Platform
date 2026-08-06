@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @RestController
 @RequestMapping("/api/v1/inventaires")
@@ -19,6 +20,7 @@ public class InventaireController {
     private final InventaireService inventaireService;
 
     @PatchMapping("/boutiques/{idBoutique}/produits/{idProduit}/ajuster")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC')")
     public ResponseEntity<InventaireResponseDTO> ajusterStock(
             @PathVariable Long idBoutique,
             @PathVariable Long idProduit,
@@ -30,6 +32,7 @@ public class InventaireController {
     }
 
     @PostMapping("/boutiques/{idBoutique}/produits/{idProduit}/reserver")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CSM', 'LOGISTIC')")
     public ResponseEntity<InventaireResponseDTO> reserverStock(
             @PathVariable Long idBoutique,
             @PathVariable Long idProduit,
@@ -53,6 +56,7 @@ public class InventaireController {
     }
 
     @PutMapping("/{idInventaire}/regle-approvisionnement")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC')")
     public ResponseEntity<InventaireResponseDTO> configurerRegleApprovisionnement(
             @PathVariable Long idInventaire,
             @RequestBody RegleApprovisionnementRequestDTO request) {

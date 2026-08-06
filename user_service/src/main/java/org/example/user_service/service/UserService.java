@@ -16,6 +16,10 @@ public interface UserService {
 
     List<UserResponse> getUsersByEnterprise(Long enterpriseId);
 
+    List<UserResponse> getActiveCouriersByEnterprise(Long enterpriseId);
+
+    UserResponse getActiveCourier(Long userId, Long enterpriseId);
+
     // ── Profile operations ──────────────────────────────────────────
 
     UserResponse getProfile(String email);

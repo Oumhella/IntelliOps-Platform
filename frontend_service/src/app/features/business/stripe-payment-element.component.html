@@ -1,0 +1,16 @@
+<section class="stripe-checkout" aria-label="Secure Stripe checkout">
+  <div class="stripe-heading">
+    <div>
+      <span>Secure payment</span>
+      <strong>{{ preparation.amount }} {{ preparation.currency.toUpperCase() }}</strong>
+    </div>
+    <span class="stripe-mark">Powered by Stripe</span>
+  </div>
+  @if (loading) { <p class="stripe-loading">Loading encrypted payment fields…</p> }
+  <div #paymentElement class="stripe-element"></div>
+  @if (errorMessage) { <p class="stripe-error" role="alert">{{ errorMessage }}</p> }
+  <p class="stripe-note">Payment details are submitted directly to Stripe and are never stored by IntelliOps.</p>
+  <button class="primary-button stripe-submit" type="button" [disabled]="loading || processing" (click)="submit()">
+    {{ processing ? 'Confirming with Stripe…' : 'Pay securely' }}
+  </button>
+</section>

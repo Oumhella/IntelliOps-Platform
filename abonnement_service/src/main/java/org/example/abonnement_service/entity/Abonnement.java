@@ -40,6 +40,7 @@ public class Abonnement {
     @Column(nullable = false)
     private Long userId;
 
+    @Column(unique = true)
     private Long paiementId;
 
     @ManyToOne(optional = false)

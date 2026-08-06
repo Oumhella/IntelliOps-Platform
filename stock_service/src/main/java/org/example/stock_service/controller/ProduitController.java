@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @RestController
 @RequestMapping("/api/v1/produits")
@@ -18,6 +19,7 @@ public class ProduitController {
     private final ProduitService produitService;
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC')")
     public ResponseEntity<ProduitResponseDTO> creerProduit(@RequestBody ProduitRequestDTO request) {
         return new ResponseEntity<>(produitService.creerProduit(request), HttpStatus.CREATED);
     }
@@ -33,6 +35,7 @@ public class ProduitController {
     }
 
     @PutMapping("/{idProduit}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC')")
     public ResponseEntity<ProduitResponseDTO> modifierProduit(
             @PathVariable Long idProduit,
             @RequestBody ProduitRequestDTO request) {
@@ -40,6 +43,7 @@ public class ProduitController {
     }
 
     @DeleteMapping("/{idProduit}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC')")
     public ResponseEntity<Void> supprimerProduit(@PathVariable Long idProduit) {
         produitService.supprimerProduit(idProduit);
         return ResponseEntity.noContent().build();

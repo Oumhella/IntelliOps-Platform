@@ -36,6 +36,10 @@ export class UsersApiService {
     return this.http.get<readonly UserResponse[]>(`${this.url}/staff`);
   }
 
+  getActiveCouriers(): Observable<readonly UserResponse[]> {
+    return this.http.get<readonly UserResponse[]>(`${this.url}/staff/couriers`);
+  }
+
   getStaffMember(id: number): Observable<UserResponse> {
     return this.http.get<UserResponse>(`${this.url}/staff/${id}`);
   }

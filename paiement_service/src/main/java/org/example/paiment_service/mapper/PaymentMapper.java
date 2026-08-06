@@ -17,5 +17,10 @@ public interface PaymentMapper {
     @Mapping(target = "statut", ignore = true)
     @Mapping(target = "facture", ignore = true)
     @Mapping(target = "tokenisation", ignore = true)
+    @Mapping(target = "enterpriseId", ignore = true)
+    @Mapping(target = "montantRembourse", ignore = true)
+    @Mapping(target = "providerTransactionId", ignore = true)
+    @Mapping(target = "consumptionReference", ignore = true)
+    @Mapping(target = "consumedAt", ignore = true)
     TransactionPaiement toEntity(InitierPaiementRequestDTO dto);
 }

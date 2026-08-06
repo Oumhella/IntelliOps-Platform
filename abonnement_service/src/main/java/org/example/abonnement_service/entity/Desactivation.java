@@ -23,6 +23,11 @@ public class Desactivation {
     @Column(nullable = false)
     private LocalDate dateFinDesactivation;
 
+    // Nullable only for compatibility with historical pause rows created before
+    // reasons were persisted; new operations validate and always set this field.
+    @Column(length = 500)
+    private String motif;
+
     @ManyToOne(optional = false)
     @JoinColumn(name = "abonnement_id", nullable = false)
     private Abonnement abonnement;

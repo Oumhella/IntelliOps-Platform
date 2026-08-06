@@ -1,7 +1,6 @@
 package org.example.delivery_service.strategy;
 import lombok.extern.slf4j.Slf4j;
 import org.example.delivery_service.entity.Livraison;
-import org.example.delivery_service.entity.StatutLivraison;
 import org.example.delivery_service.entity.TypeTransporteur;
 import org.springframework.stereotype.Component;
 
@@ -16,16 +15,15 @@ public class SocieteLivraisonStrategy implements TransporteurStrategy{
 
     @Override
     public void executerLivraison(Livraison livraison) {
-        log.info("Sending payload to external shipping carrier '{}' via endpoint: {}",
-                livraison.getNomSociete(), livraison.getEndpointApiUrl());
-
-        // HTTP REST Call or SDK integration to DHL/Aramex goes here
-        livraison.mettreAJourStatut(StatutLivraison.CHEZ_TRANSPORTEUR);
+        if (livraison.getNomSociete() == null || livraison.getNomSociete().isBlank()) {
+            throw new IllegalArgumentException("External delivery company name is required");
+        }
+        log.info("External delivery {} recorded for company '{}' in manual-dispatch mode",
+                livraison.getCodeSuiviTracking(), livraison.getNomSociete());
     }
 
     @Override
     public String recupererStatutActuel(String trackingNum) {
-        // Query Carrier Remote API
-        return StatutLivraison.CHEZ_TRANSPORTEUR.name();
+        throw new UnsupportedOperationException("No automated external carrier adapter is configured");
     }
 }

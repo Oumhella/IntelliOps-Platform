@@ -7,6 +7,8 @@ import { StockApiService } from './stock-api.service';
 import { SubscriptionsApiService } from './subscriptions-api.service';
 import { CrmApiService } from './crm-api.service';
 import { PlatformApiService } from './platform-api.service';
+import { DeliveriesApiService } from './deliveries-api.service';
+import { UsersApiService } from './users-api.service';
 
 describe('API services transport details', () => {
   let httpTesting: HttpTestingController;
@@ -43,6 +45,32 @@ describe('API services transport details', () => {
     request.flush([]);
   });
 
+  it('prepares an authoritative Stripe checkout without accepting card data', () => {
+    TestBed.inject(SubscriptionsApiService).prepareCheckout({
+      planId: 3,
+      idempotencyKey: 'checkout-abc',
+    }).subscribe();
+
+    const request = httpTesting.expectOne('http://gateway:8080/api/v1/abonnements/checkout/prepare');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({
+      planId: 3,
+      idempotencyKey: 'checkout-abc',
+    });
+    expect(request.request.body.paiementId).toBeUndefined();
+    expect(request.request.body.paymentMethodId).toBeUndefined();
+    request.flush({});
+  });
+
+  it('completes checkout using only the server payment record', () => {
+    TestBed.inject(SubscriptionsApiService).completeCheckout({ paymentId: 18 }).subscribe();
+
+    const request = httpTesting.expectOne('http://gateway:8080/api/v1/abonnements/checkout/complete');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ paymentId: 18 });
+    request.flush({});
+  });
+
   it('requests invoice download URLs as plain text', () => {
     let downloadUrl = '';
     TestBed.inject(PaymentsApiService).getInvoiceDownloadUrl(12).subscribe((value) => downloadUrl = value);
@@ -77,5 +105,28 @@ describe('API services transport details', () => {
       tenants: [],
       services: [],
     });
+  });
+
+  it('loads active tenant couriers for delivery assignment', () => {
+    TestBed.inject(UsersApiService).getActiveCouriers().subscribe();
+
+    const request = httpTesting.expectOne('http://gateway:8080/api/v1/users/staff/couriers');
+    expect(request.request.method).toBe('GET');
+    request.flush([]);
+  });
+
+  it('sends an internal delivery assignment using livreurId', () => {
+    TestBed.inject(DeliveriesApiService).ship({
+      referenceCommandeId: 7,
+      typeTransporteur: 'LIVREUR_INTERNE',
+      montantACollecterCoD: 125,
+      livreurId: 18,
+    }).subscribe();
+
+    const request = httpTesting.expectOne('http://gateway:8080/api/v1/livraisons/expedier');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body.livreurId).toBe(18);
+    expect(request.request.body.endpointApiUrl).toBeUndefined();
+    request.flush({});
   });
 });

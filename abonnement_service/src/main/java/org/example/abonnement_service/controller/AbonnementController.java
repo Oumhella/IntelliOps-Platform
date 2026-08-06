@@ -3,7 +3,12 @@ package org.example.abonnement_service.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.abonnement_service.dto.request.AbonnementRequest;
+import org.example.abonnement_service.dto.request.PaymentCheckoutRequest;
+import org.example.abonnement_service.dto.request.SubscriptionCheckoutRequest;
+import org.example.abonnement_service.dto.request.UpgradeCheckoutRequest;
+import org.example.abonnement_service.dto.request.CompletePaymentCheckoutRequest;
 import org.example.abonnement_service.dto.response.AbonnementResponse;
+import org.example.abonnement_service.dto.response.CheckoutPreparationResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,10 +17,12 @@ import org.example.abonnement_service.service.AbonnementService;
 import java.util.List;
 import org.example.common.dto.PageResponse;
 import org.example.abonnement_service.entity.StatutAbonnement;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @RestController
 @RequestMapping("/api/v1/abonnements")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMIN')")
 public class AbonnementController {
 
     private final AbonnementService abonnementService;
@@ -35,6 +42,22 @@ public class AbonnementController {
     public ResponseEntity<AbonnementResponse> souscrire(@Valid @RequestBody AbonnementRequest request) {
         AbonnementResponse response = abonnementService.souscrire(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
+    }
+
+    /**
+     * Authoritative paid checkout: the backend reads the plan price, captures
+     * the card payment, consumes it once, and only then activates the plan.
+     */
+    @PostMapping("/checkout/prepare")
+    public ResponseEntity<CheckoutPreparationResponse> prepareCheckout(
+            @Valid @RequestBody SubscriptionCheckoutRequest request) {
+        return new ResponseEntity<>(abonnementService.prepareCheckout(request), HttpStatus.CREATED);
+    }
+
+    @PostMapping("/checkout/complete")
+    public ResponseEntity<AbonnementResponse> completeCheckout(
+            @Valid @RequestBody CompletePaymentCheckoutRequest request) {
+        return new ResponseEntity<>(abonnementService.completeCheckout(request), HttpStatus.CREATED);
     }
 
     /**
@@ -68,22 +91,49 @@ public class AbonnementController {
      * Renouveler un abonnement (après paiement réussi).
      */
     @PostMapping("/{id}/renouveler")
-    public ResponseEntity<Void> renouveler(
+    public ResponseEntity<AbonnementResponse> renouveler(
             @PathVariable Long id,
             @RequestParam Long paiementId) {
-        abonnementService.renouveler(id, paiementId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(abonnementService.renouveler(id, paiementId));
+    }
+
+    @PostMapping("/{id}/renew-checkout/prepare")
+    public ResponseEntity<CheckoutPreparationResponse> prepareRenewalCheckout(
+            @PathVariable Long id,
+            @Valid @RequestBody PaymentCheckoutRequest request) {
+        return ResponseEntity.ok(abonnementService.prepareRenewalCheckout(id, request));
+    }
+
+    @PostMapping("/{id}/renew-checkout/complete")
+    public ResponseEntity<AbonnementResponse> completeRenewalCheckout(
+            @PathVariable Long id,
+            @Valid @RequestBody CompletePaymentCheckoutRequest request) {
+        return ResponseEntity.ok(abonnementService.completeRenewalCheckout(id, request));
     }
 
     /**
      * Migrer vers un plan d'abonnement supérieur (Upgrade).
      */
     @PutMapping("/{id}/upgrade")
-    public ResponseEntity<Void> upgrader(
+    public ResponseEntity<AbonnementResponse> upgrader(
             @PathVariable Long id,
-            @RequestParam Long nouveauPlanId) {
-        abonnementService.upgrader(id, nouveauPlanId);
-        return ResponseEntity.ok().build();
+            @RequestParam Long nouveauPlanId,
+            @RequestParam Long paiementId) {
+        return ResponseEntity.ok(abonnementService.upgrader(id, nouveauPlanId, paiementId));
+    }
+
+    @PostMapping("/{id}/upgrade-checkout/prepare")
+    public ResponseEntity<CheckoutPreparationResponse> prepareUpgradeCheckout(
+            @PathVariable Long id,
+            @Valid @RequestBody UpgradeCheckoutRequest request) {
+        return ResponseEntity.ok(abonnementService.prepareUpgradeCheckout(id, request));
+    }
+
+    @PostMapping("/{id}/upgrade-checkout/complete")
+    public ResponseEntity<AbonnementResponse> completeUpgradeCheckout(
+            @PathVariable Long id,
+            @Valid @RequestBody CompletePaymentCheckoutRequest request) {
+        return ResponseEntity.ok(abonnementService.completeUpgradeCheckout(id, request));
     }
 
     /**

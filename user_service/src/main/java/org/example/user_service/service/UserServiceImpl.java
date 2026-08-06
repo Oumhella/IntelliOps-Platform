@@ -8,6 +8,7 @@ import org.example.user_service.dto.request.RegisterRequest;
 import org.example.user_service.dto.request.UserCreationRequest;
 import org.example.user_service.dto.response.UserResponse;
 import org.example.user_service.entity.Admin;
+import org.example.user_service.entity.Role;
 import org.example.user_service.entity.User;
 import org.example.common.exception.ConflictException;
 import org.example.common.exception.ResourceNotFoundException;
@@ -67,6 +68,7 @@ public class UserServiceImpl implements UserService {
 
         return new AuthResponse(
                 realToken,
+                user.getId(),
                 user.getEmail(),
                 user.getFirstname(),
                 user.getLastname(),
@@ -95,8 +97,28 @@ public class UserServiceImpl implements UserService {
     public List<UserResponse> getUsersByEnterprise(Long enterpriseId) {
         return userRepository.findAllByEnterpriseId(enterpriseId)
                 .stream()
+                .filter(this::isManagedStaff)
                 .map(userMapper::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<UserResponse> getActiveCouriersByEnterprise(Long enterpriseId) {
+        return userRepository.findAllByEnterpriseId(enterpriseId)
+                .stream()
+                .filter(user -> user.getRole() == Role.ROLE_LIVREUR && user.isActive())
+                .map(userMapper::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public UserResponse getActiveCourier(Long userId, Long enterpriseId) {
+        User courier = userRepository.findByIdAndEnterpriseId(userId, enterpriseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Courier not found with id " + userId));
+        if (courier.getRole() != Role.ROLE_LIVREUR || !courier.isActive()) {
+            throw new ResourceNotFoundException("Active courier not found with id " + userId);
+        }
+        return userMapper.toResponse(courier);
     }
 
     @Override
@@ -104,6 +126,7 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findByIdAndEnterpriseId(userId, enterpriseId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "User not found with id " + userId));
+        requireManagedStaff(user);
         return userMapper.toResponse(user);
     }
 
@@ -113,6 +136,7 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findByIdAndEnterpriseId(userId, enterpriseId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "User not found with id " + userId));
+        requireManagedStaff(user);
 
         user.setActive(active);
         User savedUser = userRepository.save(user);
@@ -125,6 +149,7 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findByIdAndEnterpriseId(userId, enterpriseId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "User not found with id " + userId));
+        requireManagedStaff(user);
 
         userRepository.delete(user);
     }
@@ -188,5 +213,17 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findByIdAndEnterpriseId(userId, enterpriseId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with ID " + userId));
         return userMapper.toResponse(user);
+    }
+
+    private boolean isManagedStaff(User user) {
+        return user.getRole() == Role.ROLE_CSM
+                || user.getRole() == Role.ROLE_LOGISTIC
+                || user.getRole() == Role.ROLE_LIVREUR;
+    }
+
+    private void requireManagedStaff(User user) {
+        if (!isManagedStaff(user)) {
+            throw new IllegalArgumentException("Only staff accounts can be managed through this operation");
+        }
     }
 }

@@ -2,6 +2,7 @@ package org.example.lead_service;
 
 import org.example.lead_service.entity.Commande;
 import org.example.lead_service.entity.StatutCommande;
+import org.example.lead_service.entity.Lead;
 import org.example.lead_service.dto.CommandeDTO;
 import org.example.lead_service.mapper.CommandeMapper;
 import org.example.lead_service.repository.CommandeRepository;
@@ -18,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import org.example.common.security.TenantContext;
@@ -36,6 +38,7 @@ class CommandeServiceImplTest {
     @BeforeEach
     void setUp() {
         TenantContext.setEnterpriseId(7L);
+        TenantContext.setUserId(42L);
     }
 
     @AfterEach
@@ -52,6 +55,7 @@ class CommandeServiceImplTest {
                 .statutCommande(StatutCommande.EN_ATTENTE)
                 .lignesCommande(new ArrayList<>())
                 .totalPrix(0.0)
+                .lead(Lead.builder().agentId(42L).enterpriseId(7L).build())
                 .build();
 
         when(commandeRepository.findByIdCommandeAndLeadEnterpriseId(1L, 7L))
@@ -70,5 +74,20 @@ class CommandeServiceImplTest {
         assertEquals(2, commande.getLignesCommande().size());
 
         verify(commandeRepository, times(2)).save(commande);
+    }
+
+    @Test
+    void changerStatutCommande_RejectsSkippedLifecycleStep() {
+        Commande commande = Commande.builder()
+                .idCommande(1L)
+                .statutCommande(StatutCommande.EN_ATTENTE)
+                .lead(Lead.builder().agentId(42L).enterpriseId(7L).build())
+                .build();
+        when(commandeRepository.findByIdCommandeAndLeadEnterpriseId(1L, 7L))
+                .thenReturn(Optional.of(commande));
+
+        assertThrows(IllegalStateException.class,
+                () -> commandeService.changerStatutCommande(1L, StatutCommande.EXPEDIEE));
+        verify(commandeRepository, never()).save(any());
     }
 }

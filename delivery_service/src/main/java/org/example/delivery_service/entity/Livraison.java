@@ -7,7 +7,12 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 
 @Entity
-@Table(name = "livraisons")
+@Table(
+        name = "livraisons",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_delivery_tenant_order",
+                columnNames = {"enterprise_id", "reference_commande_id"})
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -22,7 +27,7 @@ public class Livraison {
     @Column(name = "enterprise_id", nullable = false)
     private Long enterpriseId;
 
-    @Column(nullable = false, unique = true)
+    @Column(name = "reference_commande_id", nullable = false)
     private Long referenceCommandeId;
 
     @Column(nullable = false, unique = true, length = 64)
@@ -40,8 +45,10 @@ public class Livraison {
     private String nomSociete;
     private String endpointApiUrl;
 
-    // Driver fields (if LIVREUR_INTERNE)
-    private Long externalLivreurId;
+    // Internal courier assignment (if LIVREUR_INTERNE). The legacy column name
+    // is retained so existing development data remains readable.
+    @Column(name = "external_livreur_id")
+    private Long livreurId;
 
     private LocalDateTime shippingDate;
     private LocalDateTime deliveryDate;

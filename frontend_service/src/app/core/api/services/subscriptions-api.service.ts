@@ -8,6 +8,11 @@ import {
   PlanRequest,
   PlanResponse,
   SubscriptionRequest,
+  SubscriptionCheckoutRequest,
+  PaymentCheckoutRequest,
+  UpgradeCheckoutRequest,
+  CompletePaymentCheckoutRequest,
+  CheckoutPreparationResponse,
   SubscriptionResponse,
   SubscriptionStatus,
 } from '../models';
@@ -44,6 +49,14 @@ export class SubscriptionsApiService {
     return this.http.post<SubscriptionResponse>(this.subscriptionsUrl, request);
   }
 
+  prepareCheckout(request: SubscriptionCheckoutRequest): Observable<CheckoutPreparationResponse> {
+    return this.http.post<CheckoutPreparationResponse>(`${this.subscriptionsUrl}/checkout/prepare`, request);
+  }
+
+  completeCheckout(request: CompletePaymentCheckoutRequest): Observable<SubscriptionResponse> {
+    return this.http.post<SubscriptionResponse>(`${this.subscriptionsUrl}/checkout/complete`, request);
+  }
+
   searchSubscriptions(
     page = 0,
     size = 20,
@@ -74,9 +87,25 @@ export class SubscriptionsApiService {
     return this.http.post<void>(`${this.subscriptionsUrl}/${id}/renouveler`, null, { params });
   }
 
-  upgrade(id: number, newPlanId: number): Observable<void> {
-    const params = new HttpParams().set('nouveauPlanId', newPlanId);
+  prepareRenewalCheckout(id: number, request: PaymentCheckoutRequest): Observable<CheckoutPreparationResponse> {
+    return this.http.post<CheckoutPreparationResponse>(`${this.subscriptionsUrl}/${id}/renew-checkout/prepare`, request);
+  }
+
+  completeRenewalCheckout(id: number, request: CompletePaymentCheckoutRequest): Observable<SubscriptionResponse> {
+    return this.http.post<SubscriptionResponse>(`${this.subscriptionsUrl}/${id}/renew-checkout/complete`, request);
+  }
+
+  upgrade(id: number, newPlanId: number, paymentId: number): Observable<void> {
+    const params = new HttpParams().set('nouveauPlanId', newPlanId).set('paiementId', paymentId);
     return this.http.put<void>(`${this.subscriptionsUrl}/${id}/upgrade`, null, { params });
+  }
+
+  prepareUpgradeCheckout(id: number, request: UpgradeCheckoutRequest): Observable<CheckoutPreparationResponse> {
+    return this.http.post<CheckoutPreparationResponse>(`${this.subscriptionsUrl}/${id}/upgrade-checkout/prepare`, request);
+  }
+
+  completeUpgradeCheckout(id: number, request: CompletePaymentCheckoutRequest): Observable<SubscriptionResponse> {
+    return this.http.post<SubscriptionResponse>(`${this.subscriptionsUrl}/${id}/upgrade-checkout/complete`, request);
   }
 
   getRemainingDays(id: number): Observable<number> {

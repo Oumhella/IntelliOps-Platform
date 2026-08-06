@@ -6,6 +6,7 @@ import { ApiError } from './api-error';
 import { apiInterceptor } from './api.interceptor';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE_URL } from '../api/api.config';
+import { provideRouter } from '@angular/router';
 
 describe('apiInterceptor', () => {
   let http: HttpClient;
@@ -20,6 +21,7 @@ describe('apiInterceptor', () => {
         provideHttpClientTesting(),
         { provide: API_BASE_URL, useValue: '' },
         { provide: AuthSessionService, useValue: session },
+        provideRouter([]),
       ],
     });
     http = TestBed.inject(HttpClient);

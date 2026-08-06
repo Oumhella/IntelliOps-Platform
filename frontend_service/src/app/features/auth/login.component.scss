@@ -19,6 +19,7 @@
 .login-error svg { width: 16px; height: 16px; flex: 0 0 16px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
 .login-submit { display: flex; width: 100%; height: 42px; align-items: center; justify-content: center; gap: 8px; margin-top: 23px; color: #fff; background: var(--accent-indigo); border: 0; border-radius: 8px; font-size: 11px; font-weight: 650; box-shadow: 0 4px 12px rgba(79,70,229,.2); }.login-submit:hover:not(:disabled) { background: var(--accent-indigo-hover); }.login-submit:disabled { cursor: wait; opacity: .7; }
 .button-spinner { width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }.login-help { margin: 17px 0 0; color: var(--text-muted); font-size: 9px; text-align: center; }
+.login-help a { color: var(--accent-indigo); font-weight: 650; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 800px) { .login-page { display: block; background: var(--bg-app); }.login-brand-panel { display: none; }.login-form-panel { min-height: 100vh; padding: 24px; }.mobile-login-brand { display: flex; margin-bottom: 36px; }.mobile-login-brand strong { font-size: 15px; } }
 @media (max-width: 480px) { .login-form-panel { padding: 0; }.login-form { min-height: 100vh; padding: 34px 24px; border: 0; border-radius: 0; box-shadow: none; } }

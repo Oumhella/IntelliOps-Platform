@@ -59,7 +59,7 @@
       <button class="login-submit" type="submit" [disabled]="submitting">
         @if (submitting) { <span class="button-spinner"></span> Signing in... } @else { Sign in <span>→</span> }
       </button>
-      <p class="login-help">Access is managed by your organization administrator.</p>
+      <p class="login-help">New enterprise? <a routerLink="/register">Create a workspace</a></p>
     </form>
   </section>
 </main>

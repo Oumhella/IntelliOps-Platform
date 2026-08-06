@@ -18,13 +18,27 @@ export interface InitiatePaymentRequest {
   readonly typeContexte: PaymentContext;
   readonly montant: number;
   readonly mode: PaymentMode;
-  readonly tokenCarteSecurise?: string;
-  readonly systemAccountId: number;
 }
 
 export interface RefundRequest {
   readonly montant: number;
   readonly motif: string;
+}
+
+export interface PreparePaymentRequest {
+  readonly idempotencyKey: string;
+  readonly referenceSourceId: number;
+  readonly typeContexte: PaymentContext;
+  readonly montant: number;
+}
+
+export interface PaymentPreparationResponse {
+  readonly paymentId: number;
+  readonly clientSecret: string;
+  readonly publishableKey: string;
+  readonly amount: number;
+  readonly currency: string;
+  readonly status: PaymentStatus;
 }
 
 export interface InvoiceResponse {
@@ -43,5 +57,8 @@ export interface PaymentTransactionResponse {
   readonly montantRembourse: number;
   readonly mode: PaymentMode;
   readonly statut: PaymentStatus;
+  readonly providerTransactionId: string | null;
+  readonly consumptionReference: string | null;
+  readonly consumedAt: IsoDateTime | null;
   readonly facture: InvoiceResponse | null;
 }

@@ -264,6 +264,12 @@ services:
         condition: service_started
     networks:
       - erp-network
+    # Docker Desktop's embedded resolver can return transient EAI_AGAIN errors
+    # to the JVM for external AI providers. Keep these overridable for private
+    # or corporate DNS environments.
+    dns:
+      - ${DOCKER_DNS_PRIMARY:-8.8.8.8}
+      - ${DOCKER_DNS_SECONDARY:-1.1.1.1}
 
   # ─────────────── MINIO SERVER ───────────────
   minio:

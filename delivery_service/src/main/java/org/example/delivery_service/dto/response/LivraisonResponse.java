@@ -16,7 +16,7 @@ public class LivraisonResponse {
     private StatutLivraison statutLivraison;
     private TypeTransporteur typeTransporteur;
     private String nomSociete;
-    private Long externalLivreurId;
+    private Long livreurId;
     private LocalDateTime shippingDate;
     private LocalDateTime deliveryDate;
     private double montantACollecterCoD;

@@ -93,6 +93,7 @@ public class LeadServiceImpl implements LeadService {
     @Override
     public NoteInteractionDTO enregistrerInteraction(Long idLead, TypeInteraction type, String commentaire, StatutLead nouveauStatut) {
         Lead lead = findLead(idLead);
+        assertAssignedToCurrentUser(lead);
 
         String ancienStatutStr = lead.getStatutLead().name();
 
@@ -129,6 +130,7 @@ public class LeadServiceImpl implements LeadService {
     @Transactional
     public CommandeDTO convertirEnCommande(Long idLead, CreationCommandeRequest request) {
         Lead lead = findLead(idLead);
+        assertAssignedToCurrentUser(lead);
 
         // 1. Initialise la commande avec le statut CONVERTED et copie les infos du client
         Commande nouvelleCommande = lead.convertirEnCommande();
@@ -180,5 +182,12 @@ public class LeadServiceImpl implements LeadService {
     private Lead findLead(Long idLead) {
         return leadRepository.findByIdLeadAndEnterpriseId(idLead, TenantContext.requireEnterpriseId())
                 .orElseThrow(() -> new EntityNotFoundException("Lead introuvable avec l'ID : " + idLead));
+    }
+
+    private void assertAssignedToCurrentUser(Lead lead) {
+        if (!TenantContext.requireUserId().equals(lead.getAgentId())) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "This lead is assigned to another CSM user.");
+        }
     }
 }

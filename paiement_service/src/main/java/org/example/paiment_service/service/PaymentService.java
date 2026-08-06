@@ -2,6 +2,9 @@ package org.example.paiment_service.service;
 
 import org.example.paiment_service.dto.request.InitierPaiementRequestDTO;
 import org.example.paiment_service.dto.request.RemboursementRequestDTO;
+import org.example.paiment_service.dto.request.ConsumePaymentRequest;
+import org.example.paiment_service.dto.request.PreparePaymentRequestDTO;
+import org.example.paiment_service.dto.response.PaymentPreparationResponseDTO;
 import org.example.paiment_service.dto.response.TransactionPaiementResponseDTO;
 import org.springframework.transaction.annotation.Transactional;
 import org.example.common.dto.PageResponse;
@@ -12,6 +15,15 @@ import org.example.paiment_service.entity.StatutPaiement;
 public interface PaymentService {
     @Transactional
     TransactionPaiementResponseDTO initierPaiement(InitierPaiementRequestDTO request);
+
+    @Transactional
+    PaymentPreparationResponseDTO prepareCardPayment(PreparePaymentRequestDTO request);
+
+    @Transactional
+    TransactionPaiementResponseDTO finalizeCardPayment(Long idTransaction);
+
+    @Transactional
+    TransactionPaiementResponseDTO consumeCompletedPayment(Long idTransaction, ConsumePaymentRequest request);
 
     @Transactional
     TransactionPaiementResponseDTO rembourserPaiement(Long idTransaction, RemboursementRequestDTO request);

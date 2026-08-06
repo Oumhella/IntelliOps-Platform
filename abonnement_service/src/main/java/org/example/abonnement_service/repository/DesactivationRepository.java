@@ -5,9 +5,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface DesactivationRepository extends JpaRepository<Desactivation, Long> {
     // Récupérer toutes les périodes de pause pour un abonnement donné
     List<Desactivation> findByAbonnementIdAbonnement(Long idAbonnement);
+
+    Optional<Desactivation> findTopByAbonnementIdAbonnementOrderByDateFinDesactivationDesc(Long idAbonnement);
 }

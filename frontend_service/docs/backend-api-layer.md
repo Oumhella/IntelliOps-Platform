@@ -74,16 +74,18 @@ export class LoginComponent {
 | `UsersApiService.getMyProfile` | `GET /api/v1/users/me` | Current user profile |
 | `updateMyProfile` | `PUT /api/v1/users/me` | Partial profile update; omit unchanged fields |
 | `changeMyPassword` | `PUT /api/v1/users/me/password` | Change password with confirmation |
-| `createStaffMember` | `POST /api/v1/users/staff` | Create a CSM or logistic agent |
+| `createStaffMember` | `POST /api/v1/users/staff` | Create a CSM, logistics, or internal courier account |
 | `getEnterpriseStaff` | `GET /api/v1/users/staff` | Tenant staff list |
 | `getStaffMember` | `GET /api/v1/users/staff/{id}` | One tenant staff member |
 | `setStaffStatus` | `PATCH /api/v1/users/staff/{id}/status` | Activate/deactivate staff |
 | `deleteStaffMember` | `DELETE /api/v1/users/staff/{id}` | Permanently delete staff |
 | `getUserById` | `GET /api/v1/users/{id}` | User lookup, also used between services |
 
-`UserCreationRequest.role` accepts `CSM` or `LOGISTIC`; responses and JWTs use `ROLE_ADMIN`, `ROLE_CSM`, or `ROLE_LOGISTIC`. Java's boolean getter `isActive()` is serialized by Jackson as `active`, which is why the frontend response uses that name.
+`UserCreationRequest.role` accepts `CSM`, `LOGISTIC`, or `LIVREUR`; responses and JWTs use the corresponding `ROLE_*` value. Java's boolean getter `isActive()` is serialized by Jackson as `active`, which is why the frontend response uses that name.
 
 ### Plans and subscriptions
+
+Plan reads provide the commercial catalogue. Plan writes are platform-global and require `ROLE_SUPER_ADMIN`; tenant subscription operations require `ROLE_ADMIN`. Paid checkout derives the authoritative amount from the selected plan and prepares a Stripe PaymentIntent. Stripe's Payment Element collects card/payment details directly. The completion call retrieves the PaymentIntent from Stripe, validates tenant/context/source/amount/currency, consumes it once, and only then activates or changes the entitlement. Direct paid activation without a completed payment returns HTTP 402.
 
 | Frontend method | HTTP endpoint |
 |---|---|
@@ -93,12 +95,15 @@ export class LoginComponent {
 | `updatePlan` | `PUT /api/v1/plans/{id}` |
 | `deletePlan` | `DELETE /api/v1/plans/{id}` (soft delete to `SUPPRIME`) |
 | `subscribe` | `POST /api/v1/abonnements` |
+| `prepareCheckout` / `completeCheckout` | `POST /api/v1/abonnements/checkout/prepare` / `checkout/complete` |
 | `searchSubscriptions` | `GET /api/v1/abonnements?page=...&size=...&statut=...` |
 | `getSubscriptionById` | `GET /api/v1/abonnements/{id}` |
 | `getUserSubscriptionHistory` | `GET /api/v1/abonnements/utilisateur/{userId}` |
 | `suspend` | `POST /api/v1/abonnements/{id}/suspendre?motif=...` |
 | `renew` | `POST /api/v1/abonnements/{id}/renouveler?paiementId=...` |
-| `upgrade` | `PUT /api/v1/abonnements/{id}/upgrade?nouveauPlanId=...` |
+| `prepareRenewalCheckout` / `completeRenewalCheckout` | `POST /api/v1/abonnements/{id}/renew-checkout/prepare` / `renew-checkout/complete` |
+| `upgrade` | `PUT /api/v1/abonnements/{id}/upgrade?nouveauPlanId=...&paiementId=...` |
+| `prepareUpgradeCheckout` / `completeUpgradeCheckout` | `POST /api/v1/abonnements/{id}/upgrade-checkout/prepare` / `upgrade-checkout/complete` |
 | `getRemainingDays` | `GET /api/v1/abonnements/{id}/duree-restante` |
 | `canCreateOrder` | `GET /api/v1/abonnements/{id}/verifier-limite?commandesEffectuees=...` |
 | `checkExpiration` | `POST /api/v1/abonnements/{id}/verifier-expiration` |
@@ -151,13 +156,15 @@ Store ownership (`adminId`) and tenant ownership are now assigned from the authe
 | `PaymentsApiService.searchTransactions` | `GET /api/v1/payments?page=...&size=...&statut=...&contexte=...` |
 | `getTransaction` | `GET /api/v1/payments/{transactionId}` |
 | `PaymentsApiService.initiate` | `POST /api/v1/payments/initier` |
+| `prepare` | `POST /api/v1/payments/prepare` |
+| `finalize` | `POST /api/v1/payments/{transactionId}/finalize` |
 | `refund` | `POST /api/v1/payments/{transactionId}/rembourser` |
 | `cancel` | `POST /api/v1/payments/{transactionId}/annuler` |
 | `getInvoices` | `GET /api/v1/payments/factures?page=...&size=...` |
 | `getInvoice` | `GET /api/v1/payments/factures/{invoiceId}` |
 | `getInvoiceDownloadUrl` | `GET /api/v1/payments/factures/{invoiceId}/download-url` |
 
-The invoice endpoint returns `text/plain`, not JSON. Its service method explicitly sets `responseType: 'text'`; otherwise Angular would report a parsing error even after a successful HTTP response. `idempotencyKey` should be a newly generated stable key for one logical payment attempt and reused only when retrying that same attempt.
+The invoice endpoint returns `text/plain`, not JSON. Its service method explicitly sets `responseType: 'text'`; otherwise Angular would report a parsing error even after a successful HTTP response. `idempotencyKey` should be a newly generated stable key for one logical payment attempt and reused only when retrying that same attempt. `/initier` is for cash-on-delivery; card requests are rejected there and must use prepare → Stripe Payment Element → finalize.
 
 ### Deliveries
 
@@ -236,7 +243,7 @@ import { ProductRequest, StockApiService } from './core/api';
 
 ## Backend gap resolution and tenant behavior
 
-The connection layer now covers all 73 controller operations. The previously missing store retrieval, paginated CRM lists, subscription list, payment/invoice history, delivery filters, notification history, plan management, and safe product deletion operations are implemented in both Spring and Angular.
+The typed connection layer covers all controller operations. Business screens intentionally expose only role-owned workflows: internal policy checks and platform-global mutations are not rendered merely because a transport method exists. Store retrieval, paginated CRM lists, enterprise subscription history, payment/invoice history, delivery filters, the ADMIN notification log, SUPER_ADMIN plan management, and safe product deletion remain available through their correct interfaces.
 
 Every business root created through these services now stores `enterpriseId`. Repository lookups and lists use the authenticated tenant from `TenantContext`, including indirect lookups such as inventory, orders, and invoices. Notification Kafka events carry the tenant ID so asynchronous records remain isolated. The obsolete public `/setup-admin` operation was removed from the user service, gateway bypass, MCP exclusion list, frontend client, and documentation. Staff authorization now correctly uses `hasRole('ADMIN')`.
 

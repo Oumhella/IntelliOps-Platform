@@ -1,5 +1,6 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
+import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
 import { API_BASE_URL, buildApiUrl } from '../api/api.config';
 import { AuthSessionService } from '../auth/auth-session.service';
@@ -7,6 +8,7 @@ import { ApiError } from './api-error';
 
 export const apiInterceptor: HttpInterceptorFn = (request, next) => {
   const authSession = inject(AuthSessionService);
+  const router = inject(Router);
   const apiPrefix = buildApiUrl(inject(API_BASE_URL), '/api/');
   const isApiRequest = request.url.startsWith(apiPrefix);
   const token = isApiRequest ? authSession.getToken() : null;
@@ -21,6 +23,7 @@ export const apiInterceptor: HttpInterceptorFn = (request, next) => {
       }
       if (isApiRequest && error.status === 401) {
         authSession.clear();
+        void router.navigateByUrl('/login');
       }
       return throwError(() => ApiError.fromHttpError(error));
     }),

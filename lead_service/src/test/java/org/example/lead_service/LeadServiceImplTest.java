@@ -62,6 +62,7 @@ class LeadServiceImplTest {
                 .ordrePriorite(OrdrePriorite.HIGH)
                 .infosClient(mockCoords)
                 .boutiqueId(10L)
+                .agentId(42L)
                 .enterpriseId(7L)
                 .historiqueInteractions(new ArrayList<>())
                 .build();

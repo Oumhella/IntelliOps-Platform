@@ -9,6 +9,8 @@ import {
   PaymentContext,
   PaymentStatus,
   PaymentTransactionResponse,
+  PreparePaymentRequest,
+  PaymentPreparationResponse,
   RefundRequest,
 } from '../models';
 
@@ -35,6 +37,14 @@ export class PaymentsApiService {
 
   initiate(request: InitiatePaymentRequest): Observable<PaymentTransactionResponse> {
     return this.http.post<PaymentTransactionResponse>(`${this.url}/initier`, request);
+  }
+
+  prepare(request: PreparePaymentRequest): Observable<PaymentPreparationResponse> {
+    return this.http.post<PaymentPreparationResponse>(`${this.url}/prepare`, request);
+  }
+
+  finalize(transactionId: number): Observable<PaymentTransactionResponse> {
+    return this.http.post<PaymentTransactionResponse>(`${this.url}/${transactionId}/finalize`, null);
   }
 
   refund(transactionId: number, request: RefundRequest): Observable<PaymentTransactionResponse> {

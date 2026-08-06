@@ -86,7 +86,7 @@ public class UserController {
     // ══════════════════════════════════════════════════════════════════
 
     /**
-     * Create a new staff member (CSM or Logistic agent).
+     * Create a new staff member (CSM, logistics agent, or internal courier).
      * Only accessible by users with ADMIN role.
      */
     @PostMapping("/staff")
@@ -103,6 +103,7 @@ public class UserController {
      * Get all staff members belonging to the authenticated user's enterprise.
      */
     @GetMapping("/staff")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<UserResponse>> getEnterpriseStaff(
             @RequestAttribute("enterpriseId") Long enterpriseId
     ) {
@@ -111,9 +112,30 @@ public class UserController {
     }
 
     /**
+     * List active internal couriers available for delivery assignment.
+     */
+    @GetMapping("/staff/couriers")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC')")
+    public ResponseEntity<List<UserResponse>> getActiveCouriers(
+            @RequestAttribute("enterpriseId") Long enterpriseId
+    ) {
+        return ResponseEntity.ok(userService.getActiveCouriersByEnterprise(enterpriseId));
+    }
+
+    @GetMapping("/staff/couriers/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC')")
+    public ResponseEntity<UserResponse> getActiveCourier(
+            @PathVariable Long id,
+            @RequestAttribute("enterpriseId") Long enterpriseId
+    ) {
+        return ResponseEntity.ok(userService.getActiveCourier(id, enterpriseId));
+    }
+
+    /**
      * Get a single staff member by ID (within the same enterprise).
      */
     @GetMapping("/staff/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserResponse> getStaffMember(
             @PathVariable Long id,
             @RequestAttribute("enterpriseId") Long enterpriseId
@@ -157,6 +179,7 @@ public class UserController {
      * Get a user by ID. Primarily used for inter-service communication.
      */
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserResponse> getUserById(
             @PathVariable Long id,
             @RequestAttribute("enterpriseId") Long enterpriseId) {

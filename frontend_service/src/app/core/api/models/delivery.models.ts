@@ -14,8 +14,7 @@ export interface ShipDeliveryRequest {
   readonly montantACollecterCoD: number;
   readonly clientEmail?: string;
   readonly nomSociete?: string;
-  readonly endpointApiUrl?: string;
-  readonly externalLivreurId?: number;
+  readonly livreurId?: number;
 }
 
 export interface UpdateDeliveryStatusRequest {
@@ -29,7 +28,7 @@ export interface DeliveryResponse {
   readonly statutLivraison: DeliveryStatus;
   readonly typeTransporteur: CarrierType;
   readonly nomSociete: string | null;
-  readonly externalLivreurId: number | null;
+  readonly livreurId: number | null;
   readonly shippingDate: IsoDateTime;
   readonly deliveryDate: IsoDateTime | null;
   readonly montantACollecterCoD: number;

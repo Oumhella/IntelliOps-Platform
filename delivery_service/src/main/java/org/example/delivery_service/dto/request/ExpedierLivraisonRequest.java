@@ -1,5 +1,6 @@
 package org.example.delivery_service.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Data;
@@ -22,5 +23,6 @@ public class ExpedierLivraisonRequest {
     // Optional depending on strategy chosen
     private String nomSociete;
     private String endpointApiUrl;
-    private Long externalLivreurId;
+    @JsonAlias("externalLivreurId")
+    private Long livreurId;
 }
