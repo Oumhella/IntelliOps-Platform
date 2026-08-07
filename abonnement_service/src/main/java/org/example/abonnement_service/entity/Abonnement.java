@@ -40,6 +40,9 @@ public class Abonnement {
     @Column(nullable = false)
     private Long userId;
 
+    @Column(name = "contact_email")
+    private String contactEmail;
+
     @Column(unique = true)
     private Long paiementId;
 

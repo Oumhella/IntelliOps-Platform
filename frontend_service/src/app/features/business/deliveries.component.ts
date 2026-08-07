@@ -11,6 +11,8 @@ import {
   PageResponse,
   UserResponse,
   UsersApiService,
+  CrmApiService,
+  OrderResponse,
 } from '../../core/api';
 import { AuthSessionService } from '../../core/auth/auth-session.service';
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
@@ -24,6 +26,7 @@ import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
 export class DeliveriesComponent implements OnInit {
   private readonly api = inject(DeliveriesApiService);
   private readonly usersApi = inject(UsersApiService);
+  private readonly crmApi = inject(CrmApiService);
   private readonly role = inject(AuthSessionService).currentUser()?.role;
   readonly feedback = inject(UiFeedbackService);
   readonly statuses = DELIVERY_STATUSES;
@@ -32,6 +35,7 @@ export class DeliveriesComponent implements OnInit {
   readonly page = signal<PageResponse<DeliveryResponse> | null>(null);
   readonly selected = signal<DeliveryResponse | null>(null);
   readonly couriers = signal<readonly UserResponse[]>([]);
+  readonly shippableOrders = signal<readonly OrderResponse[]>([]);
   readonly loading = signal(true);
   statusFilter: DeliveryStatus | '' = '';
   carrierFilter: CarrierType | '' = '';
@@ -43,8 +47,6 @@ export class DeliveriesComponent implements OnInit {
   shipForm = {
     referenceCommandeId: null as number | null,
     typeTransporteur: 'SOCIETE_LIVRAISON' as CarrierType,
-    montantACollecterCoD: 0,
-    clientEmail: '',
     nomSociete: '',
     livreurId: null as number | null,
   };
@@ -56,6 +58,7 @@ export class DeliveriesComponent implements OnInit {
         next: (couriers) => this.couriers.set(couriers),
         error: (error) => this.feedback.error(error, 'Available couriers could not be loaded.'),
       });
+      this.loadShippableOrders();
     }
   }
 
@@ -113,8 +116,6 @@ export class DeliveriesComponent implements OnInit {
     this.api.ship({
       referenceCommandeId: form.referenceCommandeId,
       typeTransporteur: form.typeTransporteur,
-      montantACollecterCoD: form.montantACollecterCoD,
-      clientEmail: form.clientEmail || undefined,
       nomSociete: form.typeTransporteur === 'SOCIETE_LIVRAISON' ? form.nomSociete : undefined,
       livreurId: form.typeTransporteur === 'LIVREUR_INTERNE' ? form.livreurId ?? undefined : undefined,
     }).subscribe({
@@ -123,6 +124,7 @@ export class DeliveriesComponent implements OnInit {
         this.feedback.success(`Shipment ${value.codeSuiviTracking} created.`);
         this.close();
         this.load();
+        this.loadShippableOrders();
       },
       error: (error) => { this.busy = false; this.feedback.error(error); },
     });
@@ -172,5 +174,14 @@ export class DeliveriesComponent implements OnInit {
       : value === 'ECHEC' || value === 'RETOUR' ? 'critical'
       : value === 'EN_COURS' || value === 'CHEZ_TRANSPORTEUR' ? 'info'
       : 'warning';
+  }
+
+  private loadShippableOrders(): void {
+    this.crmApi.searchOrders(0, 100, 'PREPARATION').subscribe({
+      next: (result) => this.shippableOrders.set(result.content.filter(
+        (order) => order.statutPaiement === 'PAID' || order.statutPaiement === 'AWAITING_COLLECTION',
+      )),
+      error: (error) => this.feedback.error(error, 'Orders ready to ship could not be loaded.'),
+    });
   }
 }

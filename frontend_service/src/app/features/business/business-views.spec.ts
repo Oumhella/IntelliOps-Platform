@@ -10,6 +10,7 @@ import { BusinessHomeComponent } from './business-home.component';
 import { BusinessShellComponent } from './business-shell.component';
 import { DeliveriesComponent } from './deliveries.component';
 import { LeadsComponent } from './leads.component';
+import { IntegrationsComponent } from './integrations.component';
 import { NotificationsComponent } from './notifications.component';
 import { OrdersComponent } from './orders.component';
 import { ProfileComponent } from './profile.component';
@@ -22,6 +23,7 @@ describe('business views', () => {
     BusinessShellComponent,
     BusinessHomeComponent,
     LeadsComponent,
+    IntegrationsComponent,
     OrdersComponent,
     StockComponent,
     DeliveriesComponent,

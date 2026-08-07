@@ -11,12 +11,16 @@ import org.springframework.data.repository.query.Param;
 import org.example.lead_service.entity.StatutCommande;
 
 import java.util.Optional;
+import java.time.LocalDateTime;
 
 @Repository
 public interface CommandeRepository extends JpaRepository<Commande, Long> {
 
     Optional<Commande> findByReference(String reference);
+    Optional<Commande> findByReferenceAndLeadEnterpriseId(String reference, Long enterpriseId);
     Optional<Commande> findByIdCommandeAndLeadEnterpriseId(Long idCommande, Long enterpriseId);
+    long countByLeadEnterpriseIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+            Long enterpriseId, LocalDateTime from, LocalDateTime until);
 
     @Query("""
             select commande from Commande commande

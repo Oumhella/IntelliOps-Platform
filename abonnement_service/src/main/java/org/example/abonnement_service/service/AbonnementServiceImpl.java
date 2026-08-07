@@ -98,9 +98,11 @@ public class AbonnementServiceImpl implements AbonnementService {
         }
 
         LocalDate start = LocalDate.now();
+        String contactEmail = authenticatedEmail();
         Abonnement subscription = Abonnement.builder()
                 .enterpriseId(enterpriseId)
                 .userId(accountOwnerId)
+                .contactEmail(contactEmail)
                 .planAbonnement(plan)
                 .dateDebut(start)
                 .dateFin(calculerDateFin(start, plan.getDuree()))
@@ -111,7 +113,8 @@ public class AbonnementServiceImpl implements AbonnementService {
 
         Abonnement saved = abonnementRepository.save(subscription);
         eventProducer.sendSubscriptionNotification(
-                authenticatedEmail(),
+                enterpriseId,
+                contactEmail,
                 "Your " + plan.getNomPlan() + " subscription is active",
                 "Your workspace subscription is active through " + saved.getDateFin() + ".");
         return abonnementMapper.toResponse(saved);
@@ -399,7 +402,12 @@ public class AbonnementServiceImpl implements AbonnementService {
 
     private String authenticatedEmail() {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication == null ? "billing@intelliops.local" : authentication.getName();
+        if (authentication == null || !authentication.isAuthenticated()
+                || authentication.getName() == null || authentication.getName().isBlank()
+                || "anonymousUser".equals(authentication.getName())) {
+            throw new IllegalStateException("An authenticated billing contact is required.");
+        }
+        return authentication.getName();
     }
 
     private Abonnement findEntityById(Long idAbonnement) {

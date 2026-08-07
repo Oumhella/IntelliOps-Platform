@@ -56,6 +56,9 @@ public class TransactionPaiement {
     @Column(name = "provider_transaction_id", length = 120)
     private String providerTransactionId;
 
+    @Column(name = "notification_email", length = 180)
+    private String notificationEmail;
+
     @Column(name = "consumption_reference", length = 180)
     private String consumptionReference;
 

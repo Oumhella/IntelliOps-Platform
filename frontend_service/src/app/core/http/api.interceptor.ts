@@ -25,6 +25,11 @@ export const apiInterceptor: HttpInterceptorFn = (request, next) => {
         authSession.clear();
         void router.navigateByUrl('/login');
       }
+      if (isApiRequest && error.status === 402
+          && authSession.currentUser()?.role === 'ROLE_ADMIN'
+          && !router.url.startsWith('/app/subscriptions')) {
+        void router.navigateByUrl('/app/subscriptions');
+      }
       return throwError(() => ApiError.fromHttpError(error));
     }),
   );

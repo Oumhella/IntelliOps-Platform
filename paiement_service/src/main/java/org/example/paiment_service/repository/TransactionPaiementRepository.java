@@ -2,6 +2,7 @@ package org.example.paiment_service.repository;
 
 import org.example.paiment_service.entity.Contexte;
 import org.example.paiment_service.entity.StatutPaiement;
+import org.example.paiment_service.entity.ModePaiement;
 import org.example.paiment_service.entity.TransactionPaiement;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,6 +18,8 @@ import java.util.Optional;
 public interface TransactionPaiementRepository extends JpaRepository<TransactionPaiement, Long> {
     Optional<TransactionPaiement> findByIdempotencyKeyAndEnterpriseId(String idempotencyKey, Long enterpriseId);
     Optional<TransactionPaiement> findByIdAndEnterpriseId(Long id, Long enterpriseId);
+    Optional<TransactionPaiement> findFirstByEnterpriseIdAndReferenceSourceIdAndTypeContexteAndModeOrderByIdDesc(
+            Long enterpriseId, Long referenceSourceId, Contexte typeContexte, ModePaiement mode);
 
     @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("select payment from TransactionPaiement payment where payment.id = :id and payment.enterpriseId = :enterpriseId")

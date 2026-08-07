@@ -20,6 +20,7 @@ public interface PaymentMapper {
     @Mapping(target = "enterpriseId", ignore = true)
     @Mapping(target = "montantRembourse", ignore = true)
     @Mapping(target = "providerTransactionId", ignore = true)
+    @Mapping(target = "notificationEmail", ignore = true)
     @Mapping(target = "consumptionReference", ignore = true)
     @Mapping(target = "consumedAt", ignore = true)
     TransactionPaiement toEntity(InitierPaiementRequestDTO dto);

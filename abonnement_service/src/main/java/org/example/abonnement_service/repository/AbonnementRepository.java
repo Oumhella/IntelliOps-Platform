@@ -22,6 +22,9 @@ public interface AbonnementRepository extends JpaRepository<Abonnement, Long> {
 
     boolean existsByEnterpriseIdAndStatutIn(Long enterpriseId, Collection<StatutAbonnement> statuts);
 
+    Optional<Abonnement> findFirstByEnterpriseIdAndStatutOrderByDateFinDesc(
+            Long enterpriseId, StatutAbonnement statut);
+
     Page<Abonnement> findAllByEnterpriseIdAndStatut(
             Long enterpriseId, StatutAbonnement statut, Pageable pageable);
 

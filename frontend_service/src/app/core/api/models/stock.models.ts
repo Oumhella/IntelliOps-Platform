@@ -1,15 +1,14 @@
 import { IsoDateTime } from './common.models';
 
-export const PLATFORM_TYPES = ['SHOPIFY', 'WOOCOMMERCE', 'YOUCAN', 'MAGENTO', 'AUTRE'] as const;
-export type PlatformType = (typeof PLATFORM_TYPES)[number];
+export const PLATFORM_TYPES = ['MANUAL'] as const;
+export type PlatformType = 'MANUAL' | 'SHOPIFY' | 'WOOCOMMERCE' | 'YOUCAN' | 'MAGENTO' | 'AUTRE';
 
-export const STOCK_MOVEMENT_TYPES = ['REASSORT', 'VENTE', 'RETOUR', 'PERTE', 'AJUSTEMENT'] as const;
+export const STOCK_MOVEMENT_TYPES = ['REASSORT', 'RETOUR', 'PERTE', 'AJUSTEMENT'] as const;
 export type StockMovementType = (typeof STOCK_MOVEMENT_TYPES)[number];
 
 export interface StoreRequest {
   readonly nomBoutique: string;
   readonly plateformeType: PlatformType;
-  readonly cleApi: string;
 }
 
 export interface StoreResponse {
@@ -28,6 +27,13 @@ export interface ProductRequest {
 
 export interface ProductResponse extends ProductRequest {
   readonly idProduit: number;
+}
+
+export interface SalesProductResponse {
+  readonly idProduit: number;
+  readonly nomProduit: string;
+  readonly prixVente: number;
+  readonly globalSku: string;
 }
 
 export interface UpdateStockRequest {

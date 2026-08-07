@@ -1,9 +1,10 @@
 package org.example.stock_service.controller;
 
-import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.stock_service.dto.request.RegleApprovisionnementRequestDTO;
 import org.example.stock_service.dto.request.UpdateStockRequestDTO;
+import org.example.stock_service.dto.request.ReservationStockRequest;
 import org.example.stock_service.dto.response.InventaireResponseDTO;
 import org.example.stock_service.service.InventaireService;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.example.common.security.TenantContext;
 
 @RestController
 @RequestMapping("/api/v1/inventaires")
@@ -24,23 +26,41 @@ public class InventaireController {
     public ResponseEntity<InventaireResponseDTO> ajusterStock(
             @PathVariable Long idBoutique,
             @PathVariable Long idProduit,
-            @RequestBody UpdateStockRequestDTO request,
-            HttpServletRequest httpRequest) {
+            @RequestBody UpdateStockRequestDTO request) {
 
-        Long auteurId = extraireAuteurId(httpRequest);
+        Long auteurId = TenantContext.requireUserId();
         return ResponseEntity.ok(inventaireService.ajusterStock(idBoutique, idProduit, request, auteurId));
     }
 
     @PostMapping("/boutiques/{idBoutique}/produits/{idProduit}/reserver")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CSM', 'LOGISTIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CSM', 'LOGISTIC', 'INTEGRATION_SERVICE')")
     public ResponseEntity<InventaireResponseDTO> reserverStock(
             @PathVariable Long idBoutique,
             @PathVariable Long idProduit,
-            @RequestParam int quantite,
-            HttpServletRequest httpRequest) {
+            @Valid @RequestBody ReservationStockRequest request) {
 
-        Long auteurId = extraireAuteurId(httpRequest);
-        return ResponseEntity.ok(inventaireService.reserverStock(idBoutique, idProduit, quantite, auteurId));
+        return ResponseEntity.ok(inventaireService.reserverStock(
+                idBoutique, idProduit, request, TenantContext.requireUserId()));
+    }
+
+    @PostMapping("/boutiques/{idBoutique}/produits/{idProduit}/liberer")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CSM', 'LOGISTIC', 'INTEGRATION_SERVICE')")
+    public ResponseEntity<InventaireResponseDTO> libererReservation(
+            @PathVariable Long idBoutique,
+            @PathVariable Long idProduit,
+            @Valid @RequestBody ReservationStockRequest request) {
+        return ResponseEntity.ok(inventaireService.libererReservation(
+                idBoutique, idProduit, request, TenantContext.requireUserId()));
+    }
+
+    @PostMapping("/boutiques/{idBoutique}/produits/{idProduit}/consommer")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CSM', 'LOGISTIC')")
+    public ResponseEntity<InventaireResponseDTO> consommerReservation(
+            @PathVariable Long idBoutique,
+            @PathVariable Long idProduit,
+            @Valid @RequestBody ReservationStockRequest request) {
+        return ResponseEntity.ok(inventaireService.consommerReservation(
+                idBoutique, idProduit, request, TenantContext.requireUserId()));
     }
 
     @GetMapping("/boutiques/{idBoutique}/produits/{idProduit}")
@@ -63,11 +83,4 @@ public class InventaireController {
         return ResponseEntity.ok(inventaireService.configurerRegleApprovisionnement(idInventaire, request));
     }
 
-    private Long extraireAuteurId(HttpServletRequest request) {
-        String userIdStr = request.getHeader("X-User-Id");
-        if (userIdStr != null && !userIdStr.isBlank()) {
-            return Long.valueOf(userIdStr);
-        }
-        return 1L; // Valeur par défaut
-    }
 }

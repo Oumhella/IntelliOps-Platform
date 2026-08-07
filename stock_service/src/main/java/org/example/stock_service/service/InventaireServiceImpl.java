@@ -3,6 +3,7 @@ package org.example.stock_service.service;
 import lombok.RequiredArgsConstructor;
 import org.example.stock_service.dto.request.RegleApprovisionnementRequestDTO;
 import org.example.stock_service.dto.request.UpdateStockRequestDTO;
+import org.example.stock_service.dto.request.ReservationStockRequest;
 import org.example.stock_service.dto.response.InventaireResponseDTO;
 import org.example.stock_service.entity.*;
 import org.example.stock_service.mapper.StockMapper;
@@ -19,6 +20,7 @@ import java.util.List;
 public class InventaireServiceImpl implements InventaireService {
 
     private final InventaireRepository inventaireRepository;
+    private final ReservationStockRepository reservationStockRepository;
     private final BoutiqueRepository boutiqueRepository; // <-- Ajouté pour récupérer l'entité Boutique
     private final ProduitRepository produitRepository;   // <-- Ajouté pour récupérer l'entité Produit
     private final StockMapper stockMapper;
@@ -26,6 +28,7 @@ public class InventaireServiceImpl implements InventaireService {
     @Transactional
     @Override
     public InventaireResponseDTO ajusterStock(Long idBoutique, Long idProduit, UpdateStockRequestDTO request, Long auteurId) {
+        validateManualMovement(request);
         // Auto-création de l'inventaire s'il n'existe pas encore pour cette boutique & produit
         Inventaire inventaire = obtenirOuCreerInventaire(idBoutique, idProduit);
 
@@ -38,15 +41,70 @@ public class InventaireServiceImpl implements InventaireService {
 
     @Transactional
     @Override
-    public InventaireResponseDTO reserverStock(Long idBoutique, Long idProduit, int quantite, Long auteurId) {
+    public InventaireResponseDTO reserverStock(
+            Long idBoutique, Long idProduit, ReservationStockRequest request, Long auteurId) {
         // Pour réserver du stock, l'inventaire DOIT exister
         Inventaire inventaire = trouverInventaireOuLeverException(idBoutique, idProduit);
 
         // Appel de la méthode métier d'encapsulation pour la réservation
-        inventaire.reserveStock(quantite, auteurId);
+        String reference = request.referenceOperation().trim();
+        Long enterpriseId = TenantContext.requireEnterpriseId();
+        var existing = reservationStockRepository
+                .findByEnterpriseIdAndReferenceOperationAndProduitId(enterpriseId, reference, idProduit);
+        if (existing.isPresent()) {
+            ReservationStock reservation = existing.get();
+            if (!reservation.getInventaire().getId().equals(inventaire.getId())
+                    || reservation.getQuantite() != request.quantite()) {
+                throw new IllegalStateException(
+                        "La reference de reservation existe deja avec un autre emplacement ou une autre quantite.");
+            }
+            return stockMapper.toResponse(inventaire);
+        }
+
+        inventaire.reserveStock(request.quantite(), auteurId);
 
         Inventaire saved = inventaireRepository.save(inventaire);
+        reservationStockRepository.save(ReservationStock.builder()
+                .enterpriseId(enterpriseId)
+                .referenceOperation(reference)
+                .produitId(idProduit)
+                .quantite(request.quantite())
+                .statut(StatutReservationStock.RESERVED)
+                .inventaire(saved)
+                .auteurId(auteurId)
+                .build());
         return stockMapper.toResponse(saved);
+    }
+
+    @Transactional
+    @Override
+    public InventaireResponseDTO libererReservation(
+            Long idBoutique, Long idProduit, ReservationStockRequest request, Long auteurId) {
+        ReservationStock reservation = findReservation(idBoutique, idProduit, request);
+        if (reservation.getStatut() == StatutReservationStock.RESERVED) {
+            reservation.getInventaire().releaseReservation(reservation.getQuantite(), auteurId);
+            reservation.setStatut(StatutReservationStock.RELEASED);
+            reservationStockRepository.save(reservation);
+            inventaireRepository.save(reservation.getInventaire());
+        }
+        return stockMapper.toResponse(reservation.getInventaire());
+    }
+
+    @Transactional
+    @Override
+    public InventaireResponseDTO consommerReservation(
+            Long idBoutique, Long idProduit, ReservationStockRequest request, Long auteurId) {
+        ReservationStock reservation = findReservation(idBoutique, idProduit, request);
+        if (reservation.getStatut() == StatutReservationStock.RELEASED) {
+            throw new IllegalStateException("Une reservation liberee ne peut pas etre consommee.");
+        }
+        if (reservation.getStatut() == StatutReservationStock.RESERVED) {
+            reservation.getInventaire().consumeReservation(reservation.getQuantite(), auteurId);
+            reservation.setStatut(StatutReservationStock.CONSUMED);
+            reservationStockRepository.save(reservation);
+            inventaireRepository.save(reservation.getInventaire());
+        }
+        return stockMapper.toResponse(reservation.getInventaire());
     }
 
     @Transactional(readOnly = true)
@@ -116,5 +174,42 @@ public class InventaireServiceImpl implements InventaireService {
                         idBoutique, idProduit, TenantContext.requireEnterpriseId())
                 .orElseThrow(() -> new EntityNotFoundException(
                         "Inventaire introuvable pour la boutique " + idBoutique + " et le produit " + idProduit));
+    }
+
+    private ReservationStock findReservation(
+            Long idBoutique, Long idProduit, ReservationStockRequest request) {
+        Inventaire inventaire = trouverInventaireOuLeverException(idBoutique, idProduit);
+        ReservationStock reservation = reservationStockRepository
+                .findByEnterpriseIdAndReferenceOperationAndProduitId(
+                        TenantContext.requireEnterpriseId(), request.referenceOperation().trim(), idProduit)
+                .orElseThrow(() -> new EntityNotFoundException("Reservation de stock introuvable."));
+        if (!reservation.getInventaire().getId().equals(inventaire.getId())
+                || reservation.getQuantite() != request.quantite()) {
+            throw new IllegalStateException("La reservation ne correspond pas a la commande demandee.");
+        }
+        return reservation;
+    }
+
+    private void validateManualMovement(UpdateStockRequestDTO request) {
+        if (request == null || request.getTypeMouvement() == null || request.getQuantite() == 0) {
+            throw new IllegalArgumentException("Un mouvement et une quantite non nulle sont requis.");
+        }
+        switch (request.getTypeMouvement()) {
+            case REASSORT, RETOUR -> {
+                if (request.getQuantite() < 0) {
+                    throw new IllegalArgumentException("Ce mouvement doit augmenter le stock.");
+                }
+            }
+            case PERTE -> {
+                if (request.getQuantite() > 0) {
+                    throw new IllegalArgumentException("Une perte doit diminuer le stock.");
+                }
+            }
+            case AJUSTEMENT -> {
+                // A signed delta is valid for a manually justified adjustment.
+            }
+            case VENTE, RESERVATION, LIBERATION -> throw new IllegalArgumentException(
+                    "Ce type de mouvement est gere uniquement par le cycle de vie des commandes.");
+        }
     }
 }

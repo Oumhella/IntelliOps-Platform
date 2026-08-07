@@ -55,6 +55,11 @@ public class Livraison {
 
     private String clientEmail;
 
+    private String clientNomComplet;
+    private String clientTelephone;
+    private String adresseLivraison;
+    private String villeLivraison;
+
     @Column(nullable = false)
     private double montantACollecterCoD;
 

@@ -10,6 +10,7 @@ import org.example.paiment_service.dto.request.ConsumePaymentRequest;
 import org.example.paiment_service.dto.request.InitierPaiementRequestDTO;
 import org.example.paiment_service.dto.request.RemboursementRequestDTO;
 import org.example.paiment_service.dto.request.PreparePaymentRequestDTO;
+import org.example.paiment_service.dto.request.OrderPaymentRequest;
 import org.example.paiment_service.dto.response.FactureResponseDTO;
 import org.example.paiment_service.dto.response.PaymentPreparationResponseDTO;
 import org.example.paiment_service.dto.response.TransactionPaiementResponseDTO;
@@ -20,6 +21,8 @@ import org.example.paiment_service.gateway.PaymentGatewayProvider;
 import org.example.paiment_service.mapper.PaymentMapper;
 import org.example.paiment_service.repository.FactureRepository;
 import org.example.paiment_service.repository.TransactionPaiementRepository;
+import org.example.paiment_service.client.OrderClient;
+import feign.FeignException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -44,6 +47,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentGatewayFactory gatewayFactory;
     private final InvoicePdfService invoicePdfService;
     private final PaymentEventProducer paymentEventProducer;
+    private final OrderClient orderClient;
 
     @Value("${stripe.publishable-key:}")
     private String stripePublishableKey;
@@ -70,6 +74,7 @@ public class PaymentServiceImpl implements PaymentService {
         transaction.setMontant(request.getMontant().setScale(2, RoundingMode.HALF_UP));
         transaction.setMontantRembourse(BigDecimal.ZERO.setScale(2));
         transaction.setStatut(StatutPaiement.PENDING);
+        transaction.setNotificationEmail(authenticatedEmail());
 
         // Flush the idempotency record before contacting the provider. Stripe also
         // receives the same key, protecting retries after network interruptions.
@@ -77,18 +82,74 @@ public class PaymentServiceImpl implements PaymentService {
 
         transaction.setStatut(StatutPaiement.AWAITING_COLLECTION);
 
-        if (transaction.getStatut() == StatutPaiement.COMPLETED
-                || transaction.getStatut() == StatutPaiement.AWAITING_COLLECTION) {
+        if (transaction.getStatut() == StatutPaiement.COMPLETED) {
             tryGenerateInvoice(transaction);
         }
 
         TransactionPaiement saved = transactionRepository.save(transaction);
         if (saved.getStatut() == StatutPaiement.COMPLETED) {
             paymentEventProducer.sendPaymentNotification(
-                    authenticatedEmail(),
+                    saved.getNotificationEmail(),
                     "Payment #" + saved.getId() + " confirmed",
                     "Your payment of " + saved.getMontant() + " MAD was captured successfully.");
         }
+        return paymentMapper.toResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public PaymentPreparationResponseDTO prepareOrderCardPayment(
+            Long orderId, OrderPaymentRequest request) {
+        OrderClient.OrderSummary order = requirePayableOrder(orderId, false);
+        PaymentPreparationResponseDTO prepared = prepareCardPayment(new PreparePaymentRequestDTO(
+                request.idempotencyKey(), orderId, Contexte.COMMANDE_PRODUCT, order.totalPrix()));
+        assignOrderNotificationEmail(prepared.paymentId(), order);
+        return prepared;
+    }
+
+    @Override
+    @Transactional
+    public TransactionPaiementResponseDTO initiateOrderCod(Long orderId, OrderPaymentRequest request) {
+        OrderClient.OrderSummary order = requirePayableOrder(orderId, true);
+        InitierPaiementRequestDTO payment = new InitierPaiementRequestDTO();
+        payment.setIdempotencyKey(request.idempotencyKey());
+        payment.setReferenceSourceId(orderId);
+        payment.setTypeContexte(Contexte.COMMANDE_PRODUCT);
+        payment.setMontant(order.totalPrix());
+        payment.setMode(ModePaiement.CASH_ON_DELIVERY);
+        TransactionPaiementResponseDTO response = initierPaiement(payment);
+        assignOrderNotificationEmail(response.getId(), order);
+        if ("UNPAID".equals(order.statutPaiement())) {
+            syncOrderPaymentStatus(orderId, "AWAITING_COLLECTION");
+        }
+        return response;
+    }
+
+    @Override
+    @Transactional
+    public TransactionPaiementResponseDTO collectOrderCod(Long orderId) {
+        TransactionPaiement transaction = transactionRepository
+                .findFirstByEnterpriseIdAndReferenceSourceIdAndTypeContexteAndModeOrderByIdDesc(
+                        TenantContext.requireEnterpriseId(), orderId,
+                        Contexte.COMMANDE_PRODUCT, ModePaiement.CASH_ON_DELIVERY)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "No cash-on-delivery payment exists for order " + orderId + "."));
+        if (transaction.getStatut() == StatutPaiement.COMPLETED) {
+            return paymentMapper.toResponse(transaction);
+        }
+        if (transaction.getStatut() != StatutPaiement.AWAITING_COLLECTION) {
+            throw new IllegalStateException("This cash-on-delivery payment cannot be collected.");
+        }
+        transaction.setStatut(StatutPaiement.COMPLETED);
+        if (transaction.getFacture() == null) {
+            tryGenerateInvoice(transaction);
+        }
+        syncOrderPaymentStatus(orderId, "PAID");
+        TransactionPaiement saved = transactionRepository.save(transaction);
+        paymentEventProducer.sendPaymentNotification(
+                saved.getNotificationEmail(),
+                "Cash payment #" + saved.getId() + " collected",
+                "Cash on delivery of " + saved.getMontant() + " MAD was collected.");
         return paymentMapper.toResponse(saved);
     }
 
@@ -114,6 +175,7 @@ public class PaymentServiceImpl implements PaymentService {
                         .montant(amount)
                         .montantRembourse(BigDecimal.ZERO.setScale(2))
                         .mode(ModePaiement.CREDIT_CARD)
+                        .notificationEmail(authenticatedEmail())
                         .statut(StatutPaiement.PENDING)
                         .build()));
 
@@ -155,8 +217,11 @@ public class PaymentServiceImpl implements PaymentService {
         }
         TransactionPaiement saved = transactionRepository.save(transaction);
         if (newlyCompleted) {
+            if (saved.getTypeContexte() == Contexte.COMMANDE_PRODUCT) {
+                syncOrderPaymentStatus(saved.getReferenceSourceId(), "PAID");
+            }
             paymentEventProducer.sendPaymentNotification(
-                    authenticatedEmail(),
+                    saved.getNotificationEmail(),
                     "Payment #" + saved.getId() + " confirmed",
                     "Your payment of " + saved.getMontant() + " MAD was captured successfully.");
         }
@@ -206,7 +271,13 @@ public class PaymentServiceImpl implements PaymentService {
             }
         }
         transaction.rembourser(amount);
-        return paymentMapper.toResponse(transactionRepository.save(transaction));
+        TransactionPaiement saved = transactionRepository.save(transaction);
+        if (saved.getTypeContexte() == Contexte.COMMANDE_PRODUCT) {
+            syncOrderPaymentStatus(saved.getReferenceSourceId(),
+                    saved.getStatut() == StatutPaiement.REFUNDED
+                            ? "REFUNDED" : "PARTIALLY_REFUNDED");
+        }
+        return paymentMapper.toResponse(saved);
     }
 
     @Override
@@ -217,7 +288,12 @@ public class PaymentServiceImpl implements PaymentService {
             throw new IllegalStateException("A payment linked to a subscription cannot be cancelled directly.");
         }
         transaction.annuler();
-        return paymentMapper.toResponse(transactionRepository.save(transaction));
+        TransactionPaiement saved = transactionRepository.save(transaction);
+        if (saved.getTypeContexte() == Contexte.COMMANDE_PRODUCT
+                && saved.getMode() == ModePaiement.CASH_ON_DELIVERY) {
+            syncOrderPaymentStatus(saved.getReferenceSourceId(), "UNPAID");
+        }
+        return paymentMapper.toResponse(saved);
     }
 
     @Override
@@ -263,6 +339,36 @@ public class PaymentServiceImpl implements PaymentService {
         if (request.getMode() == ModePaiement.CREDIT_CARD) {
             throw new IllegalArgumentException(
                     "Card payments must use the secure /prepare and /{id}/finalize Payment Element flow.");
+        }
+    }
+
+    private OrderClient.OrderSummary requirePayableOrder(Long orderId, boolean allowAwaitingCollection) {
+        OrderClient.OrderSummary order;
+        try {
+            order = orderClient.getOrder(orderId);
+        } catch (FeignException exception) {
+            throw new EntityNotFoundException("Order not found: " + orderId);
+        }
+        if (order == null || order.totalPrix() == null || order.totalPrix().signum() <= 0) {
+            throw new IllegalStateException("The order has no payable total.");
+        }
+        if (!"CONFIRMEE".equals(order.statutCommande())) {
+            throw new IllegalStateException("Only a confirmed order can enter payment.");
+        }
+        if (!"UNPAID".equals(order.statutPaiement())
+                && !(allowAwaitingCollection && "AWAITING_COLLECTION".equals(order.statutPaiement()))) {
+            throw new IllegalStateException("The order already has a payment workflow.");
+        }
+        return order;
+    }
+
+    private void syncOrderPaymentStatus(Long orderId, String desiredStatus) {
+        OrderClient.OrderSummary order = orderClient.getOrder(orderId);
+        if (order == null) {
+            throw new IllegalStateException("The linked order could not be loaded.");
+        }
+        if (!desiredStatus.equals(order.statutPaiement())) {
+            orderClient.updatePaymentStatus(orderId, new OrderClient.PaymentStatusUpdate(desiredStatus));
         }
     }
 
@@ -329,7 +435,24 @@ public class PaymentServiceImpl implements PaymentService {
 
     private String authenticatedEmail() {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication == null ? "billing@intelliops.local" : authentication.getName();
+        if (authentication == null || !authentication.isAuthenticated()
+                || authentication.getName() == null || authentication.getName().isBlank()
+                || "anonymousUser".equals(authentication.getName())) {
+            return null;
+        }
+        return authentication.getName();
+    }
+
+    private void assignOrderNotificationEmail(Long paymentId, OrderClient.OrderSummary order) {
+        if (order.infosClient() == null || order.infosClient().email() == null
+                || order.infosClient().email().isBlank()) {
+            return;
+        }
+        transactionRepository.findByIdAndEnterpriseId(paymentId, TenantContext.requireEnterpriseId())
+                .ifPresent(transaction -> {
+                    transaction.setNotificationEmail(order.infosClient().email().trim());
+                    transactionRepository.save(transaction);
+                });
     }
 
     private TransactionPaiement findTransaction(Long idTransaction) {

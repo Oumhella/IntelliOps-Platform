@@ -1,5 +1,6 @@
 package org.example.lead_service.controller;
 
+import jakarta.validation.Valid;
 import org.example.lead_service.dto.*;
 import org.example.lead_service.entity.StatutLead;
 import org.example.lead_service.entity.TypeInteraction;
@@ -25,7 +26,7 @@ public class LeadController {
     @PostMapping
     @PreAuthorize("hasRole('CSM')")
     public ResponseEntity<LeadDTO> creerLead(
-            @RequestBody LeadDTO leadDTO,
+            @Valid @RequestBody LeadDTO leadDTO,
             @RequestAttribute("userId") Long agentId
     ) {
         leadDTO.setAgentId(agentId);
@@ -101,6 +102,7 @@ public class LeadController {
     @PreAuthorize("hasRole('CSM')")
     public ResponseEntity<CommandeDTO> convertirEnCommande(
             @PathVariable Long idLead,
+            @Valid
             @RequestBody CreationCommandeRequest request) { // 📥 On récupère le JSON ici !
 
         return new ResponseEntity<>(leadService.convertirEnCommande(idLead, request), HttpStatus.CREATED);

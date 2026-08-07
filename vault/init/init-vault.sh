@@ -155,6 +155,23 @@ vault kv put secret/stock-service \
   spring.datasource.username="${DB_USER:-postgres}" \
   spring.datasource.password="${DB_PASSWORD:-changeme}"
 
+INTEGRATION_MASTER_KEY_VALUE="${INTEGRATION_CREDENTIALS_MASTER_KEY:-}"
+if [ -z "$INTEGRATION_MASTER_KEY_VALUE" ]; then
+  INTEGRATION_MASTER_KEY_VALUE="$(vault kv get -field=integration.credentials-master-key secret/store-integration-service 2>/dev/null || true)"
+fi
+if [ -z "$INTEGRATION_MASTER_KEY_VALUE" ]; then
+  INTEGRATION_MASTER_KEY_VALUE="$(vault write -field=random_bytes sys/tools/random/32 format=base64)"
+fi
+SHOPIFY_CLIENT_ID_VALUE="${SHOPIFY_CLIENT_ID:-$(vault kv get -field=integration.shopify.client-id secret/store-integration-service 2>/dev/null || true)}"
+SHOPIFY_CLIENT_SECRET_VALUE="${SHOPIFY_CLIENT_SECRET:-$(vault kv get -field=integration.shopify.client-secret secret/store-integration-service 2>/dev/null || true)}"
+
+vault kv put secret/store-integration-service \
+  spring.datasource.username="${DB_USER:-postgres}" \
+  spring.datasource.password="${DB_PASSWORD:-changeme}" \
+  integration.credentials-master-key="$INTEGRATION_MASTER_KEY_VALUE" \
+  integration.shopify.client-id="$SHOPIFY_CLIENT_ID_VALUE" \
+  integration.shopify.client-secret="$SHOPIFY_CLIENT_SECRET_VALUE"
+
 vault kv put secret/mcp-server \
   spring.ai.openai.api-key="${NVIDIA_API_KEY}" \
   spring.ai.openai.chat.options.model="${NVIDIA_MODEL}"\

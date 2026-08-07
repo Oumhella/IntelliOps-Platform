@@ -162,7 +162,7 @@ public class UserController {
     }
 
     /**
-     * Permanently delete a staff member from the database.
+     * Deactivate a staff member while preserving historical ownership/audit references.
      * Only accessible by users with ADMIN role.
      */
     @DeleteMapping("/staff/{id}")

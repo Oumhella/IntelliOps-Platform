@@ -3,6 +3,8 @@ package org.example.delivery_service.service;
 import org.example.common.exception.ResourceNotFoundException;
 import org.example.delivery_service.client.UserClient;
 import org.example.delivery_service.client.UserSummary;
+import org.example.delivery_service.client.OrderClient;
+import org.example.delivery_service.client.PaymentClient;
 import org.example.delivery_service.dto.request.ExpedierLivraisonRequest;
 import org.example.delivery_service.dto.request.UpdateStatutRequest;
 import org.example.delivery_service.dto.response.LivraisonResponse;
@@ -27,6 +29,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
+import feign.FeignException;
 
 @Service
 @RequiredArgsConstructor
@@ -37,6 +40,8 @@ public class LivraisonServiceImpl implements LivraisonService {
     private final LivraisonMapper livraisonMapper;
     private final LivraisonEventProducer eventProducer;
     private final UserClient userClient;
+    private final OrderClient orderClient;
+    private final PaymentClient paymentClient;
 
     @Override
     @Transactional
@@ -47,6 +52,10 @@ public class LivraisonServiceImpl implements LivraisonService {
             throw new IllegalArgumentException("Shipment already exists for order ID: " + request.getReferenceCommandeId());
         }
         validateTransporter(request);
+        OrderClient.OrderSummary order = requireShippableOrder(request.getReferenceCommandeId());
+        OrderClient.CustomerSummary customer = order.infosClient();
+        double codAmount = "AWAITING_COLLECTION".equals(order.statutPaiement())
+                ? order.totalPrix().doubleValue() : 0.0;
 
         Livraison livraison = Livraison.builder()
                 .enterpriseId(enterpriseId)
@@ -55,10 +64,13 @@ public class LivraisonServiceImpl implements LivraisonService {
                 .statutLivraison(StatutLivraison.EN_PREPARATION)
                 .typeTransporteur(request.getTypeTransporteur())
                 .nomSociete(request.getNomSociete())
-                .endpointApiUrl(request.getEndpointApiUrl())
                 .livreurId(request.getLivreurId())
-                .montantACollecterCoD(request.getMontantACollecterCoD())
-                .clientEmail(request.getClientEmail())
+                .montantACollecterCoD(codAmount)
+                .clientEmail(customer.email())
+                .clientNomComplet(customer.nomComplet())
+                .clientTelephone(customer.telephone())
+                .adresseLivraison(customer.adresseLivraison())
+                .villeLivraison(customer.ville())
                 .shippingDate(LocalDateTime.now())
                 .build();
 
@@ -132,6 +144,17 @@ public class LivraisonServiceImpl implements LivraisonService {
                     "Invalid delivery transition from " + livraison.getStatutLivraison() + " to " + request.getStatut() + ".");
         }
 
+        if (request.getStatut() == StatutLivraison.CHEZ_TRANSPORTEUR
+                || request.getStatut() == StatutLivraison.EN_COURS) {
+            orderClient.updateFulfillmentStatus(livraison.getReferenceCommandeId(),
+                    new OrderClient.StatusUpdate("EXPEDIEE"));
+        } else if (request.getStatut() == StatutLivraison.LIVREE) {
+            completeOrderDelivery(livraison);
+        } else if (request.getStatut() == StatutLivraison.RETOUR) {
+            orderClient.updateFulfillmentStatus(livraison.getReferenceCommandeId(),
+                    new OrderClient.StatusUpdate("RETOURNEE"));
+        }
+
         livraison.mettreAJourStatut(request.getStatut());
         Livraison saved = livraisonRepository.save(livraison);
         return livraisonMapper.toResponse(saved);
@@ -147,6 +170,7 @@ public class LivraisonServiceImpl implements LivraisonService {
             throw new IllegalStateException("Reception can only be confirmed for a dispatched delivery.");
         }
 
+        completeOrderDelivery(livraison);
         livraison.mettreAJourStatut(StatutLivraison.LIVREE);
         Livraison saved = livraisonRepository.save(livraison);
 
@@ -191,7 +215,7 @@ public class LivraisonServiceImpl implements LivraisonService {
             if (request.getLivreurId() == null) {
                 throw new IllegalArgumentException("An internal courier must be selected");
             }
-            if (hasText(request.getNomSociete()) || hasText(request.getEndpointApiUrl())) {
+            if (hasText(request.getNomSociete())) {
                 throw new IllegalArgumentException("External carrier fields cannot be used for an internal courier");
             }
             UserSummary courier = userClient.getActiveCourier(request.getLivreurId());
@@ -207,10 +231,37 @@ public class LivraisonServiceImpl implements LivraisonService {
         if (request.getLivreurId() != null) {
             throw new IllegalArgumentException("An external-company shipment cannot be assigned to an internal courier");
         }
-        if (hasText(request.getEndpointApiUrl())) {
-            throw new IllegalArgumentException(
-                    "Carrier API endpoints must be configured server-side; arbitrary shipment URLs are not accepted");
+    }
+
+    private OrderClient.OrderSummary requireShippableOrder(Long orderId) {
+        OrderClient.OrderSummary order;
+        try {
+            order = orderClient.getOrder(orderId);
+        } catch (FeignException exception) {
+            throw new ResourceNotFoundException("Order not found: " + orderId);
         }
+        if (order == null || !"PREPARATION".equals(order.statutCommande())) {
+            throw new IllegalStateException("Only an order in preparation can be shipped.");
+        }
+        if (!"PAID".equals(order.statutPaiement())
+                && !"AWAITING_COLLECTION".equals(order.statutPaiement())) {
+            throw new IllegalStateException(
+                    "The order must be paid or explicitly configured for cash on delivery before shipping.");
+        }
+        OrderClient.CustomerSummary customer = order.infosClient();
+        if (customer == null || !hasText(customer.nomComplet()) || !hasText(customer.telephone())
+                || !hasText(customer.adresseLivraison()) || !hasText(customer.ville())) {
+            throw new IllegalStateException("The order has incomplete delivery details.");
+        }
+        return order;
+    }
+
+    private void completeOrderDelivery(Livraison delivery) {
+        if (delivery.getMontantACollecterCoD() > 0) {
+            paymentClient.collectCashOnDelivery(delivery.getReferenceCommandeId());
+        }
+        orderClient.updateFulfillmentStatus(delivery.getReferenceCommandeId(),
+                new OrderClient.StatusUpdate("LIVREE"));
     }
 
     private void ensureCourierAccess(Livraison delivery) {

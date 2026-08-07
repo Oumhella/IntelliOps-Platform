@@ -7,12 +7,10 @@
     <app-stripe-payment-element [preparation]="preparation" [returnUrl]="paymentReturnUrl" (confirmed)="cardPaymentConfirmed()"/>
   }@else{
     <form (ngSubmit)="initiate()"><div class="form-grid">
-      <label class="form-field form-field-full"><span>Idempotency key</span><input name="key" [(ngModel)]="paymentForm.idempotencyKey" required/><small class="form-help">Keep this key when retrying the same logical payment.</small></label>
-      <label class="form-field"><span>Order reference ID</span><input name="source" type="number" [(ngModel)]="paymentForm.referenceSourceId" required/></label>
-      <label class="form-field"><span>Context</span><select name="context" [(ngModel)]="paymentForm.typeContexte"><option value="COMMANDE_PRODUCT">Order</option></select></label>
-      <label class="form-field"><span>Mode</span><select name="mode" [(ngModel)]="paymentForm.mode">@for(x of modes;track x){<option [value]="x">{{label(x)}}</option>}</select></label>
-      <label class="form-field"><span>Amount</span><input name="amount" type="number" min="0.01" step=".01" [(ngModel)]="paymentForm.montant" required/></label>
-    </div><div class="form-actions"><button class="primary-button" [disabled]="busy">{{busy?'Preparing payment…':paymentForm.mode==='CREDIT_CARD'?'Continue to secure payment':'Record cash-on-delivery payment'}}</button></div></form>
+      <label class="form-field form-field-full"><span>Confirmed unpaid order</span><select name="order" [(ngModel)]="paymentForm.orderId" required><option [ngValue]="null" disabled>Select an order</option>@for(order of payableOrders();track order.idCommande){<option [ngValue]="order.idCommande">{{order.reference}} · {{order.infosClient.nomComplet}} · {{order.totalPrix}} MAD</option>}</select></label>
+      <label class="form-field"><span>Payment mode</span><select name="mode" [(ngModel)]="paymentForm.mode">@for(x of modes;track x){<option [value]="x">{{label(x)}}</option>}</select></label>
+      <p class="row-secondary form-field-full">The amount is read from the selected order. Cash on delivery remains awaiting collection until delivery is confirmed.</p>
+    </div><div class="form-actions"><button class="primary-button" [disabled]="busy||!paymentForm.orderId">{{busy?'Preparing payment…':paymentForm.mode==='CREDIT_CARD'?'Continue to secure payment':'Use cash on delivery'}}</button></div></form>
   }
 }
 @if(panel==='transaction'&&selectedTransaction();as t){<div class="detail-panel"><dl class="detail-list"><div><dt>ID</dt><dd>#{{t.id}}</dd></div><div><dt>Status</dt><dd>{{label(t.statut)}}</dd></div><div><dt>Amount</dt><dd>{{t.montant}} MAD</dd></div><div><dt>Refunded</dt><dd>{{t.montantRembourse}} MAD</dd></div><div><dt>Mode</dt><dd>{{label(t.mode)}}</dd></div><div><dt>Context</dt><dd>{{label(t.typeContexte)}}</dd></div><div><dt>Source</dt><dd>#{{t.referenceSourceId}}</dd></div><div><dt>Invoice</dt><dd>{{t.facture?.numeroFactureUnique||'—'}}</dd></div></dl></div>}

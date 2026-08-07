@@ -55,6 +55,7 @@ export class SubscriptionsComponent implements OnInit {
   checkoutKey = '';
   pauseReason = '';
   private pendingCheckout: PendingCheckout | null = null;
+  private onboardingApplied = false;
   readonly paymentReturnUrl = `${globalThis.location?.origin ?? ''}/app/subscriptions?stripe_return=1`;
 
   ngOnInit(): void {
@@ -67,7 +68,10 @@ export class SubscriptionsComponent implements OnInit {
 
   loadPlans(): void {
     this.api.getPlans('ACTIF').subscribe({
-      next: (plans) => this.plans.set(plans),
+      next: (plans) => {
+        this.plans.set(plans);
+        this.applyOnboardingSelection(plans);
+      },
       error: (error) => this.feedback.error(error, 'Available plans could not be loaded.'),
     });
   }
@@ -280,6 +284,20 @@ export class SubscriptionsComponent implements OnInit {
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
+  }
+
+  private applyOnboardingSelection(plans: readonly PlanResponse[]): void {
+    if (this.onboardingApplied || this.route.snapshot.queryParamMap.get('onboarding') !== '1') return;
+    this.onboardingApplied = true;
+    const requestedPlanId = Number(this.route.snapshot.queryParamMap.get('plan'));
+    const plan = plans.find((candidate) => candidate.idPlan === requestedPlanId);
+    globalThis.sessionStorage?.removeItem('intelliops.onboarding-plan');
+    if (!plan) {
+      this.feedback.error(null, 'The selected onboarding plan is no longer available. Choose another active plan.');
+      return;
+    }
+    this.open('subscribe');
+    this.planId = plan.idPlan;
   }
 
   private run(operation: Observable<unknown>, message: string): void {

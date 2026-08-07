@@ -9,6 +9,7 @@ import { CrmApiService } from './crm-api.service';
 import { PlatformApiService } from './platform-api.service';
 import { DeliveriesApiService } from './deliveries-api.service';
 import { UsersApiService } from './users-api.service';
+import { IntegrationsApiService } from './integrations-api.service';
 
 describe('API services transport details', () => {
   let httpTesting: HttpTestingController;
@@ -25,17 +26,6 @@ describe('API services transport details', () => {
   });
 
   afterEach(() => httpTesting.verify());
-
-  it('sends stock reservation values as query parameters', () => {
-    TestBed.inject(StockApiService).reserveStock(4, 9, 3).subscribe();
-
-    const request = httpTesting.expectOne(
-      (candidate) => candidate.url === 'http://gateway:8080/api/v1/inventaires/boutiques/4/produits/9/reserver',
-    );
-    expect(request.request.method).toBe('POST');
-    expect(request.request.params.get('quantite')).toBe('3');
-    request.flush({});
-  });
 
   it('omits the optional plan status filter when it is not supplied', () => {
     TestBed.inject(SubscriptionsApiService).getPlans().subscribe();
@@ -119,7 +109,6 @@ describe('API services transport details', () => {
     TestBed.inject(DeliveriesApiService).ship({
       referenceCommandeId: 7,
       typeTransporteur: 'LIVREUR_INTERNE',
-      montantACollecterCoD: 125,
       livreurId: 18,
     }).subscribe();
 
@@ -127,6 +116,40 @@ describe('API services transport details', () => {
     expect(request.request.method).toBe('POST');
     expect(request.request.body.livreurId).toBe(18);
     expect(request.request.body.endpointApiUrl).toBeUndefined();
+    request.flush({});
+  });
+
+  it('starts Shopify authorization without sending provider credentials', () => {
+    TestBed.inject(IntegrationsApiService).connectShopify({
+      displayName: 'Main store',
+      store: 'merchant.myshopify.com',
+      stockLocationId: 4,
+    }).subscribe();
+
+    const request = httpTesting.expectOne('http://gateway:8080/api/v1/integrations/shopify/connect');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({
+      displayName: 'Main store',
+      store: 'merchant.myshopify.com',
+      stockLocationId: 4,
+    });
+    expect(request.request.body.accessToken).toBeUndefined();
+    expect(request.request.body.consumerSecret).toBeUndefined();
+    request.flush({ authorizationUrl: 'https://merchant.myshopify.com/admin/oauth/authorize', expiresAt: '2026-08-07T16:00:00Z' });
+  });
+
+  it('creates an explicit external-to-internal product mapping', () => {
+    TestBed.inject(IntegrationsApiService).createMapping(9, {
+      externalProductId: '81',
+      externalVariantId: '93',
+      externalSku: 'EXT-93',
+      externalName: 'Blue shirt — Medium',
+      internalProductId: 12,
+    }).subscribe();
+
+    const request = httpTesting.expectOne('http://gateway:8080/api/v1/integrations/connections/9/mappings');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body.internalProductId).toBe(12);
     request.flush({});
   });
 });

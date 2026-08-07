@@ -15,6 +15,8 @@ import {
   PaymentTransactionResponse,
   PaymentPreparationResponse,
   PaymentsApiService,
+  CrmApiService,
+  OrderResponse,
 } from '../../core/api';
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
 import { StripePaymentElementComponent } from './stripe-payment-element.component';
@@ -24,6 +26,7 @@ const PENDING_BILLING_PAYMENT_KEY = 'intelliops.pending-billing-payment';
 @Component({ selector: 'app-billing', imports: [FormsModule, DatePipe, StripePaymentElementComponent], templateUrl: './billing.component.html', styleUrl: './business-view.scss' })
 export class BillingComponent implements OnInit {
   private readonly api = inject(PaymentsApiService);
+  private readonly crmApi = inject(CrmApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   readonly feedback = inject(UiFeedbackService);
@@ -36,17 +39,18 @@ export class BillingComponent implements OnInit {
   readonly selectedInvoice = signal<InvoiceResponse | null>(null);
   readonly loading = signal(true);
   readonly paymentPreparation = signal<PaymentPreparationResponse | null>(null);
+  readonly payableOrders = signal<readonly OrderResponse[]>([]);
   tab: 'transactions' | 'invoices' = 'transactions';
   panel: 'initiate' | 'transaction' | 'refund' | 'invoice' | null = null;
   statusFilter: PaymentStatus | '' = '';
   contextFilter: PaymentContext | '' = '';
   busy = false;
   lookupId: number | null = null;
-  paymentForm = { idempotencyKey: '', referenceSourceId: null as number | null, typeContexte: 'COMMANDE_PRODUCT' as PaymentContext, montant: 0, mode: 'CASH_ON_DELIVERY' as PaymentMode };
+  paymentForm = { idempotencyKey: '', orderId: null as number | null, mode: 'CASH_ON_DELIVERY' as PaymentMode };
   refundForm = { montant: 0, motif: '' };
   readonly paymentReturnUrl = `${globalThis.location?.origin ?? ''}/app/billing?stripe_return=1`;
 
-  ngOnInit(): void { this.newKey(); this.loadTransactions(); if (this.route.snapshot.queryParamMap.get('stripe_return') === '1' || globalThis.sessionStorage?.getItem(PENDING_BILLING_PAYMENT_KEY)) this.recoverCardPayment(); }
+  ngOnInit(): void { this.newKey(); this.loadTransactions(); this.loadPayableOrders(); if (this.route.snapshot.queryParamMap.get('stripe_return') === '1' || globalThis.sessionStorage?.getItem(PENDING_BILLING_PAYMENT_KEY)) this.recoverCardPayment(); }
   newKey(): void { this.paymentForm.idempotencyKey = globalThis.crypto?.randomUUID?.() ?? `payment-${Date.now()}`; }
   setTab(tab: 'transactions' | 'invoices'): void { this.tab = tab; tab === 'transactions' ? this.loadTransactions() : this.loadInvoices(); }
   loadTransactions(page = 0): void { this.loading.set(true); this.api.searchTransactions(page, 20, this.statusFilter || undefined, this.contextFilter || undefined).subscribe({ next: (value) => { this.transactions.set(value); this.loading.set(false); }, error: (error) => { this.loading.set(false); this.feedback.error(error); } }); }
@@ -57,10 +61,10 @@ export class BillingComponent implements OnInit {
   close(): void { this.panel = null; this.selectedTransaction.set(null); this.selectedInvoice.set(null); this.paymentPreparation.set(null); globalThis.sessionStorage?.removeItem(PENDING_BILLING_PAYMENT_KEY); }
   initiate(): void {
     const form = this.paymentForm;
-    if (!form.referenceSourceId) return;
+    if (!form.orderId) return;
     this.busy = true;
     if (form.mode === 'CREDIT_CARD') {
-      this.api.prepare({ idempotencyKey: form.idempotencyKey, referenceSourceId: form.referenceSourceId, typeContexte: form.typeContexte, montant: form.montant })
+      this.api.prepareOrderCard(form.orderId, { idempotencyKey: form.idempotencyKey })
         .pipe(finalize(() => this.busy = false)).subscribe({
           next: (prepared) => {
             this.paymentPreparation.set(prepared);
@@ -70,9 +74,9 @@ export class BillingComponent implements OnInit {
         });
       return;
     }
-    this.api.initiate({ idempotencyKey: form.idempotencyKey, referenceSourceId: form.referenceSourceId, typeContexte: form.typeContexte, montant: form.montant, mode: form.mode })
+    this.api.initiateOrderCod(form.orderId, { idempotencyKey: form.idempotencyKey })
       .pipe(finalize(() => this.busy = false)).subscribe({
-        next: (value) => { this.feedback.success(`Payment #${value.id} initiated.`); this.close(); this.newKey(); this.loadTransactions(); },
+        next: (value) => { this.feedback.success(`Cash-on-delivery payment #${value.id} attached to the order.`); this.close(); this.newKey(); this.loadTransactions(); this.loadPayableOrders(); },
         error: (error) => this.feedback.error(error),
       });
   }
@@ -101,6 +105,7 @@ export class BillingComponent implements OnInit {
           this.panel = null;
           this.newKey();
           this.loadTransactions();
+          this.loadPayableOrders();
         } else {
           this.feedback.error(null, 'Stripe has not completed this payment. The transaction remains pending.');
         }
@@ -112,5 +117,14 @@ export class BillingComponent implements OnInit {
 
   private clearStripeReturnQuery(): void {
     void this.router.navigate([], { relativeTo: this.route, queryParams: { stripe_return: null, payment_intent: null, payment_intent_client_secret: null, redirect_status: null }, queryParamsHandling: 'merge', replaceUrl: true });
+  }
+
+  private loadPayableOrders(): void {
+    this.crmApi.searchOrders(0, 100, 'CONFIRMEE').subscribe({
+      next: (result) => this.payableOrders.set(
+        result.content.filter((order) => order.statutPaiement === 'UNPAID'),
+      ),
+      error: (error) => this.feedback.error(error, 'Confirmed orders could not be loaded.'),
+    });
   }
 }

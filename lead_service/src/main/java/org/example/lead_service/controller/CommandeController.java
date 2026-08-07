@@ -1,5 +1,9 @@
 package org.example.lead_service.controller;
 
+import jakarta.validation.Valid;
+import org.example.lead_service.dto.AddOrderLineRequest;
+import org.example.lead_service.dto.UpdateOrderPaymentStatusRequest;
+import org.example.lead_service.dto.UpdateOrderFulfillmentStatusRequest;
 import org.example.lead_service.entity.StatutCommande;
 import org.example.lead_service.dto.CommandeDTO;
 import org.example.lead_service.service.CommandeService;
@@ -37,11 +41,9 @@ public class CommandeController {
     @PreAuthorize("hasRole('CSM')")
     public ResponseEntity<CommandeDTO> ajouterProduitACommande(
             @PathVariable Long idCommande,
-            @RequestParam Long produitId,
-            @RequestParam int quantite,
-            @RequestParam double prixUnitaire) {
+            @Valid @RequestBody AddOrderLineRequest request) {
 
-        return ResponseEntity.ok(commandeService.ajouterProduitACommande(idCommande, produitId, quantite, prixUnitaire));
+        return ResponseEntity.ok(commandeService.ajouterProduitACommande(idCommande, request));
     }
 
     @PutMapping("/{idCommande}/statut")
@@ -64,6 +66,22 @@ public class CommandeController {
         }
 
         return ResponseEntity.ok(commandeService.changerStatutCommande(idCommande, nouveauStatut));
+    }
+
+    @PatchMapping("/{idCommande}/payment-status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<CommandeDTO> changerStatutPaiement(
+            @PathVariable Long idCommande,
+            @Valid @RequestBody UpdateOrderPaymentStatusRequest request) {
+        return ResponseEntity.ok(commandeService.changerStatutPaiement(idCommande, request.status()));
+    }
+
+    @PatchMapping("/{idCommande}/fulfillment-status")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC', 'LIVREUR')")
+    public ResponseEntity<CommandeDTO> changerStatutLogistique(
+            @PathVariable Long idCommande,
+            @Valid @RequestBody UpdateOrderFulfillmentStatusRequest request) {
+        return ResponseEntity.ok(commandeService.changerStatutCommande(idCommande, request.status()));
     }
 
     private boolean hasRole(Authentication authentication, String role) {

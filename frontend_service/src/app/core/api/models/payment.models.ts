@@ -32,6 +32,10 @@ export interface PreparePaymentRequest {
   readonly montant: number;
 }
 
+export interface OrderPaymentRequest {
+  readonly idempotencyKey: string;
+}
+
 export interface PaymentPreparationResponse {
   readonly paymentId: number;
   readonly clientSecret: string;

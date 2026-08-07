@@ -11,6 +11,7 @@ import {
   PaymentTransactionResponse,
   PreparePaymentRequest,
   PaymentPreparationResponse,
+  OrderPaymentRequest,
   RefundRequest,
 } from '../models';
 
@@ -45,6 +46,14 @@ export class PaymentsApiService {
 
   finalize(transactionId: number): Observable<PaymentTransactionResponse> {
     return this.http.post<PaymentTransactionResponse>(`${this.url}/${transactionId}/finalize`, null);
+  }
+
+  prepareOrderCard(orderId: number, request: OrderPaymentRequest): Observable<PaymentPreparationResponse> {
+    return this.http.post<PaymentPreparationResponse>(`${this.url}/orders/${orderId}/prepare`, request);
+  }
+
+  initiateOrderCod(orderId: number, request: OrderPaymentRequest): Observable<PaymentTransactionResponse> {
+    return this.http.post<PaymentTransactionResponse>(`${this.url}/orders/${orderId}/cod`, request);
   }
 
   refund(transactionId: number, request: RefundRequest): Observable<PaymentTransactionResponse> {

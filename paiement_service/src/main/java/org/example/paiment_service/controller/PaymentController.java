@@ -6,6 +6,7 @@ import org.example.paiment_service.dto.request.InitierPaiementRequestDTO;
 import org.example.paiment_service.dto.request.RemboursementRequestDTO;
 import org.example.paiment_service.dto.request.ConsumePaymentRequest;
 import org.example.paiment_service.dto.request.PreparePaymentRequestDTO;
+import org.example.paiment_service.dto.request.OrderPaymentRequest;
 import jakarta.validation.Valid;
 import org.example.paiment_service.dto.response.FactureResponseDTO;
 import org.example.paiment_service.dto.response.TransactionPaiementResponseDTO;
@@ -51,6 +52,26 @@ public class PaymentController {
     public ResponseEntity<PaymentPreparationResponseDTO> prepareCardPayment(
             @Valid @RequestBody PreparePaymentRequestDTO request) {
         return new ResponseEntity<>(paymentService.prepareCardPayment(request), HttpStatus.CREATED);
+    }
+
+    @PostMapping("/orders/{orderId}/prepare")
+    public ResponseEntity<PaymentPreparationResponseDTO> prepareOrderCardPayment(
+            @PathVariable Long orderId,
+            @Valid @RequestBody OrderPaymentRequest request) {
+        return new ResponseEntity<>(paymentService.prepareOrderCardPayment(orderId, request), HttpStatus.CREATED);
+    }
+
+    @PostMapping("/orders/{orderId}/cod")
+    public ResponseEntity<TransactionPaiementResponseDTO> initiateOrderCod(
+            @PathVariable Long orderId,
+            @Valid @RequestBody OrderPaymentRequest request) {
+        return new ResponseEntity<>(paymentService.initiateOrderCod(orderId, request), HttpStatus.CREATED);
+    }
+
+    @PostMapping("/orders/{orderId}/collect-cod")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC', 'LIVREUR')")
+    public ResponseEntity<TransactionPaiementResponseDTO> collectOrderCod(@PathVariable Long orderId) {
+        return ResponseEntity.ok(paymentService.collectOrderCod(orderId));
     }
 
     @PostMapping("/{idTransaction}/finalize")

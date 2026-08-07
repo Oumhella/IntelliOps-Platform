@@ -8,12 +8,14 @@ import org.example.user_service.dto.request.RegisterRequest;
 import org.example.user_service.dto.request.UserCreationRequest;
 import org.example.user_service.dto.response.UserResponse;
 import org.example.user_service.entity.Admin;
+import org.example.user_service.entity.Enterprise;
 import org.example.user_service.entity.Role;
 import org.example.user_service.entity.User;
 import org.example.common.exception.ConflictException;
 import org.example.common.exception.ResourceNotFoundException;
 import org.example.user_service.mapper.UserMapper;
 import org.example.user_service.repository.UserRepository;
+import org.example.user_service.repository.EnterpriseRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.example.user_service.dto.response.AuthResponse;
@@ -28,6 +30,7 @@ import java.util.stream.Collectors;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final EnterpriseRepository enterpriseRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
     private final UserJwtGenerator userJwtGenerator;
@@ -41,9 +44,15 @@ public class UserServiceImpl implements UserService {
             throw new ConflictException("This email is already in use");
         }
 
-        Long newEnterpriseId = System.currentTimeMillis();
+        Enterprise enterprise = new Enterprise();
+        enterprise.setCompanyName(request.getCompanyName().trim());
+        enterprise.setActivityType(request.getActivityType().trim());
+        enterprise.setActive(true);
+        Long newEnterpriseId = enterpriseRepository.save(enterprise).getId();
 
         Admin admin = userMapper.toAdminEntity(request, newEnterpriseId);
+        admin.setCompanyName(enterprise.getCompanyName());
+        admin.setActivityType(enterprise.getActivityType());
         admin.setPassword(passwordEncoder.encode(admin.getPassword()));
         // createdAt is now set automatically via @PrePersist
 
@@ -62,6 +71,14 @@ public class UserServiceImpl implements UserService {
 
         if (!user.isActive()) {
             throw new IllegalArgumentException("This account is deactivated");
+        }
+
+        if (user.getRole() != Role.ROLE_SUPER_ADMIN) {
+            enterpriseRepository.findById(user.getEnterpriseId()).ifPresent(enterprise -> {
+                if (!enterprise.isActive()) {
+                    throw new IllegalArgumentException("This enterprise workspace is deactivated");
+                }
+            });
         }
 
         String realToken = userJwtGenerator.generateToken(user);
@@ -151,7 +168,10 @@ public class UserServiceImpl implements UserService {
                         "User not found with id " + userId));
         requireManagedStaff(user);
 
-        userRepository.delete(user);
+        // Keep the row so historical lead, order, delivery, and audit references
+        // remain attributable. "Delete" is therefore a recoverable deactivation.
+        user.setActive(false);
+        userRepository.save(user);
     }
 
     // ── Profile Operations ──────────────────────────────────────────

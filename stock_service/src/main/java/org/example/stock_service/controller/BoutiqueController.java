@@ -1,5 +1,6 @@
 package org.example.stock_service.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.stock_service.dto.request.BoutiqueRequestDTO;
 import org.example.stock_service.dto.response.BoutiqueResponseDTO;
@@ -20,7 +21,7 @@ public class BoutiqueController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<BoutiqueResponseDTO> creerBoutique(@RequestBody BoutiqueRequestDTO request) {
+    public ResponseEntity<BoutiqueResponseDTO> creerBoutique(@Valid @RequestBody BoutiqueRequestDTO request) {
         return new ResponseEntity<>(boutiqueService.creerBoutique(request), HttpStatus.CREATED);
     }
 
@@ -38,20 +39,8 @@ public class BoutiqueController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<BoutiqueResponseDTO> modifierBoutique(
             @PathVariable Long idBoutique,
-            @RequestBody BoutiqueRequestDTO request) {
+            @Valid @RequestBody BoutiqueRequestDTO request) {
         return ResponseEntity.ok(boutiqueService.modifierBoutique(idBoutique, request));
     }
 
-    @PostMapping("/{idBoutique}/tester-connexion")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Boolean> testerConnexion(@PathVariable Long idBoutique) {
-        return ResponseEntity.ok(boutiqueService.testerConnexion(idBoutique));
-    }
-
-    @PostMapping("/{idBoutique}/synchroniser")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> synchroniserProduits(@PathVariable Long idBoutique) {
-        boutiqueService.synchroniserProduits(idBoutique);
-        return ResponseEntity.accepted().build();
-    }
 }

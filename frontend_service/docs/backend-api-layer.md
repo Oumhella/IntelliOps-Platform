@@ -134,8 +134,6 @@ The gateway injects the authenticated `userId` when a CSM creates a lead. `Creat
 | `getStores` | `GET /api/v1/boutiques` |
 | `getStoreById` | `GET /api/v1/boutiques/{id}` |
 | `updateStore` | `PUT /api/v1/boutiques/{id}` |
-| `testStoreConnection` | `POST /api/v1/boutiques/{id}/tester-connexion` |
-| `synchronizeStoreProducts` | `POST /api/v1/boutiques/{id}/synchroniser` |
 | `createProduct` | `POST /api/v1/produits` |
 | `getProductById` | `GET /api/v1/produits/{id}` |
 | `getProducts` | `GET /api/v1/produits` |

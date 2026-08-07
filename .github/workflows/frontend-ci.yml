@@ -16,11 +16,11 @@ jobs:
   devsecops-frontend:
     name: DevSecOps - Angular Frontend
     runs-on: ubuntu-latest
-    with:
-      fetch-depth: 0
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # Reusing your existing Composite Action with project_type: 'node'
       - name: Build & Scan Frontend Service

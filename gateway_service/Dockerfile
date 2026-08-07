@@ -1,4 +1,5 @@
 # Étape 1 : Build du JAR avec Maven
+# syntax=docker/dockerfile:1.7
 FROM maven:3.9-eclipse-temurin-17-alpine AS build
 WORKDIR /app
 
@@ -9,7 +10,8 @@ COPY gateway_service/src ./gateway_service/src
 
 # On compile spécifiquement le sous-module
 WORKDIR /app/gateway_service
-RUN mvn clean package -DskipTests
+RUN --mount=type=cache,id=intelliops-maven,target=/root/.m2,sharing=locked \
+    mvn clean package -DskipTests -Dmaven.wagon.http.retryHandler.count=5
 
 # Étape 2 : Exécution du JAR
 FROM eclipse-temurin:17-jre-alpine

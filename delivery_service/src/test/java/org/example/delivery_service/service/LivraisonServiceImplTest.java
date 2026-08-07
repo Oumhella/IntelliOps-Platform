@@ -3,6 +3,8 @@ package org.example.delivery_service.service;
 import org.example.common.security.TenantContext;
 import org.example.delivery_service.client.UserClient;
 import org.example.delivery_service.client.UserSummary;
+import org.example.delivery_service.client.OrderClient;
+import org.example.delivery_service.client.PaymentClient;
 import org.example.delivery_service.dto.request.ExpedierLivraisonRequest;
 import org.example.delivery_service.entity.Livraison;
 import org.example.delivery_service.entity.StatutLivraison;
@@ -29,6 +31,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
 import java.util.Optional;
+import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -44,6 +47,8 @@ class LivraisonServiceImplTest {
     @Mock private LivraisonMapper mapper;
     @Mock private LivraisonEventProducer eventProducer;
     @Mock private UserClient userClient;
+    @Mock private OrderClient orderClient;
+    @Mock private PaymentClient paymentClient;
     @Mock private TransporteurStrategy strategy;
     @InjectMocks private LivraisonServiceImpl service;
 
@@ -63,6 +68,7 @@ class LivraisonServiceImplTest {
     void createsInternalShipmentOnlyForAnActiveCourierAndKeepsItAwaitingAcceptance() {
         ExpedierLivraisonRequest request = internalRequest(19L);
         when(userClient.getActiveCourier(19L)).thenReturn(new UserSummary(19L, "ROLE_LIVREUR", true));
+        when(orderClient.getOrder(12L)).thenReturn(shippableOrder());
         when(strategyFactory.getStrategy(TypeTransporteur.LIVREUR_INTERNE)).thenReturn(strategy);
         when(repository.save(any(Livraison.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -110,6 +116,17 @@ class LivraisonServiceImplTest {
         request.setTypeTransporteur(TypeTransporteur.LIVREUR_INTERNE);
         request.setLivreurId(courierId);
         return request;
+    }
+
+    private OrderClient.OrderSummary shippableOrder() {
+        return new OrderClient.OrderSummary(
+                12L,
+                new BigDecimal("120.00"),
+                "PREPARATION",
+                "PAID",
+                new OrderClient.CustomerSummary(
+                        "Customer", "customer@example.test", "+212600000000",
+                        "1 Test Street", "Casablanca"));
     }
 
     private void authenticateCourier() {

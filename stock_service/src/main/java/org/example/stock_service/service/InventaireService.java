@@ -2,6 +2,7 @@ package org.example.stock_service.service;
 
 import org.example.stock_service.dto.request.RegleApprovisionnementRequestDTO;
 import org.example.stock_service.dto.request.UpdateStockRequestDTO;
+import org.example.stock_service.dto.request.ReservationStockRequest;
 import org.example.stock_service.dto.response.InventaireResponseDTO;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,7 +13,16 @@ public interface InventaireService {
     InventaireResponseDTO ajusterStock(Long idBoutique, Long idProduit, UpdateStockRequestDTO request, Long auteurId);
 
     @Transactional
-    InventaireResponseDTO reserverStock(Long idBoutique, Long idProduit, int quantite, Long auteurId);
+    InventaireResponseDTO reserverStock(
+            Long idBoutique, Long idProduit, ReservationStockRequest request, Long auteurId);
+
+    @Transactional
+    InventaireResponseDTO libererReservation(
+            Long idBoutique, Long idProduit, ReservationStockRequest request, Long auteurId);
+
+    @Transactional
+    InventaireResponseDTO consommerReservation(
+            Long idBoutique, Long idProduit, ReservationStockRequest request, Long auteurId);
 
     @Transactional(readOnly = true)
     InventaireResponseDTO obtenirInventaireParBoutiqueEtProduit(Long idBoutique, Long idProduit);

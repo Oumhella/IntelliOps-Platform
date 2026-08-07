@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 # ============================================================
 # Shared Dockerfile for all Spring Boot microservices
 # Usage: Pass SERVICE_NAME and SERVICE_PORT as build args
@@ -11,12 +12,16 @@ WORKDIR /app
 # Copier et installer la librairie commune en premier
 COPY common_lib/pom.xml ./common_lib/pom.xml
 COPY common_lib/src ./common_lib/src
-RUN mvn -f common_lib/pom.xml clean install -DskipTests -q
+RUN --mount=type=cache,id=intelliops-maven,target=/root/.m2,sharing=locked \
+    mvn -f common_lib/pom.xml clean install -DskipTests -q \
+    -Dmaven.wagon.http.retryHandler.count=5
 
 # Copier et builder le microservice
 COPY ${SERVICE_NAME}/pom.xml ./pom.xml
 COPY ${SERVICE_NAME}/src ./src
-RUN mvn clean package -DskipTests -q
+RUN --mount=type=cache,id=intelliops-maven,target=/root/.m2,sharing=locked \
+    mvn clean package -DskipTests -q \
+    -Dmaven.wagon.http.retryHandler.count=5
 
 # Étape 2 : Exécution du JAR
 FROM eclipse-temurin:17-jre-alpine

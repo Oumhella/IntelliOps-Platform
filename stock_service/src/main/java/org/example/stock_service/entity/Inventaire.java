@@ -59,6 +59,9 @@ public class Inventaire {
     }
 
     public void reserveStock(int qty, Long auteurId) {
+        if (qty <= 0) {
+            throw new IllegalArgumentException("La quantite reservee doit etre strictement positive.");
+        }
         if (this.quantiteDisponible < qty) {
             throw new IllegalStateException("Stock disponible insuffisant pour réserver " + qty + " unités.");
         }
@@ -68,9 +71,36 @@ public class Inventaire {
         MouvementStock mouvement = MouvementStock.builder()
                 .inventaire(this)
                 .quantite(qty)
-                .typeMouvement(TypeMouvement.VENTE)
+                .typeMouvement(TypeMouvement.RESERVATION)
                 .auteurId(auteurId)
                 .build();
         this.mouvements.add(mouvement);
+    }
+
+    public void releaseReservation(int qty, Long auteurId) {
+        if (qty <= 0 || this.quantiteReservee < qty) {
+            throw new IllegalStateException("La quantite reservee ne permet pas cette liberation.");
+        }
+        this.quantiteReservee -= qty;
+        this.quantiteDisponible += qty;
+        this.mouvements.add(MouvementStock.builder()
+                .inventaire(this)
+                .quantite(qty)
+                .typeMouvement(TypeMouvement.LIBERATION)
+                .auteurId(auteurId)
+                .build());
+    }
+
+    public void consumeReservation(int qty, Long auteurId) {
+        if (qty <= 0 || this.quantiteReservee < qty) {
+            throw new IllegalStateException("La quantite reservee ne permet pas cette consommation.");
+        }
+        this.quantiteReservee -= qty;
+        this.mouvements.add(MouvementStock.builder()
+                .inventaire(this)
+                .quantite(-qty)
+                .typeMouvement(TypeMouvement.VENTE)
+                .auteurId(auteurId)
+                .build());
     }
 }

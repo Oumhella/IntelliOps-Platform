@@ -13,7 +13,7 @@ describe('application routes', () => {
     const childPaths = businessRoute?.children?.map((route) => route.path) ?? [];
 
     expect(childPaths).toEqual(jasmine.arrayContaining([
-      '', 'leads', 'orders', 'stock', 'deliveries', 'billing',
+      '', 'leads', 'orders', 'stock', 'integrations', 'deliveries', 'billing',
       'subscriptions', 'team', 'notifications', 'assistant', 'profile',
     ]));
     expect(businessRoute?.children?.every((route) => route.loadComponent !== undefined)).toBeTrue();
@@ -21,7 +21,7 @@ describe('application routes', () => {
 
   it('restricts management routes to enterprise administrators', () => {
     const children = routes.find((route) => route.path === 'app')?.children ?? [];
-    for (const path of ['billing', 'subscriptions', 'team', 'notifications']) {
+    for (const path of ['billing', 'subscriptions', 'integrations', 'team', 'notifications']) {
       expect(children.find((route) => route.path === path)?.data?.['roles']).toEqual(['ROLE_ADMIN']);
     }
   });

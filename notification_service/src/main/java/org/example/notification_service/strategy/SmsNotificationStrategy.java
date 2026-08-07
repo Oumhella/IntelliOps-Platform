@@ -17,8 +17,6 @@ public class SmsNotificationStrategy implements NotificationChannelStrategy {
 
     @Override
     public boolean send(Notification notification) {
-        log.info("Sending SMS to '{}': {}", notification.getRecipientContact(), notification.getContenu());
-        // Integration with Twilio / Infobip goes here
-        return true;
+        throw new UnsupportedOperationException("No SMS delivery provider is configured.");
     }
 }

@@ -13,6 +13,7 @@ import org.example.paiment_service.gateway.PaymentGatewayProvider;
 import org.example.paiment_service.mapper.PaymentMapper;
 import org.example.paiment_service.repository.FactureRepository;
 import org.example.paiment_service.repository.TransactionPaiementRepository;
+import org.example.paiment_service.client.OrderClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,8 +32,9 @@ class PaymentServiceImplTest {
     private final PaymentGatewayFactory gatewayFactory = mock(PaymentGatewayFactory.class);
     private final InvoicePdfService invoicePdfService = mock(InvoicePdfService.class);
     private final PaymentEventProducer events = mock(PaymentEventProducer.class);
+    private final OrderClient orders = mock(OrderClient.class);
     private final PaymentServiceImpl service = new PaymentServiceImpl(
-            transactions, invoices, mapper, gatewayFactory, invoicePdfService, events);
+            transactions, invoices, mapper, gatewayFactory, invoicePdfService, events, orders);
 
     @BeforeEach
     void tenant() {
@@ -146,6 +148,7 @@ class PaymentServiceImplTest {
                 .montant(new BigDecimal("99.00"))
                 .montantRembourse(new BigDecimal("0.00"))
                 .mode(ModePaiement.CREDIT_CARD)
+                .notificationEmail("customer@example.test")
                 .statut(status)
                 .build();
     }

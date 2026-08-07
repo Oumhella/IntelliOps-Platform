@@ -4,6 +4,7 @@ import org.example.paiment_service.dto.request.InitierPaiementRequestDTO;
 import org.example.paiment_service.dto.request.RemboursementRequestDTO;
 import org.example.paiment_service.dto.request.ConsumePaymentRequest;
 import org.example.paiment_service.dto.request.PreparePaymentRequestDTO;
+import org.example.paiment_service.dto.request.OrderPaymentRequest;
 import org.example.paiment_service.dto.response.PaymentPreparationResponseDTO;
 import org.example.paiment_service.dto.response.TransactionPaiementResponseDTO;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +19,15 @@ public interface PaymentService {
 
     @Transactional
     PaymentPreparationResponseDTO prepareCardPayment(PreparePaymentRequestDTO request);
+
+    @Transactional
+    PaymentPreparationResponseDTO prepareOrderCardPayment(Long orderId, OrderPaymentRequest request);
+
+    @Transactional
+    TransactionPaiementResponseDTO initiateOrderCod(Long orderId, OrderPaymentRequest request);
+
+    @Transactional
+    TransactionPaiementResponseDTO collectOrderCod(Long orderId);
 
     @Transactional
     TransactionPaiementResponseDTO finalizeCardPayment(Long idTransaction);

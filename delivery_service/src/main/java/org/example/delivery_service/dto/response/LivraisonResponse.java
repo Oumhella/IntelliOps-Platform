@@ -21,4 +21,9 @@ public class LivraisonResponse {
     private LocalDateTime deliveryDate;
     private double montantACollecterCoD;
     private long delaiJours;
+    private String clientNomComplet;
+    private String clientEmail;
+    private String clientTelephone;
+    private String adresseLivraison;
+    private String villeLivraison;
 }

@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
@@ -54,6 +55,10 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
             log.info("Incoming request to path: {}", path);
             if (path.contains("/api/v1/users/register") ||
                     path.contains("/api/v1/users/login") ||
+                    (request.getMethod() == HttpMethod.GET && path.startsWith("/api/v1/plans")) ||
+                    path.equals("/api/v1/integrations/oauth/shopify/callback") ||
+                    path.equals("/api/v1/integrations/oauth/woocommerce/callback") ||
+                    path.startsWith("/api/v1/integrations/webhooks/") ||
                     path.contains("/v3/api-docs") ||
                     path.contains("/swagger-ui.html") ||
                     path.contains("/swagger-ui") ||

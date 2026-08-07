@@ -11,6 +11,30 @@ services:
     volumes:
       - erp-db-data:/var/lib/postgresql/data
       - ./docker/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    networks:
+      - erp-network
+
+  # The standard Postgres init directory runs only for a brand-new volume.
+  # This one-shot job also provisions databases added after a volume exists.
+  database-init:
+    image: postgres:15-alpine
+    depends_on:
+      erp-db:
+        condition: service_healthy
+    environment:
+      - PGHOST=erp-db
+      - PGDATABASE=erp
+      - PGUSER=${DB_USER}
+      - PGPASSWORD=${DB_PASSWORD}
+    volumes:
+      - ./docker/ensure-databases.sql:/scripts/ensure-databases.sql:ro
+    command: ["psql", "-v", "ON_ERROR_STOP=1", "-f", "/scripts/ensure-databases.sql"]
     networks:
       - erp-network
 
@@ -88,6 +112,12 @@ services:
     container_name: erp-discovery-server
     ports:
       - "8761:8761"
+    environment:
+      # A single-node Compose registry must evict dead containers promptly.
+      # Eureka self-preservation is intended for multi-node production clusters
+      # and otherwise keeps obsolete container IPs routable after a rebuild.
+      - EUREKA_SERVER_ENABLE_SELF_PRESERVATION=false
+      - EUREKA_SERVER_EVICTION_INTERVAL_TIMER_IN_MS=10000
     networks:
       - erp-network
 
@@ -119,8 +149,9 @@ services:
         SERVICE_NAME: user_service
         SERVICE_PORT: 8081
     container_name: erp-user-service
-    ports:
-      - "8081:8081"
+    # Business APIs are reachable from the host only through gateway-service.
+    expose:
+      - "8081"
     env_file:
       - .env
     environment:
@@ -148,8 +179,8 @@ services:
       args:
         SERVICE_NAME: lead_service
         SERVICE_PORT: 8082
-    ports:
-      - "8082:8082"
+    expose:
+      - "8082"
     env_file:
       - .env
     environment:
@@ -178,8 +209,8 @@ services:
         SERVICE_NAME: abonnement_service
         SERVICE_PORT: 8083
     container_name: erp-abonnement-service
-    ports:
-      - "8083:8083"
+    expose:
+      - "8083"
     env_file:
       - .env
     environment:
@@ -209,8 +240,8 @@ services:
         SERVICE_NAME: stock_service
         SERVICE_PORT: 8084
     container_name: erp-stock-service
-    ports:
-      - "8084:8084"
+    expose:
+      - "8084"
     env_file:
       - .env
     environment:
@@ -271,6 +302,43 @@ services:
       - ${DOCKER_DNS_PRIMARY:-8.8.8.8}
       - ${DOCKER_DNS_SECONDARY:-1.1.1.1}
 
+  store-integration-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.microservice
+      args:
+        SERVICE_NAME: store-integration-service
+        SERVICE_PORT: 8090
+    container_name: erp-store-integration-service
+    # Provider traffic reaches this service only through the gateway. Store
+    # credentials are loaded from Vault/config-server, never from this block.
+    expose:
+      - "8090"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://erp-db:5432/erp_integrations
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - CONFIG_SERVER_URL=http://config-server:8888
+      - LEAD_SERVICE_URL=http://lead-service:8082
+      - STOCK_SERVICE_URL=http://stock-service:8084
+      - INTEGRATION_PUBLIC_BASE_URL=${INTEGRATION_PUBLIC_BASE_URL:-}
+      - INTEGRATION_ORDER_CURRENCY=${INTEGRATION_ORDER_CURRENCY:-MAD}
+      - FRONTEND_PUBLIC_URL=${FRONTEND_PUBLIC_URL:-http://localhost:4200}
+      - SHOPIFY_SCOPES=${SHOPIFY_SCOPES:-read_orders,read_products}
+      - SHOPIFY_API_VERSION=${SHOPIFY_API_VERSION:-2026-07}
+    depends_on:
+      database-init:
+        condition: service_completed_successfully
+      discovery-server:
+        condition: service_started
+      config-server:
+        condition: service_healthy
+      lead-service:
+        condition: service_started
+      stock-service:
+        condition: service_started
+    networks:
+      - erp-network
+
   # ─────────────── MINIO SERVER ───────────────
   minio:
     image: minio/minio:RELEASE.2024-01-16T16-07-38Z # Ou tag récent
@@ -319,8 +387,8 @@ services:
         SERVICE_NAME: paiement_service
         SERVICE_PORT: 8086
     container_name: erp-paiement-service
-    ports:
-      - "8086:8086"
+    expose:
+      - "8086"
     env_file:
       - .env
     environment:
@@ -351,8 +419,8 @@ services:
         SERVICE_NAME: delivery_service
         SERVICE_PORT: 8087
     container_name: erp-delivery-service
-    ports:
-      - "8087:8087"
+    expose:
+      - "8087"
     env_file:
       - .env
     environment:
@@ -406,8 +474,8 @@ services:
         SERVICE_NAME: notification_service
         SERVICE_PORT: 8089
     container_name: erp-notification-service
-    ports:
-      - "8089:8089"
+    expose:
+      - "8089"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - SPRING_DATASOURCE_URL=jdbc:postgresql://erp-db:5432/erp_notifications

@@ -10,6 +10,13 @@ import org.example.lead_service.mapper.LeadMapper;
 import org.example.lead_service.repository.CommandeRepository;
 import org.example.lead_service.repository.LeadRepository;
 import org.example.lead_service.service.LeadServiceImpl;
+import org.example.lead_service.client.StockClient;
+import org.example.lead_service.client.AbonnementClient;
+import org.example.lead_service.client.UserClient;
+import org.example.lead_service.dto.StockProductDTO;
+import org.example.lead_service.dto.StockInventoryDTO;
+import org.example.lead_service.dto.ExternalOrderImportRequest;
+import org.example.lead_service.event.OrderEventProducer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +28,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -38,6 +46,14 @@ class LeadServiceImplTest {
     private LeadMapper leadMapper;
     @Mock
     private CommandeMapper commandeMapper;
+    @Mock
+    private StockClient stockClient;
+    @Mock
+    private AbonnementClient abonnementClient;
+    @Mock
+    private UserClient userClient;
+    @Mock
+    private OrderEventProducer orderEventProducer;
 
     @InjectMocks
     private LeadServiceImpl leadService;
@@ -52,6 +68,7 @@ class LeadServiceImplTest {
         mockCoords = CoordonneesClient.builder()
                 .nomComplet("John Doe")
                 .telephone("+212600000000")
+                .adresseLivraison("1 Test Street")
                 .ville("Tétouan")
                 .build();
 
@@ -79,6 +96,8 @@ class LeadServiceImplTest {
         when(leadRepository.findByIdLeadAndEnterpriseId(1L, 7L)).thenReturn(Optional.of(mockLead));
         when(leadRepository.save(any(Lead.class))).thenReturn(mockLead);
         when(leadMapper.toDto(any(Lead.class))).thenReturn(new LeadDTO());
+        when(userClient.getStaffMember(42L))
+                .thenReturn(new UserClient.UserSummary(42L, "ROLE_CSM", true));
 
         // Act
         leadService.assignerAgent(1L, 42L);
@@ -126,23 +145,34 @@ class LeadServiceImplTest {
     @Test
     void convertirEnCommande_DevraitCreerCommandeEtChangerStatutEnConverted() {
         // Arrange
+        mockLead.setStatutLead(StatutLead.IN_PROGRESS);
         when(leadRepository.findByIdLeadAndEnterpriseId(1L, 7L)).thenReturn(Optional.of(mockLead));
         when(leadRepository.save(any(Lead.class))).thenReturn(mockLead);
         when(commandeMapper.toDto(any(Commande.class))).thenReturn(new CommandeDTO());
+        when(commandeRepository.findByReferenceAndLeadEnterpriseId(anyString(), eq(7L)))
+                .thenReturn(Optional.empty());
+        when(abonnementClient.currentEntitlement())
+                .thenReturn(new AbonnementClient.Entitlement(true, 100, null));
+        when(stockClient.obtenirBoutique(10L)).thenReturn(new Object());
+        when(stockClient.obtenirProduit(anyLong())).thenReturn(StockProductDTO.builder()
+                .prixVente(500.0)
+                .build());
+        StockInventoryDTO inventory = new StockInventoryDTO();
+        inventory.setQuantiteDisponible(20);
+        when(stockClient.obtenirInventaire(eq(10L), anyLong())).thenReturn(inventory);
 
         // Préparation du DTO de requête avec les articles simulés
         CreationCommandeRequest request = new CreationCommandeRequest();
-        request.setTotalAmount(1500.00);
+        request.setIdempotencyKey("test-order-1");
+        request.setStockLocationId(10L);
 
         CreationCommandeRequest.ItemRequest item1 = new CreationCommandeRequest.ItemRequest();
         item1.setProductId(102L);
         item1.setQuantity(2);
-        item1.setUnitPrice(500.00);
 
         CreationCommandeRequest.ItemRequest item2 = new CreationCommandeRequest.ItemRequest();
         item2.setProductId(205L);
         item2.setQuantity(1);
-        item2.setUnitPrice(500.00);
 
         request.setItems(List.of(item1, item2));
 
@@ -162,5 +192,55 @@ class LeadServiceImplTest {
 
         // On s'assure que le lead entier a été sauvegardé (ce qui propage l'enregistrement de la commande)
         verify(leadRepository, times(1)).save(mockLead);
+    }
+
+    @Test
+    void importExternalOrder_UsesProviderTotalAndCreatesUnassignedConvertedLead() {
+        when(commandeRepository.findByReferenceAndLeadEnterpriseId(anyString(), eq(7L))).thenReturn(Optional.empty());
+        when(abonnementClient.currentEntitlement()).thenReturn(new AbonnementClient.Entitlement(true, 100, null));
+        when(stockClient.obtenirBoutique(10L)).thenReturn(new Object());
+        when(stockClient.obtenirProduit(102L)).thenReturn(StockProductDTO.builder().idProduit(102L).build());
+        StockInventoryDTO inventory = new StockInventoryDTO();
+        inventory.setQuantiteDisponible(20);
+        when(stockClient.obtenirInventaire(10L, 102L)).thenReturn(inventory);
+        when(leadRepository.save(any(Lead.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(commandeMapper.toDto(any(Commande.class))).thenReturn(new CommandeDTO());
+
+        ExternalOrderImportRequest request = new ExternalOrderImportRequest(
+                "SHOPIFY", "external-900", "#900", 10L,
+                new ExternalOrderImportRequest.Customer("Jane Doe", "jane@example.com", "+212600000001", "2 Test Street", "Rabat"),
+                "PAID", "MAD", new BigDecimal("125.50"),
+                List.of(new ExternalOrderImportRequest.Line(102L, 2, new BigDecimal("50.00"))));
+
+        leadService.importExternalOrder(request);
+
+        var leadCaptor = org.mockito.ArgumentCaptor.forClass(Lead.class);
+        verify(leadRepository).save(leadCaptor.capture());
+        Lead imported = leadCaptor.getValue();
+        assertEquals(LeadSource.SHOPIFY, imported.getSource());
+        assertEquals(StatutLead.CONVERTED, imported.getStatutLead());
+        assertNull(imported.getAgentId());
+        assertEquals(StatutCommande.CONFIRMEE, imported.getCommande().getStatutCommande());
+        assertEquals(StatutPaiementCommande.PAID, imported.getCommande().getStatutPaiement());
+        assertEquals(125.50, imported.getCommande().getTotalPrix());
+        assertTrue(imported.getCommande().getReference().startsWith("EXT-"));
+        verify(stockClient).reserverStock(eq(10L), eq(102L), any(StockClient.ReservationRequest.class));
+    }
+
+    @Test
+    void importExternalOrder_IsIdempotentBeforeSubscriptionAndStockCalls() {
+        Commande existing = Commande.builder().reference("existing").build();
+        CommandeDTO expected = new CommandeDTO();
+        when(commandeRepository.findByReferenceAndLeadEnterpriseId(anyString(), eq(7L))).thenReturn(Optional.of(existing));
+        when(commandeMapper.toDto(existing)).thenReturn(expected);
+
+        ExternalOrderImportRequest request = new ExternalOrderImportRequest(
+                "WOOCOMMERCE", "external-42", "42", 10L,
+                new ExternalOrderImportRequest.Customer("Jane Doe", null, null, "2 Test Street", "Rabat"),
+                "UNPAID", "MAD", new BigDecimal("50.00"),
+                List.of(new ExternalOrderImportRequest.Line(102L, 1, new BigDecimal("50.00"))));
+
+        assertSame(expected, leadService.importExternalOrder(request));
+        verifyNoInteractions(abonnementClient, stockClient);
     }
 }

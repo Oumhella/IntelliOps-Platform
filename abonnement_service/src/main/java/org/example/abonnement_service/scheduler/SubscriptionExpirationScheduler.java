@@ -45,7 +45,7 @@ public class SubscriptionExpirationScheduler {
                             abonnementRepository.save(sub);
                             eventProducer.sendSubscriptionNotification(
                                     sub.getEnterpriseId(),
-                                    "user" + sub.getUserId() + "@intelliops.local",
+                                    sub.getContactEmail(),
                                     "Votre espace IntelliOps est réactivé",
                                     "La pause planifiée est terminée. Votre abonnement est de nouveau actif."
                             );
@@ -58,7 +58,7 @@ public class SubscriptionExpirationScheduler {
 
                 eventProducer.sendSubscriptionNotification(
                         sub.getEnterpriseId(),
-                        "user" + sub.getUserId() + "@intelliops.local",
+                        sub.getContactEmail(),
                         "Alerte : Votre abonnement a expiré",
                         "Votre abonnement au plan " + sub.getPlanAbonnement().getNomPlan() + " a expiré le " + sub.getDateFin() + ". Veuillez le renouveler."
                 );

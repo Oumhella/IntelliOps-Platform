@@ -1,9 +1,10 @@
+# syntax=docker/dockerfile:1.7
 # Stage 1: Build Angular SPA
 FROM node:20-alpine AS build
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+RUN --mount=type=cache,id=intelliops-npm,target=/root/.npm npm ci
 
 COPY . .
 # Builds plain SPA without SSR prerendering errors

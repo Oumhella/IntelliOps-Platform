@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "commandes")
@@ -24,6 +25,18 @@ public class Commande {
     private String reference;
 
     private double totalPrix;
+
+    private Long stockLocationId;
+
+    @Column(length = 100)
+    private String stockReservationReference;
+
+    private LocalDateTime createdAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, columnDefinition = "varchar(32) default 'UNPAID'")
+    @Builder.Default
+    private StatutPaiementCommande statutPaiement = StatutPaiementCommande.UNPAID;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -72,5 +85,12 @@ public class Commande {
 
     public void changerStatut(StatutCommande nouveauStatut) {
         this.statutCommande = nouveauStatut;
+    }
+
+    @PrePersist
+    void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
     }
 }

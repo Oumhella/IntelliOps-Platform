@@ -11,8 +11,6 @@ export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
 export interface ShipDeliveryRequest {
   readonly referenceCommandeId: number;
   readonly typeTransporteur: CarrierType;
-  readonly montantACollecterCoD: number;
-  readonly clientEmail?: string;
   readonly nomSociete?: string;
   readonly livreurId?: number;
 }
@@ -33,4 +31,9 @@ export interface DeliveryResponse {
   readonly deliveryDate: IsoDateTime | null;
   readonly montantACollecterCoD: number;
   readonly delaiJours: number;
+  readonly clientNomComplet: string;
+  readonly clientEmail: string | null;
+  readonly clientTelephone: string;
+  readonly adresseLivraison: string;
+  readonly villeLivraison: string;
 }

@@ -2,7 +2,7 @@ package org.example.abonnement_service.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.*;
 import org.example.abonnement_service.entity.DureeOffre;
 import org.example.abonnement_service.entity.StatutOffre;
@@ -19,7 +19,7 @@ public class PlanAbonnementRequest {
     private String description;
 
     @NotNull(message = "Le prix est obligatoire")
-    @Positive(message = "Le prix doit être positif")
+    @PositiveOrZero(message = "Le prix ne peut pas etre negatif")
     private Double prix;
 
     @NotNull(message = "La durée est obligatoire")
@@ -31,5 +31,6 @@ public class PlanAbonnementRequest {
     @NotNull(message = "Le statut est obligatoire")
     private StatutOffre estActif;
 
+    @PositiveOrZero(message = "La limite mensuelle ne peut pas etre negative")
     private int limiteCommandesMois;
 }

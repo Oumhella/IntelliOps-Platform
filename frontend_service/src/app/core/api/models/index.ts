@@ -2,6 +2,7 @@ export * from './agent.models';
 export * from './common.models';
 export * from './crm.models';
 export * from './delivery.models';
+export * from './integration.models';
 export * from './notification.models';
 export * from './payment.models';
 export * from './platform.models';

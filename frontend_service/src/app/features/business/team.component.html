@@ -39,7 +39,7 @@
                 <div class="row-actions">
                   <button class="action-button" (click)="open(user)">View</button>
                   <button class="action-button" (click)="toggle(user)">{{user.active ? 'Deactivate' : 'Activate'}}</button>
-                  <button class="action-button action-button-danger" (click)="delete(user)">Delete</button>
+                  <button class="action-button action-button-danger" (click)="delete(user)" [disabled]="!user.active">Deactivate</button>
                 </div>
               </td>
             </tr>
