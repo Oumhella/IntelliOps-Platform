@@ -2,6 +2,7 @@ package org.example.storeintegration.service;
 
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.common.exception.ConflictException;
 import org.example.common.security.TenantContext;
 import org.example.storeintegration.client.CoreOperationsClient;
@@ -27,6 +28,7 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class IntegrationService {
@@ -52,13 +54,15 @@ public class IntegrationService {
 
     @Transactional
     public StartedAuthorization beginShopify(ConnectRequest request) {
-        if (!properties.shopifyConfigured()) throw new IllegalStateException("Shopify app credentials or HTTPS callback URL are not configured.");
+        if (!properties.shopifyConfigured())
+            throw new IllegalStateException("Shopify app credentials or HTTPS callback URL are not configured.");
         URI store = urlPolicy.requireShopifyStore(request.store());
         verifyLocation(TenantContext.requireEnterpriseId(), request.stockLocationId());
         StateToken state = createState(StorePlatform.SHOPIFY, request, store);
         String callback = publicUrl("/api/v1/integrations/oauth/shopify/callback");
         return new StartedAuthorization(
-                new AuthorizationResponse(shopifyConnector.authorizationUrl(store, callback, state.raw()), state.expiresAt()),
+                new AuthorizationResponse(shopifyConnector.authorizationUrl(store, callback, state.raw()),
+                        state.expiresAt()),
                 state.raw());
     }
 
@@ -69,7 +73,8 @@ public class IntegrationService {
         verifyLocation(TenantContext.requireEnterpriseId(), request.stockLocationId());
         StateToken state = createState(StorePlatform.WOOCOMMERCE, request, store);
         String authorizationUrl = UriComponentsBuilder.fromUri(store).path("/wc-auth/v1/authorize")
-                .queryParam("app_name", "IntelliOps").queryParam("scope", "read_write").queryParam("user_id", state.raw())
+                .queryParam("app_name", "IntelliOps").queryParam("scope", "read_write")
+                .queryParam("user_id", state.raw())
                 .queryParam("return_url", properties.frontendReturnUrl() + "?woocommerce_return=1")
                 .queryParam("callback_url", publicUrl("/api/v1/integrations/oauth/woocommerce/callback"))
                 .build().encode().toUriString();
@@ -78,25 +83,59 @@ public class IntegrationService {
 
     @Transactional
     public StoreConnection completeShopify(MultiValueMap<String, String> query, String browserState) {
-        if (!shopifyConnector.validOAuthHmac(query)) throw new SecurityException("Invalid Shopify OAuth signature.");
+        log.debug("completeShopify: validating HMAC signature");
+        if (!shopifyConnector.validOAuthHmac(query)) {
+            log.warn("completeShopify: HMAC validation failed for shop={}", query.getFirst("shop"));
+            throw new SecurityException("Invalid Shopify OAuth signature.");
+        }
         String rawState = required(query.getFirst("state"), "OAuth state is required.");
-        if (!constantTimeEquals(rawState, browserState)) throw new SecurityException("Shopify authorization browser state is missing or invalid.");
         String code = required(query.getFirst("code"), "Shopify authorization code is required.");
         URI shop = urlPolicy.requireShopifyStore(query.getFirst("shop"));
+        log.debug("completeShopify: looking up OAuth state for shop={}", shop);
         OAuthState state = requireState(rawState, StorePlatform.SHOPIFY);
-        if (!state.getStoreUrl().equals(shop.toString())) throw new SecurityException("Shopify shop does not match the authorization request.");
-        String token = shopifyConnector.exchangeCode(shop, code);
-        StoreCredentials credentials = StoreCredentials.shopify(token);
-        shopifyConnector.verifyConnection(shop, credentials);
+        if (!state.getStoreUrl().equals(shop.toString())) {
+            log.warn("completeShopify: shop mismatch. expected={}, received={}", state.getStoreUrl(), shop);
+            throw new SecurityException("Shopify shop does not match the authorization request.");
+        }
+        log.debug("completeShopify: exchanging authorization code for tokens");
+        var exchange = shopifyConnector.exchangeCode(shop, code);
+        Long expiresAtEpoch = exchange.expiresIn() == null ? null
+                : Instant.now().plusSeconds(exchange.expiresIn()).getEpochSecond();
+        StoreCredentials credentials = StoreCredentials.shopify(exchange.accessToken(), exchange.refreshToken(),
+                expiresAtEpoch);
+        log.debug("completeShopify: verifying connection with Shopify Admin API");
+        try {
+            shopifyConnector.verifyConnection(shop, credentials);
+        } catch (org.springframework.web.client.HttpClientErrorException forbidden) {
+            // If Shopify rejects the provided token but we received a refresh token,
+            // attempt refresh then retry once.
+            String body = forbidden.getResponseBodyAsString();
+            log.warn("completeShopify: initial verification failed ({}), body={}", forbidden.getStatusCode(), body);
+            if (exchange.refreshToken() != null && body != null
+                    && body.contains("Non-expiring access tokens are no longer accepted")) {
+                log.info("completeShopify: refreshing access token");
+                var refreshed = shopifyConnector.refreshAccessToken(shop, exchange.refreshToken());
+                Long newExpires = refreshed.expiresIn() == null ? null
+                        : Instant.now().plusSeconds(refreshed.expiresIn()).getEpochSecond();
+                credentials = StoreCredentials.shopify(refreshed.accessToken(), refreshed.refreshToken(), newExpires);
+                shopifyConnector.verifyConnection(shop, credentials);
+            } else {
+                throw forbidden;
+            }
+        }
+        log.debug("completeShopify: saving connection and registering webhooks");
         StoreConnection connection = saveConnection(state, credentials);
         registerWebhook(connection, credentials);
-        state.setConsumedAt(Instant.now()); stateRepository.save(state);
+        state.setConsumedAt(Instant.now());
+        stateRepository.save(state);
+        log.info("completeShopify: completed for shop={}, connectionId={}", shop, connection.getId());
         return connection;
     }
 
     @Transactional
     public StoreConnection completeWooCommerce(WooAuthorizationCallback callback) {
-        OAuthState state = requireState(required(callback.state(), "WooCommerce state is required."), StorePlatform.WOOCOMMERCE);
+        OAuthState state = requireState(required(callback.state(), "WooCommerce state is required."),
+                StorePlatform.WOOCOMMERCE);
         if (callback.consumerKey() == null || !callback.consumerKey().startsWith("ck_")
                 || callback.consumerSecret() == null || !callback.consumerSecret().startsWith("cs_")
                 || callback.keyPermissions() == null || !callback.keyPermissions().contains("write")) {
@@ -104,44 +143,65 @@ public class IntegrationService {
         }
         URI store = urlPolicy.requirePublicHttpsStore(state.getStoreUrl());
         String webhookSecret = randomToken();
-        StoreCredentials credentials = StoreCredentials.woocommerce(callback.consumerKey(), callback.consumerSecret(), webhookSecret);
+        StoreCredentials credentials = StoreCredentials.woocommerce(callback.consumerKey(), callback.consumerSecret(),
+                webhookSecret);
         wooCommerceConnector.verifyConnection(store, credentials);
         StoreConnection connection = saveConnection(state, credentials);
         registerWebhook(connection, credentials);
-        state.setConsumedAt(Instant.now()); stateRepository.save(state);
+        state.setConsumedAt(Instant.now());
+        stateRepository.save(state);
         return connection;
     }
 
     @Transactional(readOnly = true)
     public List<ConnectionResponse> connections() {
-        return connectionRepository.findAllByEnterpriseIdOrderByCreatedAtDesc(TenantContext.requireEnterpriseId()).stream().map(this::response).toList();
+        return connectionRepository.findAllByEnterpriseIdOrderByCreatedAtDesc(TenantContext.requireEnterpriseId())
+                .stream().map(this::response).toList();
     }
 
     @Transactional(readOnly = true)
     public List<ExternalProduct> externalProducts(Long connectionId) {
         StoreConnection connection = requireConnection(connectionId);
-        if (connection.getStatus() == ConnectionStatus.DISCONNECTED) throw new IllegalStateException("The store is disconnected.");
+        if (connection.getStatus() == ConnectionStatus.DISCONNECTED)
+            throw new IllegalStateException("The store is disconnected.");
         URI store = connection.getPlatform() == StorePlatform.SHOPIFY
                 ? urlPolicy.requireShopifyStore(connection.getStoreUrl())
                 : urlPolicy.requirePublicHttpsStore(connection.getStoreUrl());
-        return connectorFactory.require(connection.getPlatform()).listProducts(store, credentialCipher.decrypt(connection.getEncryptedCredentials()));
+        try {
+            return connectorFactory.require(connection.getPlatform()).listProducts(store,
+                    credentialCipher.decrypt(connection.getEncryptedCredentials()));
+        } catch (org.example.storeintegration.connector.TokenRefreshedException tre) {
+            // Persist refreshed tokens and retry once
+            var refreshed = tre.refreshed();
+            StoreCredentials updated = StoreCredentials.shopify(refreshed.accessToken(), refreshed.refreshToken(),
+                    refreshed.expiresIn() == null ? null
+                            : Instant.now().plusSeconds(refreshed.expiresIn()).getEpochSecond());
+            connection.setEncryptedCredentials(credentialCipher.encrypt(updated));
+            connectionRepository.save(connection);
+            return connectorFactory.require(connection.getPlatform()).listProducts(store, updated);
+        }
     }
 
     @Transactional(readOnly = true)
     public List<ProductMappingResponse> mappings(Long connectionId) {
         requireConnection(connectionId);
-        return mappingRepository.findAllByConnectionIdAndEnterpriseIdOrderByExternalNameAsc(connectionId, TenantContext.requireEnterpriseId()).stream().map(this::mappingResponse).toList();
+        return mappingRepository.findAllByConnectionIdAndEnterpriseIdOrderByExternalNameAsc(connectionId,
+                TenantContext.requireEnterpriseId()).stream().map(this::mappingResponse).toList();
     }
 
     @Transactional
     public ProductMappingResponse mapProduct(Long connectionId, ProductMappingRequest request) {
         StoreConnection connection = requireConnection(connectionId);
-        coreClient.verifyProductAndLocation(connection.getEnterpriseId(), request.internalProductId(), connection.getStockLocationId());
-        if (mappingRepository.findByConnectionIdAndExternalVariantId(connectionId, request.externalVariantId().trim()).isPresent()) {
+        coreClient.verifyProductAndLocation(connection.getEnterpriseId(), request.internalProductId(),
+                connection.getStockLocationId());
+        if (mappingRepository.findByConnectionIdAndExternalVariantId(connectionId, request.externalVariantId().trim())
+                .isPresent()) {
             throw new ConflictException("This external variant is already mapped.");
         }
-        ProductMapping mapping = ProductMapping.builder().connection(connection).enterpriseId(connection.getEnterpriseId())
-                .externalProductId(request.externalProductId().trim()).externalVariantId(request.externalVariantId().trim())
+        ProductMapping mapping = ProductMapping.builder().connection(connection)
+                .enterpriseId(connection.getEnterpriseId())
+                .externalProductId(request.externalProductId().trim())
+                .externalVariantId(request.externalVariantId().trim())
                 .externalSku(blankToNull(request.externalSku())).externalName(request.externalName().trim())
                 .internalProductId(request.internalProductId()).build();
         return mappingResponse(mappingRepository.save(mapping));
@@ -149,7 +209,8 @@ public class IntegrationService {
 
     @Transactional
     public void deleteMapping(Long mappingId) {
-        ProductMapping mapping = mappingRepository.findByIdAndEnterpriseId(mappingId, TenantContext.requireEnterpriseId())
+        ProductMapping mapping = mappingRepository
+                .findByIdAndEnterpriseId(mappingId, TenantContext.requireEnterpriseId())
                 .orElseThrow(() -> new EntityNotFoundException("Product mapping not found."));
         mappingRepository.delete(mapping);
     }
@@ -157,25 +218,39 @@ public class IntegrationService {
     @Transactional
     public ConnectionResponse disconnect(Long connectionId) {
         StoreConnection connection = requireConnection(connectionId);
-        connection.setEncryptedCredentials(credentialCipher.encrypt(new StoreCredentials(null, null, null, null)));
-        connection.setStatus(ConnectionStatus.DISCONNECTED); connection.setWebhooksActive(false);
-        connection.setLastError("Disconnected by workspace administrator. Provider-side app access should also be revoked.");
+        connection.setEncryptedCredentials(
+                credentialCipher.encrypt(new StoreCredentials(null, null, null, null, null, null)));
+        connection.setStatus(ConnectionStatus.DISCONNECTED);
+        connection.setWebhooksActive(false);
+        connection.setLastError(
+                "Disconnected by workspace administrator. Provider-side app access should also be revoked.");
         return response(connectionRepository.save(connection));
     }
 
     @Transactional(readOnly = true)
     public List<EventResponse> recentEvents() {
-        return eventRepository.findTop50ByConnectionEnterpriseIdOrderByReceivedAtDesc(TenantContext.requireEnterpriseId()).stream()
-                .map(event -> new EventResponse(event.getId(), event.getConnection().getId(), event.getExternalEventId(), event.getTopic(), event.getStatus(), event.getErrorMessage(), event.getReceivedAt(), event.getProcessedAt())).toList();
+        return eventRepository
+                .findTop50ByConnectionEnterpriseIdOrderByReceivedAtDesc(TenantContext.requireEnterpriseId()).stream()
+                .map(event -> new EventResponse(event.getId(), event.getConnection().getId(),
+                        event.getExternalEventId(), event.getTopic(), event.getStatus(), event.getErrorMessage(),
+                        event.getReceivedAt(), event.getProcessedAt()))
+                .toList();
     }
 
     private StoreConnection saveConnection(OAuthState state, StoreCredentials credentials) {
-        StoreConnection connection = connectionRepository.findByEnterpriseIdAndPlatformAndStoreUrl(state.getEnterpriseId(), state.getPlatform(), state.getStoreUrl()).orElseGet(StoreConnection::new);
-        if (connection.getId() != null && connection.getStatus() != ConnectionStatus.DISCONNECTED) throw new ConflictException("This store is already connected.");
-        connection.setEnterpriseId(state.getEnterpriseId()); connection.setPlatform(state.getPlatform()); connection.setDisplayName(state.getDisplayName());
-        connection.setStoreUrl(state.getStoreUrl()); connection.setStockLocationId(state.getStockLocationId());
-        connection.setEncryptedCredentials(credentialCipher.encrypt(credentials)); connection.setStatus(ConnectionStatus.CONNECTED);
-        connection.setWebhooksActive(false); connection.setLastError(null);
+        StoreConnection connection = connectionRepository.findByEnterpriseIdAndPlatformAndStoreUrl(
+                state.getEnterpriseId(), state.getPlatform(), state.getStoreUrl()).orElseGet(StoreConnection::new);
+        if (connection.getId() != null && connection.getStatus() != ConnectionStatus.DISCONNECTED)
+            throw new ConflictException("This store is already connected.");
+        connection.setEnterpriseId(state.getEnterpriseId());
+        connection.setPlatform(state.getPlatform());
+        connection.setDisplayName(state.getDisplayName());
+        connection.setStoreUrl(state.getStoreUrl());
+        connection.setStockLocationId(state.getStockLocationId());
+        connection.setEncryptedCredentials(credentialCipher.encrypt(credentials));
+        connection.setStatus(ConnectionStatus.CONNECTED);
+        connection.setWebhooksActive(false);
+        connection.setLastError(null);
         return connectionRepository.save(connection);
     }
 
@@ -185,17 +260,52 @@ public class IntegrationService {
                     ? urlPolicy.requireShopifyStore(connection.getStoreUrl())
                     : urlPolicy.requirePublicHttpsStore(connection.getStoreUrl());
             connectorFactory.require(connection.getPlatform()).registerOrderWebhook(store, credentials,
-                    publicUrl("/api/v1/integrations/webhooks/" + connection.getPlatform().name().toLowerCase() + "/" + connection.getId()));
-            connection.setWebhooksActive(true); connection.setStatus(ConnectionStatus.CONNECTED); connection.setLastError(null);
+                    publicUrl("/api/v1/integrations/webhooks/" + connection.getPlatform().name().toLowerCase() + "/"
+                            + connection.getId()));
+            connection.setWebhooksActive(true);
+            connection.setStatus(ConnectionStatus.CONNECTED);
+            connection.setLastError(null);
         } catch (RuntimeException exception) {
-            connection.setWebhooksActive(false); connection.setStatus(ConnectionStatus.ACTION_REQUIRED);
-            connection.setLastError("Store connected, but order webhook registration failed: " + safeMessage(exception));
+            // If token was refreshed during webhook registration, persist and retry once
+            if (exception instanceof org.example.storeintegration.connector.TokenRefreshedException tre) {
+                var refreshed = tre.refreshed();
+                StoreCredentials updated = StoreCredentials.shopify(refreshed.accessToken(), refreshed.refreshToken(),
+                        refreshed.expiresIn() == null ? null
+                                : Instant.now().plusSeconds(refreshed.expiresIn()).getEpochSecond());
+                connection.setEncryptedCredentials(credentialCipher.encrypt(updated));
+                connectionRepository.save(connection);
+                try {
+                    URI store = connection.getPlatform() == StorePlatform.SHOPIFY
+                            ? urlPolicy.requireShopifyStore(connection.getStoreUrl())
+                            : urlPolicy.requirePublicHttpsStore(connection.getStoreUrl());
+                    connectorFactory.require(connection.getPlatform()).registerOrderWebhook(store, updated,
+                            publicUrl("/api/v1/integrations/webhooks/" + connection.getPlatform().name().toLowerCase()
+                                    + "/" + connection.getId()));
+                    connection.setWebhooksActive(true);
+                    connection.setStatus(ConnectionStatus.CONNECTED);
+                    connection.setLastError(null);
+                    connectionRepository.save(connection);
+                    return;
+                } catch (RuntimeException inner) {
+                    connection.setWebhooksActive(false);
+                    connection.setStatus(ConnectionStatus.CONNECTED);
+                    connection.setLastError(
+                            "Store connected, but order webhook registration pending: " + safeMessage(inner));
+                    connectionRepository.save(connection);
+                    return;
+                }
+            }
+            connection.setWebhooksActive(false);
+            connection.setStatus(ConnectionStatus.CONNECTED);
+            connection
+                    .setLastError("Store connected, but order webhook registration pending: " + safeMessage(exception));
         }
         connectionRepository.save(connection);
     }
 
     private StateToken createState(StorePlatform platform, ConnectRequest request, URI store) {
-        String raw = randomToken(); Instant expiry = Instant.now().plus(Duration.ofMinutes(10));
+        String raw = randomToken();
+        Instant expiry = Instant.now().plus(Duration.ofMinutes(10));
         stateRepository.save(OAuthState.builder().stateHash(hash(raw)).enterpriseId(TenantContext.requireEnterpriseId())
                 .userId(TenantContext.requireUserId()).platform(platform).displayName(request.displayName().trim())
                 .storeUrl(store.toString()).stockLocationId(request.stockLocationId()).expiresAt(expiry).build());
@@ -203,26 +313,85 @@ public class IntegrationService {
     }
 
     private OAuthState requireState(String raw, StorePlatform platform) {
-        OAuthState state = stateRepository.findByStateHash(hash(raw)).orElseThrow(() -> new SecurityException("Unknown authorization state."));
-        if (state.getPlatform() != platform || state.getConsumedAt() != null || state.getExpiresAt().isBefore(Instant.now())) throw new SecurityException("Authorization state is expired or already used.");
+        OAuthState state = stateRepository.findByStateHash(hash(raw))
+                .orElseThrow(() -> new SecurityException("Unknown authorization state."));
+        if (state.getPlatform() != platform || state.getConsumedAt() != null
+                || state.getExpiresAt().isBefore(Instant.now()))
+            throw new SecurityException("Authorization state is expired or already used.");
         return state;
     }
 
-    private StoreConnection requireConnection(Long id) { return connectionRepository.findByIdAndEnterpriseId(id, TenantContext.requireEnterpriseId()).orElseThrow(() -> new EntityNotFoundException("Store connection not found.")); }
-    private void verifyLocation(Long enterpriseId, Long locationId) { coreClient.verifyLocation(enterpriseId, locationId); }
-    private String publicUrl(String path) { requirePublicCallbacks(); return properties.publicBaseUrl().replaceAll("/$", "") + path; }
-    private void requirePublicCallbacks() { if (!properties.hasPublicCallbackUrl()) throw new IllegalStateException("An HTTPS integration.public-base-url is required for provider callbacks."); }
-    private String randomToken() { byte[] bytes = new byte[32]; secureRandom.nextBytes(bytes); return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes); }
-    private boolean constantTimeEquals(String expected, String provided) {
-        if (provided == null) return false;
-        return MessageDigest.isEqual(expected.getBytes(java.nio.charset.StandardCharsets.UTF_8), provided.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    private StoreConnection requireConnection(Long id) {
+        return connectionRepository.findByIdAndEnterpriseId(id, TenantContext.requireEnterpriseId())
+                .orElseThrow(() -> new EntityNotFoundException("Store connection not found."));
     }
-    private String hash(String value) { try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8))); } catch (Exception e) { throw new IllegalStateException(e); } }
-    private String required(String value, String message) { if (value == null || value.isBlank()) throw new IllegalArgumentException(message); return value; }
-    private String blankToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }
-    private String safeMessage(Exception exception) { String value = exception.getMessage(); return value == null ? exception.getClass().getSimpleName() : value.substring(0, Math.min(700, value.length())); }
-    private ConnectionResponse response(StoreConnection c) { return new ConnectionResponse(c.getId(), c.getPlatform(), c.getDisplayName(), c.getStoreUrl(), c.getStockLocationId(), c.getStatus(), c.isWebhooksActive(), c.getLastError(), c.getLastSyncAt(), c.getCreatedAt()); }
-    private ProductMappingResponse mappingResponse(ProductMapping m) { return new ProductMappingResponse(m.getId(), m.getConnection().getId(), m.getExternalProductId(), m.getExternalVariantId(), m.getExternalSku(), m.getExternalName(), m.getInternalProductId(), m.getCreatedAt()); }
-    public record StartedAuthorization(AuthorizationResponse response, String browserState) {}
-    private record StateToken(String raw, Instant expiresAt) {}
+
+    private void verifyLocation(Long enterpriseId, Long locationId) {
+        coreClient.verifyLocation(enterpriseId, locationId);
+    }
+
+    private String publicUrl(String path) {
+        requirePublicCallbacks();
+        return properties.publicBaseUrl().replaceAll("/$", "") + path;
+    }
+
+    private void requirePublicCallbacks() {
+        if (!properties.hasPublicCallbackUrl())
+            throw new IllegalStateException("An HTTPS integration.public-base-url is required for provider callbacks.");
+    }
+
+    private String randomToken() {
+        byte[] bytes = new byte[32];
+        secureRandom.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    private boolean constantTimeEquals(String expected, String provided) {
+        if (provided == null)
+            return false;
+        return MessageDigest.isEqual(expected.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                provided.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    private String hash(String value) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private String required(String value, String message) {
+        if (value == null || value.isBlank())
+            throw new IllegalArgumentException(message);
+        return value;
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private String safeMessage(Exception exception) {
+        String value = exception.getMessage();
+        return value == null ? exception.getClass().getSimpleName() : value.substring(0, Math.min(700, value.length()));
+    }
+
+    private ConnectionResponse response(StoreConnection c) {
+        return new ConnectionResponse(c.getId(), c.getPlatform(), c.getDisplayName(), c.getStoreUrl(),
+                c.getStockLocationId(), c.getStatus(), c.isWebhooksActive(), c.getLastError(), c.getLastSyncAt(),
+                c.getCreatedAt());
+    }
+
+    private ProductMappingResponse mappingResponse(ProductMapping m) {
+        return new ProductMappingResponse(m.getId(), m.getConnection().getId(), m.getExternalProductId(),
+                m.getExternalVariantId(), m.getExternalSku(), m.getExternalName(), m.getInternalProductId(),
+                m.getCreatedAt());
+    }
+
+    public record StartedAuthorization(AuthorizationResponse response, String browserState) {
+    }
+
+    private record StateToken(String raw, Instant expiresAt) {
+    }
 }

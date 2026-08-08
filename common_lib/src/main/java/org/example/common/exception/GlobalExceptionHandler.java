@@ -75,6 +75,22 @@ public class GlobalExceptionHandler {
         return problemDetail;
     }
 
+    @ExceptionHandler(SecurityException.class)
+    public ProblemDetail handleSecurityException(SecurityException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        problemDetail.setTitle("Security Violation");
+        return problemDetail;
+    }
+
+    @ExceptionHandler(org.springframework.web.client.RestClientResponseException.class)
+    public ProblemDetail handleRestClientResponseException(org.springframework.web.client.RestClientResponseException ex) {
+        HttpStatus status = HttpStatus.resolve(ex.getRawStatusCode());
+        HttpStatus targetStatus = status != null ? status : HttpStatus.BAD_GATEWAY;
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(targetStatus, ex.getResponseBodyAsString());
+        problemDetail.setTitle("External Integration Error");
+        return problemDetail;
+    }
+
     @ExceptionHandler(RuntimeException.class)
     public ProblemDetail handleRuntimeException(RuntimeException ex) {
         ex.printStackTrace();

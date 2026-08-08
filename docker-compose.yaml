@@ -338,6 +338,11 @@ services:
         condition: service_started
     networks:
       - erp-network
+    # Docker Desktop's embedded resolver can return transient EAI_AGAIN errors
+    # to the JVM for external providers (*.myshopify.com, ngrok, etc.).
+    dns:
+      - ${DOCKER_DNS_PRIMARY:-8.8.8.8}
+      - ${DOCKER_DNS_SECONDARY:-1.1.1.1}
 
   # ─────────────── MINIO SERVER ───────────────
   minio:

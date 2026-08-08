@@ -19,8 +19,10 @@ class CredentialCipherTest {
         assertThat(encrypted).startsWith("v1.").doesNotContain("ck_private", "cs_private", "webhook-secret");
         assertThat(cipher.decrypt(encrypted)).isEqualTo(credentials);
 
-        char replacement = encrypted.endsWith("A") ? 'B' : 'A';
-        String tampered = encrypted.substring(0, encrypted.length() - 1) + replacement;
+        String[] parts = encrypted.split("\\.");
+        byte[] payload = Base64.getUrlDecoder().decode(parts[2]);
+        payload[0] = (byte) (payload[0] ^ 0xFF);
+        String tampered = parts[0] + "." + parts[1] + "." + Base64.getUrlEncoder().withoutPadding().encodeToString(payload);
         assertThatThrownBy(() -> cipher.decrypt(tampered)).isInstanceOf(IllegalStateException.class);
     }
 
