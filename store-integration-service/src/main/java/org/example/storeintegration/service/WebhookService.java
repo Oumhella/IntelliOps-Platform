@@ -86,6 +86,33 @@ public class WebhookService {
             List<String> missing = new ArrayList<>();
             for (NormalizedLine line : order.lines()) {
                 ProductMapping mapping = mappingRepository.findByConnectionIdAndExternalVariantId(connection.getId(), line.externalVariantId()).orElse(null);
+                if (mapping != null) {
+                    try {
+                        coreClient.verifyProductAndLocation(connection.getEnterpriseId(), mapping.getInternalProductId(), connection.getStockLocationId());
+                    } catch (Exception missingProduct) {
+                        Long newInternalId = coreClient.createProduct(connection.getEnterpriseId(), line.label(), "SKU-" + line.externalVariantId(), line.unitPrice().doubleValue());
+                        if (newInternalId != null) {
+                            mapping.setInternalProductId(newInternalId);
+                            mapping = mappingRepository.save(mapping);
+                        } else {
+                            mapping = null;
+                        }
+                    }
+                }
+                if (mapping == null) {
+                    Long newInternalId = coreClient.createProduct(connection.getEnterpriseId(), line.label(), "SKU-" + line.externalVariantId(), line.unitPrice().doubleValue());
+                    if (newInternalId != null) {
+                        mapping = ProductMapping.builder()
+                                .connection(connection)
+                                .enterpriseId(connection.getEnterpriseId())
+                                .externalProductId(line.externalVariantId())
+                                .externalVariantId(line.externalVariantId())
+                                .externalName(line.label())
+                                .internalProductId(newInternalId)
+                                .build();
+                        mapping = mappingRepository.save(mapping);
+                    }
+                }
                 if (mapping == null) { missing.add(line.label() + " [" + line.externalVariantId() + "]"); continue; }
                 items.add(new ExternalOrderLine(mapping.getInternalProductId(), line.quantity(), line.unitPrice()));
             }
@@ -129,8 +156,13 @@ public class WebhookService {
         String currency = requireCurrency(order.path("currency").asText(null));
         JsonNode address = order.path("shipping_address").isObject() ? order.path("shipping_address") : order.path("billing_address");
         String name = text(address, "name", join(text(order.path("customer"), "first_name", ""), text(order.path("customer"), "last_name", "")));
-        Customer customer = new Customer(name, text(order, "email", text(order.path("customer"), "email", null)),
-                text(address, "phone", text(order, "phone", null)), address(address), text(address, "city", ""));
+        if (name.isBlank()) name = "Shopify Customer";
+        String email = text(order, "email", text(order.path("customer"), "email", null));
+        if (email != null && email.isBlank()) email = null;
+        String addrStr = address(address);
+        if (addrStr.isBlank()) addrStr = "N/A";
+        String cityStr = text(address, "city", "N/A");
+        Customer customer = new Customer(name, email, text(address, "phone", text(order, "phone", null)), addrStr, cityStr);
         List<NormalizedLine> lines = new ArrayList<>();
         for (JsonNode line : order.path("line_items")) {
             String variantId = line.path("variant_id").asText("");
@@ -183,8 +215,10 @@ public class WebhookService {
     private String required(String value, String message) { if (value == null || value.isBlank()) throw new IllegalArgumentException(message); return value.trim(); }
     private String requireCurrency(String value) {
         String currency = required(value, "External order currency is required.").toUpperCase(Locale.ROOT);
-        if (!currency.equalsIgnoreCase(properties.orderCurrency())) {
-            throw new ActionRequiredException("External order currency " + currency + " does not match workspace billing currency " + properties.orderCurrency().toUpperCase(Locale.ROOT) + ".");
+        String configured = properties.orderCurrency() != null ? properties.orderCurrency().toUpperCase(Locale.ROOT) : "USD,MAD,EUR";
+        java.util.Set<String> allowed = java.util.Set.of(configured.split("\\s*,\\s*"));
+        if (!allowed.contains(currency) && !configured.equals("*")) {
+            throw new ActionRequiredException("External order currency " + currency + " does not match workspace accepted currencies (" + configured + ").");
         }
         return currency;
     }

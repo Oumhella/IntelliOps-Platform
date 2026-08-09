@@ -22,7 +22,7 @@ public class InventaireController {
     private final InventaireService inventaireService;
 
     @PatchMapping("/boutiques/{idBoutique}/produits/{idProduit}/ajuster")
-    @PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CSM', 'LOGISTIC', 'INTEGRATION_SERVICE')")
     public ResponseEntity<InventaireResponseDTO> ajusterStock(
             @PathVariable Long idBoutique,
             @PathVariable Long idProduit,

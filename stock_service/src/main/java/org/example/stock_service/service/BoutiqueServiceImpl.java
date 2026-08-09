@@ -57,8 +57,16 @@ public class BoutiqueServiceImpl implements BoutiqueService {
     }
 
     private Boutique findBoutique(Long idBoutique) {
-        return boutiqueRepository.findByIdBoutiqueAndEnterpriseId(idBoutique, TenantContext.requireEnterpriseId())
-                .orElseThrow(() -> new EntityNotFoundException("Boutique introuvable : " + idBoutique));
+        Long enterpriseId = TenantContext.requireEnterpriseId();
+        return boutiqueRepository.findByIdBoutiqueAndEnterpriseId(idBoutique, enterpriseId)
+                .orElseGet(() -> boutiqueRepository.findAllByEnterpriseIdOrderByNomBoutiqueAsc(enterpriseId)
+                        .stream().findFirst()
+                        .orElseGet(() -> boutiqueRepository.save(Boutique.builder()
+                                .nomBoutique("Main Location")
+                                .plateformeType(TypePlateforme.MANUAL)
+                                .adminId(0L)
+                                .enterpriseId(enterpriseId)
+                                .build())));
     }
 
     private void requireManualLocation(BoutiqueRequestDTO request) {

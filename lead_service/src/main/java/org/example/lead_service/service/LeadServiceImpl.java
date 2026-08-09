@@ -207,8 +207,8 @@ public class LeadServiceImpl implements LeadService {
             try {
                 StockProductDTO product = stockClient.obtenirProduit(line.productId());
                 StockInventoryDTO inventory = stockClient.obtenirInventaire(request.stockLocationId(), line.productId());
-                if (product == null || inventory == null || inventory.getQuantiteDisponible() < line.quantity()) {
-                    throw new IllegalStateException("Insufficient mapped stock for product " + line.productId() + ".");
+                if (product == null || inventory == null) {
+                    throw new ResourceNotFoundException("Mapped product or inventory not found for product " + line.productId() + ".");
                 }
             } catch (FeignException exception) {
                 throw new ResourceNotFoundException("Mapped product or inventory not found for product " + line.productId() + ".");

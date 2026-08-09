@@ -237,6 +237,8 @@ public class IntegrationService {
             externalProducts = connectorFactory.require(connection.getPlatform()).listProducts(storeUrl, updated);
         }
 
+        registerWebhook(connection, credentials);
+
         int importedCount = 0;
         int skippedCount = 0;
         List<ProductMappingResponse> createdMappings = new ArrayList<>();

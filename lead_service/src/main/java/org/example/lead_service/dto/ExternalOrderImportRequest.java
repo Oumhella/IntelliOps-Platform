@@ -12,12 +12,12 @@ public record ExternalOrderImportRequest(
         @NotNull @Positive Long stockLocationId,
         @NotNull @Valid Customer customer,
         @NotBlank String paymentStatus,
-        @NotBlank @Pattern(regexp = "(?i)MAD") String currency,
+        @NotBlank @Pattern(regexp = "(?i)[A-Z]{3}") String currency,
         @NotNull @DecimalMin(value = "0.0", inclusive = true) BigDecimal totalAmount,
         @NotEmpty List<@Valid Line> items
 ) {
-    public record Customer(@NotBlank String fullName, @Email String email, String phone,
-                           @NotBlank String address, @NotBlank String city) {}
+    public record Customer(String fullName, @Email String email, String phone,
+                           String address, String city) {}
     public record Line(@NotNull @Positive Long productId, @Positive int quantity,
                        @NotNull @DecimalMin(value = "0.0", inclusive = false) BigDecimal unitPrice) {}
 }

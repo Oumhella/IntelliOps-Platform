@@ -135,6 +135,8 @@ public class ShopifyConnector implements StoreConnector {
                     String userErrors = result.path("userErrors").toString();
                     if (userErrors.contains("protected customer data")) {
                         protectedDataTopics.add(topic);
+                    } else if (userErrors.contains("already been taken")) {
+                        log.info("registerOrderWebhook: Webhook subscription for topic {} already exists.", topic);
                     } else {
                         failedTopics.add(topic + ": " + userErrors);
                     }
