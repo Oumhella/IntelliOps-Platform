@@ -227,10 +227,10 @@ public class LeadServiceImpl implements LeadService {
             CoordonneesClient customer = CoordonneesClient.builder().nomComplet(externalCustomer.fullName().trim())
                     .email(blankToNull(externalCustomer.email())).telephone(blankToNull(externalCustomer.phone()))
                     .adresseLivraison(externalCustomer.address().trim()).ville(externalCustomer.city().trim()).build();
-            Lead lead = Lead.builder().statutLead(StatutLead.CONVERTED).ordrePriorite(OrdrePriorite.MEDIUM)
+            Lead lead = Lead.builder().statutLead(StatutLead.NEW_LEAD).ordrePriorite(OrdrePriorite.MEDIUM)
                     .infosClient(customer).boutiqueId(request.stockLocationId()).agentId(null).source(source)
                     .enterpriseId(enterpriseId).historiqueInteractions(new ArrayList<>()).build();
-            Commande order = Commande.builder().lead(lead).reference(orderReference).statutCommande(StatutCommande.CONFIRMEE)
+            Commande order = Commande.builder().lead(lead).reference(orderReference).statutCommande(StatutCommande.EN_ATTENTE)
                     .statutPaiement(paymentStatus).infosClient(customer).stockLocationId(request.stockLocationId())
                     .stockReservationReference(orderReference).totalPrix(0.0).build();
             prepared.forEach(item -> order.ajouterLigne(item.productId(), item.quantity(), item.unitPrice()));

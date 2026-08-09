@@ -238,7 +238,8 @@ export class LeadsComponent implements OnInit {
     }
   }
 
-  agentLabel(agentId: number): string {
+  agentLabel(agentId: number | null): string {
+    if (agentId === null) return 'Unassigned';
     if (agentId === this.currentUser()?.id) return 'You';
     const agent = this.csmAgents().find((candidate) => candidate.id === agentId);
     return agent ? `${agent.firstname} ${agent.lastname}` : `#${agentId}`;
