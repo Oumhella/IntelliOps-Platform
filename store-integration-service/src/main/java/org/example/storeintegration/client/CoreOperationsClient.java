@@ -40,4 +40,20 @@ public class CoreOperationsClient {
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + tokenProvider.forTenant(enterpriseId))
                 .build().patch().uri("/api/v1/internal/integrations/orders/state").body(request).retrieve().toBodilessEntity();
     }
+
+    public Long createProduct(Long enterpriseId, String name, String sku, double price) {
+        String token = tokenProvider.forTenant(enterpriseId);
+        RestClient stock = restClientBuilder.clone().baseUrl(stockUrl)
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token).build();
+        String safeName = (name == null || name.isBlank()) ? "Unnamed Product" : (name.length() > 180 ? name.substring(0, 180) : name);
+        String safeSku = (sku != null && !sku.isBlank()) ? (sku.length() > 100 ? sku.substring(0, 100) : sku) : "SKU-" + System.currentTimeMillis();
+        var body = java.util.Map.of(
+                "nomProduit", safeName,
+                "prixAchat", 0.0,
+                "prixVente", price > 0 ? price : 10.0,
+                "globalSku", safeSku
+        );
+        com.fasterxml.jackson.databind.JsonNode response = stock.post().uri("/api/v1/produits").body(body).retrieve().body(com.fasterxml.jackson.databind.JsonNode.class);
+        return response != null && response.has("idProduit") ? response.path("idProduit").asLong() : null;
+    }
 }

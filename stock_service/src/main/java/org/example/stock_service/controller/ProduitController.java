@@ -21,7 +21,7 @@ public class ProduitController {
     private final ProduitService produitService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC', 'INTEGRATION_SERVICE')")
     public ResponseEntity<ProduitResponseDTO> creerProduit(@Valid @RequestBody ProduitRequestDTO request) {
         return new ResponseEntity<>(produitService.creerProduit(request), HttpStatus.CREATED);
     }

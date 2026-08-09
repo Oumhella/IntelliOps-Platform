@@ -28,6 +28,7 @@ public final class IntegrationDtos {
                                          String externalVariantId, String externalSku, String externalName,
                                          Long internalProductId, Instant createdAt) {}
     public record ExternalProduct(String productId, String variantId, String sku, String name) {}
+    public record AutoImportResponse(int importedCount, int skippedCount, List<ProductMappingResponse> mappings) {}
     public record EventResponse(Long id, Long connectionId, String externalEventId, String topic,
                                 WebhookEventStatus status, String errorMessage, Instant receivedAt, Instant processedAt) {}
     public record WooAuthorizationCallback(

@@ -172,12 +172,16 @@ public class ShopifyConnector implements StoreConnector {
             int status = ex.getRawStatusCode();
             String body = ex.getResponseBodyAsString();
             log.warn("graphql: Shopify responded with status={}, body={}", status, body);
-            if ((status == 401 || status == 403) && credentials.refreshToken() != null
-                    && body != null && body.contains("Non-expiring access tokens are no longer accepted")) {
-                // Acquire a new token from Shopify and bubble up so caller can persist and
-                // retry.
-                ExchangeResult refreshed = refreshAccessToken(storeUrl, credentials.refreshToken());
-                throw new TokenRefreshedException("Access token refreshed", refreshed);
+            if ((status == 401 || status == 403) && credentials.refreshToken() != null && !credentials.refreshToken().isBlank()) {
+                try {
+                    log.info("graphql: Shopify access token expired or invalid (status={}), attempting refresh...", status);
+                    ExchangeResult refreshed = refreshAccessToken(storeUrl, credentials.refreshToken());
+                    throw new TokenRefreshedException("Access token refreshed", refreshed);
+                } catch (TokenRefreshedException tre) {
+                    throw tre;
+                } catch (Exception refreshEx) {
+                    log.warn("graphql: Token refresh failed: {}", refreshEx.getMessage());
+                }
             }
             throw ex;
         }

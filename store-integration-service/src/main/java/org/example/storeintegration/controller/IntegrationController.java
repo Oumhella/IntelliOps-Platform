@@ -56,6 +56,11 @@ public class IntegrationController {
         return service.externalProducts(id);
     }
 
+    @PostMapping("/connections/{id}/auto-import")
+    public AutoImportResponse autoImport(@PathVariable Long id) {
+        return service.autoImportProducts(id);
+    }
+
     @GetMapping("/connections/{id}/mappings")
     public List<ProductMappingResponse> mappings(@PathVariable Long id) {
         return service.mappings(id);

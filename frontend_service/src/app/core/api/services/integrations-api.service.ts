@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { API_BASE_URL, buildApiUrl } from '../api.config';
-import { ExternalProductResponse, IntegrationAuthorization, IntegrationCapabilities, IntegrationConnectRequest, IntegrationEventResponse, ProductMappingRequest, ProductMappingResponse, StoreConnectionResponse } from '../models';
+import { AutoImportResponse, ExternalProductResponse, IntegrationAuthorization, IntegrationCapabilities, IntegrationConnectRequest, IntegrationEventResponse, ProductMappingRequest, ProductMappingResponse, StoreConnectionResponse } from '../models';
 
 @Injectable({providedIn:'root'})
 export class IntegrationsApiService {
@@ -17,4 +17,5 @@ export class IntegrationsApiService {
   deleteMapping(id:number):Observable<void>{return this.http.delete<void>(`${this.url}/mappings/${id}`)}
   disconnect(id:number):Observable<StoreConnectionResponse>{return this.http.delete<StoreConnectionResponse>(`${this.url}/connections/${id}`)}
   events():Observable<readonly IntegrationEventResponse[]>{return this.http.get<readonly IntegrationEventResponse[]>(`${this.url}/events`)}
+  autoImport(id:number):Observable<AutoImportResponse>{return this.http.post<AutoImportResponse>(`${this.url}/connections/${id}/auto-import`,{})}
 }

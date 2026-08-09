@@ -24,6 +24,7 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
@@ -213,6 +214,58 @@ public class IntegrationService {
                 .findByIdAndEnterpriseId(mappingId, TenantContext.requireEnterpriseId())
                 .orElseThrow(() -> new EntityNotFoundException("Product mapping not found."));
         mappingRepository.delete(mapping);
+    }
+
+    @Transactional
+    public AutoImportResponse autoImportProducts(Long connectionId) {
+        StoreConnection connection = requireConnection(connectionId);
+        URI storeUrl = connection.getPlatform() == StorePlatform.SHOPIFY
+                ? urlPolicy.requireShopifyStore(connection.getStoreUrl())
+                : urlPolicy.requirePublicHttpsStore(connection.getStoreUrl());
+        StoreCredentials credentials = credentialCipher.decrypt(connection.getEncryptedCredentials());
+
+        List<ExternalProduct> externalProducts;
+        try {
+            externalProducts = connectorFactory.require(connection.getPlatform()).listProducts(storeUrl, credentials);
+        } catch (org.example.storeintegration.connector.TokenRefreshedException tre) {
+            var refreshed = tre.refreshed();
+            StoreCredentials updated = StoreCredentials.shopify(refreshed.accessToken(), refreshed.refreshToken(),
+                    refreshed.expiresIn() == null ? null
+                            : Instant.now().plusSeconds(refreshed.expiresIn()).getEpochSecond());
+            connection.setEncryptedCredentials(credentialCipher.encrypt(updated));
+            connectionRepository.save(connection);
+            externalProducts = connectorFactory.require(connection.getPlatform()).listProducts(storeUrl, updated);
+        }
+
+        int importedCount = 0;
+        int skippedCount = 0;
+        List<ProductMappingResponse> createdMappings = new ArrayList<>();
+
+        for (ExternalProduct ep : externalProducts) {
+            boolean exists = mappingRepository.findByConnectionIdAndExternalVariantId(connection.getId(), ep.variantId()).isPresent();
+            if (exists) {
+                skippedCount++;
+                continue;
+            }
+
+            Long internalId = coreClient.createProduct(connection.getEnterpriseId(), ep.name(), ep.sku(), 10.0);
+            if (internalId != null) {
+                ProductMapping mapping = ProductMapping.builder()
+                        .connection(connection)
+                        .enterpriseId(connection.getEnterpriseId())
+                        .externalProductId(ep.productId())
+                        .externalVariantId(ep.variantId())
+                        .externalSku(blankToNull(ep.sku()))
+                        .externalName(ep.name())
+                        .internalProductId(internalId)
+                        .build();
+                createdMappings.add(mappingResponse(mappingRepository.save(mapping)));
+                importedCount++;
+            }
+        }
+
+        log.info("autoImportProducts: completed for store={}, imported={}, skipped={}", connection.getStoreUrl(), importedCount, skippedCount);
+        return new AutoImportResponse(importedCount, skippedCount, createdMappings);
     }
 
     @Transactional
