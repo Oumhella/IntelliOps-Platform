@@ -3,7 +3,7 @@ name: Infrastructure Integration Test
 
 on:
   push:
-    branches: [ "main", "develop", "feature/vault-gateway" ]
+    branches: [ "main", "develop", "feature/**" ]
   pull_request:
     branches: [ "main" ]
 

@@ -2,7 +2,7 @@ name: Store Integration Service CI (DevSecOps)
 
 on:
   push:
-    branches: [ "main", "develop", "feature/identity-auth", "feature/vault-gateway" ]
+    branches: [ "main", "develop", "feature/**" ]
     paths:
       - 'store-integration-service/**'
       - 'common_lib/**'

@@ -2,7 +2,7 @@ name: stock Service CI (DevSecOps)
 
 on:
   push:
-    branches: [ "main", "develop", "feature/identity-auth", "feature/vault-gateway" ]
+    branches: [ "main", "develop", "feature/**" ]
     paths:
       - 'paiement_service/**'
       - 'common_lib/**'
