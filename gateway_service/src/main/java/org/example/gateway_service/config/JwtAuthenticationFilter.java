@@ -13,6 +13,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -24,14 +25,18 @@ import java.security.Key;
 public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAuthenticationFilter.Config> {
 
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
+    private static final String BLACKLIST_PREFIX = "jwt:blacklist:";
+
+    private final ReactiveStringRedisTemplate redisTemplate;
 
     @Value("${jwt.secret}")
     private String secretKey;
 
     public static class Config {}
 
-    public JwtAuthenticationFilter() {
+    public JwtAuthenticationFilter(ReactiveStringRedisTemplate redisTemplate) {
         super(Config.class);
+        this.redisTemplate = redisTemplate;
     }
 
     @Override
@@ -55,6 +60,7 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
             log.info("Incoming request to path: {}", path);
             if (path.contains("/api/v1/users/register") ||
                     path.contains("/api/v1/users/login") ||
+                    path.contains("/api/v1/users/refresh") ||
                     (request.getMethod() == HttpMethod.GET && path.startsWith("/api/v1/plans")) ||
                     path.equals("/api/v1/integrations/oauth/shopify/callback") ||
                     path.equals("/api/v1/integrations/oauth/woocommerce/callback") ||
@@ -98,17 +104,33 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
                 Object enterpriseIdObj = claims.get("enterpriseId");
                 String enterpriseId = enterpriseIdObj != null ? String.valueOf(enterpriseIdObj) : "";
 
-                log.info("JWT validation succeeded for path {}. User: {}, Role: {}, Enterprise: {}", path, email, role, enterpriseId);
+                String tokenId = claims.getId();
+                if (tokenId == null || tokenId.isBlank()) {
+                    return onError(cleanedExchange, "Token identifier missing", HttpStatus.UNAUTHORIZED);
+                }
 
-                // 5. Injecter les informations de l'utilisateur dans les headers pour les microservices aval
-                ServerHttpRequest modifiedRequest = cleanedRequest.mutate()
-                        .header("X-User-Email", email != null ? email : "")
-                        .header("X-User-Role", role != null ? role : "")
-                        .header("X-User-Id", userId)
-                        .header("X-Enterprise-Id", enterpriseId)
-                        .build();
+                return redisTemplate.hasKey(BLACKLIST_PREFIX + tokenId)
+                        .onErrorResume(redisError -> {
+                            log.error("JWT revocation check failed for path {}", path, redisError);
+                            return onError(cleanedExchange, "Authentication service unavailable",
+                                    HttpStatus.SERVICE_UNAVAILABLE).then(Mono.empty());
+                        })
+                        .flatMap(blacklisted -> {
+                            if (Boolean.TRUE.equals(blacklisted)) {
+                                log.info("Rejected revoked JWT {} for path {}", tokenId, path);
+                                return onError(cleanedExchange, "Token revoked", HttpStatus.UNAUTHORIZED);
+                            }
 
-                return chain.filter(cleanedExchange.mutate().request(modifiedRequest).build());
+                            log.info("JWT validation succeeded for path {}. User: {}, Role: {}, Enterprise: {}",
+                                    path, email, role, enterpriseId);
+                            ServerHttpRequest modifiedRequest = cleanedRequest.mutate()
+                                    .header("X-User-Email", email != null ? email : "")
+                                    .header("X-User-Role", role != null ? role : "")
+                                    .header("X-User-Id", userId)
+                                    .header("X-Enterprise-Id", enterpriseId)
+                                    .build();
+                            return chain.filter(cleanedExchange.mutate().request(modifiedRequest).build());
+                        });
 
             } catch (Exception e) {
                 log.error("JWT validation failed for path {}: Exception: {} - {}", path, e.getClass().getSimpleName(), e.getMessage());

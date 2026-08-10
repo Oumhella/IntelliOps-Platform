@@ -38,6 +38,20 @@ services:
     networks:
       - erp-network
 
+  redis:
+    image: redis:7.4-alpine
+    container_name: erp-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - erp-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - erp-network
+
     # --- INFRASTRUCTURE DE SÉCURITÉ & CONFIGURATION ---
   vault:
     image: hashicorp/vault:1.15.2
@@ -102,8 +116,8 @@ services:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8888/actuator/health"]
       interval: 5s
       timeout: 3s
-      retries: 10
-      start_period: 20s
+      retries: 12
+      start_period: 90s
   # --- MICROSERVICES ARCHITECTURE ---
   discovery-server:
     build:
@@ -135,10 +149,13 @@ services:
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - CONFIG_SERVER_URL=http://config-server:8888
+      - SPRING_DATA_REDIS_HOST=redis
     depends_on:
       discovery-server:
         condition: service_started
       config-server:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   user-service:
@@ -160,6 +177,9 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - CONFIG_SERVER_URL=http://config-server:8888
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=erp-kafka:29092
+      - SPRING_DATA_REDIS_HOST=redis
+      - JWT_EXPIRATION=900000
+      - REFRESH_COOKIE_SECURE=false
     depends_on:
       erp-db:
         condition: service_started
@@ -169,6 +189,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_started
+      redis:
+        condition: service_healthy
     networks:
       - erp-network
 
@@ -518,4 +540,5 @@ networks:
 
 volumes:
   erp-db-data:
+  erp-redis-data:
   minio_data:

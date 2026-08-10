@@ -10,7 +10,11 @@ public interface UserService {
 
     UserResponse register(RegisterRequest request);
 
-    AuthResponse login(LoginRequest request);
+    AuthenticationTokens login(LoginRequest request);
+
+    AuthenticationTokens refresh(String refreshToken);
+
+    void logout(String authorizationHeader, String refreshToken);
 
     UserResponse createUser(UserCreationRequest userCreationRequest, Long enterpriseId);
 

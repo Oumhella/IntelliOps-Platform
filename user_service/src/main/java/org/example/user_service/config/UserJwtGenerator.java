@@ -14,6 +14,7 @@ import java.security.Key;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 
 @Component("userJwtGenerator")
@@ -70,6 +71,7 @@ public class UserJwtGenerator {
 
         return Jwts.builder()
                 .setClaims(extraClaims)
+                .setId(UUID.randomUUID().toString())
                 .setSubject(user.getEmail())
                 .setIssuedAt(new Date(System.currentTimeMillis()))
                 .setExpiration(new Date(System.currentTimeMillis() + jwtExpiration))
@@ -101,6 +103,15 @@ public class UserJwtGenerator {
      */
     private Date extractExpiration(String token) {
         return extractClaim(token, Claims::getExpiration);
+    }
+
+    public String extractTokenId(String token) {
+        return extractClaim(token, Claims::getId);
+    }
+
+    public long getRemainingExpirationInSeconds(String token) {
+        long remainingMillis = extractExpiration(token).getTime() - System.currentTimeMillis();
+        return Math.max(0, (remainingMillis + 999) / 1000);
     }
 
     /**

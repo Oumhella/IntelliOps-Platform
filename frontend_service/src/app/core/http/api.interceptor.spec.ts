@@ -14,7 +14,7 @@ describe('apiInterceptor', () => {
   let session: jasmine.SpyObj<AuthSessionService>;
 
   beforeEach(() => {
-    session = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', ['getToken', 'clear']);
+    session = jasmine.createSpyObj<AuthSessionService>('AuthSessionService', ['getToken', 'clear', 'setSession']);
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([apiInterceptor])),
@@ -51,22 +51,26 @@ describe('apiInterceptor', () => {
     request.flush({});
   });
 
-  it('normalizes Spring ProblemDetail errors and clears an unauthorized session', () => {
+  it('refreshes once and retries an unauthorized API request', () => {
     session.getToken.and.returnValue('expired-token');
-    let receivedError: unknown;
+    let response: unknown;
 
-    http.get('/api/v1/users/me').subscribe({ error: (error) => receivedError = error });
-    httpTesting.expectOne('/api/v1/users/me').flush(
-      {
-        title: 'Validation Error',
-        detail: 'Validation failed for one or more fields.',
-        errors: { email: 'Email format is invalid' },
-      },
-      { status: 401, statusText: 'Unauthorized' },
-    );
+    http.get('/api/v1/users/me').subscribe((value) => response = value);
+    httpTesting.expectOne('/api/v1/users/me')
+      .flush({}, { status: 401, statusText: 'Unauthorized' });
 
-    expect(session.clear).toHaveBeenCalled();
-    expect(receivedError).toEqual(jasmine.any(ApiError));
-    expect((receivedError as ApiError).fieldErrors['email']).toBe('Email format is invalid');
+    const refreshedSession = {
+      token: 'new-token', id: 1, email: 'user@example.com', firstname: 'Test',
+      lastname: 'User', role: 'ROLE_ADMIN' as const, enterpriseId: 7,
+    };
+    httpTesting.expectOne('/api/v1/users/refresh').flush(refreshedSession);
+
+    const retried = httpTesting.expectOne('/api/v1/users/me');
+    expect(retried.request.headers.get('Authorization')).toBe('Bearer new-token');
+    retried.flush({ id: 1 });
+
+    expect(session.setSession).toHaveBeenCalledWith(refreshedSession);
+    expect(session.clear).not.toHaveBeenCalled();
+    expect(response).toEqual({ id: 1 });
   });
 });

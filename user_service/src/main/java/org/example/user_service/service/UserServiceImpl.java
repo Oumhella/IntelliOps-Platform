@@ -7,21 +7,28 @@ import org.example.user_service.dto.request.ProfileUpdateRequest;
 import org.example.user_service.dto.request.RegisterRequest;
 import org.example.user_service.dto.request.UserCreationRequest;
 import org.example.user_service.dto.response.UserResponse;
-import org.example.user_service.entity.Admin;
-import org.example.user_service.entity.Enterprise;
-import org.example.user_service.entity.Role;
-import org.example.user_service.entity.User;
+import org.example.user_service.entity.*;
 import org.example.common.exception.ConflictException;
 import org.example.common.exception.ResourceNotFoundException;
+import org.example.common.exception.UnauthorizedException;
 import org.example.user_service.mapper.UserMapper;
+import org.example.user_service.repository.RefreshTokenRedisRepository;
 import org.example.user_service.repository.UserRepository;
 import org.example.user_service.repository.EnterpriseRepository;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.example.user_service.dto.response.AuthResponse;
 import org.example.user_service.dto.request.LoginRequest;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -34,7 +41,13 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
     private final UserJwtGenerator userJwtGenerator;
+    private final RefreshTokenRedisRepository refreshTokenRepository;
+    private final StringRedisTemplate redisTemplate; // Utile pour la blacklist des Access Tokens
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final String BLACKLIST_PREFIX = "jwt:blacklist:";
 
+    @Value("${app.auth.refresh-token-ttl:7d}")
+    private Duration refreshTokenTtl;
     // ── Authentication ──────────────────────────────────────────────
 
     @Override
@@ -61,29 +74,29 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public AuthResponse login(LoginRequest request) {
+    public AuthenticationTokens login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
+                .orElseThrow(() -> new UnauthorizedException("Invalid credentials"));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new IllegalArgumentException("Invalid credentials");
+            throw new UnauthorizedException("Invalid credentials");
         }
 
         if (!user.isActive()) {
-            throw new IllegalArgumentException("This account is deactivated");
+            throw new UnauthorizedException("This account is deactivated");
         }
 
         if (user.getRole() != Role.ROLE_SUPER_ADMIN) {
             enterpriseRepository.findById(user.getEnterpriseId()).ifPresent(enterprise -> {
                 if (!enterprise.isActive()) {
-                    throw new IllegalArgumentException("This enterprise workspace is deactivated");
+                    throw new UnauthorizedException("This enterprise workspace is deactivated");
                 }
             });
         }
 
         String realToken = userJwtGenerator.generateToken(user);
 
-        return new AuthResponse(
+        AuthResponse response = new AuthResponse(
                 realToken,
                 user.getId(),
                 user.getEmail(),
@@ -92,9 +105,81 @@ public class UserServiceImpl implements UserService {
                 user.getRole().name(),
                 user.getEnterpriseId()
         );
+        return new AuthenticationTokens(response, createRefreshToken(user.getId()));
+    }
+
+    private String createRefreshToken(Long userId) {
+        byte[] bytes = new byte[32];
+        SECURE_RANDOM.nextBytes(bytes);
+        String rawToken = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        refreshTokenRepository.save(new RefreshTokenRedis(
+                hashRefreshToken(rawToken), userId, refreshTokenTtl.toSeconds()));
+        return rawToken;
+    }
+    // 2. Traitement de la requête /refresh
+    @Override
+    public AuthenticationTokens refresh(String refreshToken) {
+        String refreshTokenHash = hashRefreshToken(refreshToken);
+        if (!refreshTokenRepository.existsById(refreshTokenHash)) {
+            throw new UnauthorizedException("Invalid or expired refresh token");
+        }
+        RefreshTokenRedis storedToken = refreshTokenRepository.findById(refreshTokenHash)
+                .orElseThrow(() -> new RuntimeException("Refresh token invalide ou expiré"));
+
+        User user = userRepository.findById(storedToken.getUserId())
+                .orElseThrow(() -> new UnauthorizedException("Invalid or expired refresh token"));
+        if (!user.isActive()) {
+            throw new UnauthorizedException("This account is deactivated");
+        }
+
+        // Rotation du token (Sécurité : supprimer l'ancien et créer un nouveau)
+        refreshTokenRepository.deleteById(storedToken.getId());
+        String newRefreshToken = createRefreshToken(user.getId());
+        String newAccessToken = userJwtGenerator.generateToken(user);
+
+        AuthResponse response = new AuthResponse(
+                newAccessToken, user.getId(), user.getEmail(), user.getFirstname(),
+                user.getLastname(), user.getRole().name(), user.getEnterpriseId());
+        return new AuthenticationTokens(response, newRefreshToken);
+    }
+
+    // 3. Traitement de la déconnexion (Logout)
+    @Override
+    public void logout(String accessToken, String refreshToken) {
+        // A. Revocation du Refresh Token dans Redis
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            refreshTokenRepository.deleteById(hashRefreshToken(refreshToken));
+        }
+
+        // B. Ajout de l'Access Token à la Blacklist Redis
+        if (accessToken != null && accessToken.startsWith("Bearer ")) {
+            String jwt = accessToken.substring(7);
+            long remainingExpirationSeconds = userJwtGenerator.getRemainingExpirationInSeconds(jwt);
+
+            if (remainingExpirationSeconds > 0) {
+                redisTemplate.opsForValue().set(
+                        BLACKLIST_PREFIX + userJwtGenerator.extractTokenId(jwt),
+                        "true",
+                        Duration.ofSeconds(remainingExpirationSeconds)
+                );
+            }
+        }
     }
 
     // ── Staff Management (CRUD) ─────────────────────────────────────
+
+    private String hashRefreshToken(String token) {
+        if (token == null || token.isBlank()) {
+            throw new IllegalArgumentException("Refresh token is required");
+        }
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(token.getBytes(StandardCharsets.UTF_8));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is not available", exception);
+        }
+    }
 
     @Override
     @Transactional

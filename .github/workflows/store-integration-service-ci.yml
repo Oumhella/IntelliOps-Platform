@@ -1,0 +1,33 @@
+name: Store Integration Service CI (DevSecOps)
+
+on:
+  push:
+    branches: [ "main", "develop", "feature/identity-auth", "feature/vault-gateway" ]
+    paths:
+      - 'store-integration-service/**'
+      - 'common_lib/**'
+      - 'Dockerfile.microservice'
+      - '.github/actions/build-and-scan-service/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'store-integration-service/**'
+      - 'common_lib/**'
+      - 'Dockerfile.microservice'
+      - '.github/actions/build-and-scan-service/**'
+
+jobs:
+  build-and-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build, test, and scan store-integration-service
+        uses: ./.github/actions/build-and-scan-service
+        with:
+          service_name: store-integration-service
+          service_port: 8090
+          image_name: erp-store-integration-service
+          run_tests: 'true'
