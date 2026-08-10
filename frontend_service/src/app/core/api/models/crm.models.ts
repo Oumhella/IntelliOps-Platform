@@ -37,8 +37,13 @@ export interface LeadResponse {
   readonly ordrePriorite: LeadPriority;
   readonly infosClient: CustomerDetails;
   readonly boutiqueId: number | null;
-  readonly agentId: number;
+  readonly agentId: number | null;
   readonly source: LeadSource;
+  readonly commandeId?: number | null;
+  readonly commandeReference?: string | null;
+  readonly stockLocationId?: number | null;
+  readonly hasPrebuiltOrder?: boolean;
+  readonly lignesCommande?: readonly OrderLineResponse[];
 }
 
 export interface CreateLeadRequest {
@@ -69,7 +74,7 @@ export interface CreateOrderItemRequest {
 export interface CreateOrderRequest {
   readonly idempotencyKey: string;
   readonly stockLocationId: number;
-  readonly items: readonly CreateOrderItemRequest[];
+  readonly items?: readonly CreateOrderItemRequest[];
 }
 
 export interface OrderLineResponse {

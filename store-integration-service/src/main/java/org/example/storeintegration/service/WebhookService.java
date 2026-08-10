@@ -4,32 +4,39 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.storeintegration.client.CoreOperationsClient;
 import org.example.storeintegration.config.IntegrationProperties;
 import org.example.storeintegration.connector.ShopifyConnector;
 import org.example.storeintegration.connector.SignatureVerifier;
+import org.example.storeintegration.connector.TokenRefreshedException;
 import org.example.storeintegration.connector.WooCommerceConnector;
 import org.example.storeintegration.domain.*;
 import org.example.storeintegration.dto.IntegrationDtos.*;
 import org.example.storeintegration.entity.*;
 import org.example.storeintegration.repository.*;
 import org.example.storeintegration.security.CredentialCipher;
+import org.example.storeintegration.security.CredentialCipher.StoreCredentials;
+import org.example.storeintegration.security.ExternalUrlPolicy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WebhookService {
     private final ObjectMapper objectMapper;
     private final IntegrationProperties properties;
     private final CredentialCipher credentialCipher;
+    private final ExternalUrlPolicy urlPolicy;
     private final ShopifyConnector shopifyConnector;
     private final WooCommerceConnector wooCommerceConnector;
     private final CoreOperationsClient coreClient;
@@ -81,6 +88,9 @@ public class WebhookService {
             if (!supported)
                 return actionRequired(event, "Unsupported webhook topic: " + topic);
             JsonNode body = objectMapper.readTree(payload);
+            if (shopify) {
+                body = enrichShopifyOrder(connection, body);
+            }
             NormalizedOrder order = shopify ? shopifyOrder(body) : wooOrder(body);
             boolean createTopic = topic.toLowerCase(Locale.ROOT).endsWith("create")
                     || topic.toLowerCase(Locale.ROOT).endsWith("created");
@@ -156,6 +166,12 @@ public class WebhookService {
                             "The external order's items or total changed. Reconcile it before fulfillment.");
                 }
             }
+            if (shopify && !hasImportableCustomer(order.customer())) {
+                return actionRequired(event,
+                        "Shopify order customer details are incomplete (missing email/phone or street address). "
+                                + "Approve Protected Customer Data (name, email, phone, address) in the Shopify Partner Dashboard, "
+                                + "reinstall/reconnect the app, then retry this webhook.");
+            }
             coreClient.importOrder(connection.getEnterpriseId(),
                     new ExternalOrderRequest(connection.getPlatform().name(), order.id(), order.reference(),
                             connection.getStockLocationId(), order.customer(), order.initialPaymentStatus(),
@@ -197,13 +213,13 @@ public class WebhookService {
         String orderNum = order.path("name").asText(order.path("order_number").asText(""));
 
         String name = text(address, "name",
-                join(text(address, "first_name", text(customerNode, "first_name", "")),
-                        text(address, "last_name", text(customerNode, "last_name", ""))));
+                join(text(address, "first_name", text(shippingAddr, "first_name", text(billingAddr, "first_name", text(customerNode, "first_name", "")))),
+                        text(address, "last_name", text(shippingAddr, "last_name", text(billingAddr, "last_name", text(customerNode, "last_name", ""))))));
         if (name.isBlank() || "Shopify Customer".equals(name)) {
             name = join(text(customerNode, "first_name", ""), text(customerNode, "last_name", ""));
         }
         if (name.isBlank()) {
-            name = text(address, "company", text(defaultAddr, "company", ""));
+            name = text(address, "company", text(shippingAddr, "company", text(billingAddr, "company", text(defaultAddr, "company", ""))));
         }
         if (name.isBlank()) {
             name = "Shopify Customer " + orderNum;
@@ -211,31 +227,40 @@ public class WebhookService {
 
         String email = text(order, "email",
                 text(order, "contact_email",
-                        text(customerNode, "email", null)));
+                        text(customerNode, "email",
+                                text(shippingAddr, "email",
+                                        text(billingAddr, "email",
+                                                text(defaultAddr, "email", null))))));
         if (email != null && email.isBlank())
             email = null;
 
         String phone = text(address, "phone",
-                text(order, "phone",
-                        text(customerNode, "phone",
-                                text(defaultAddr, "phone", null))));
+                text(shippingAddr, "phone",
+                        text(billingAddr, "phone",
+                                text(customerNode, "phone",
+                                        text(defaultAddr, "phone",
+                                                text(order, "phone", null))))));
+        if (phone != null && phone.isBlank())
+            phone = null;
 
-        String addrStr = shopifyAddress(address);
+        String addrStr = shopifyAddress(shippingAddr);
+        if (addrStr.isBlank())
+            addrStr = shopifyAddress(billingAddr);
         if (addrStr.isBlank())
             addrStr = shopifyAddress(defaultAddr);
         if (addrStr.isBlank())
-            addrStr = shopifyAddress(order.path("billing_address"));
-        if (addrStr.isBlank())
-            addrStr = shopifyAddress(order.path("shipping_address"));
+            addrStr = shopifyAddress(address);
         if (addrStr.isBlank())
             addrStr = "Shopify Store Order " + orderNum;
 
-        String cityStr = text(address, "city",
-                text(defaultAddr, "city",
-                        text(address, "country_name",
-                                text(address, "country",
-                                        text(defaultAddr, "country_name",
-                                                text(defaultAddr, "country", "N/A"))))));
+        String cityStr = firstNonBlank(
+                text(shippingAddr, "city", null),
+                text(billingAddr, "city", null),
+                text(defaultAddr, "city", null),
+                text(address, "city", null),
+                text(shippingAddr, "province", null),
+                text(billingAddr, "province", null),
+                "N/A");
 
         Customer customer = new Customer(name, email, phone, addrStr, cityStr);
         List<NormalizedLine> lines = new ArrayList<>();
@@ -289,6 +314,47 @@ public class WebhookService {
         return new NormalizedOrder(order.path("id").asText(), order.path("number").asText(order.path("id").asText()),
                 customer, initialPayment, currentPayment, cancelled, currency, money(order.path("total").asText()),
                 lines);
+    }
+
+    private JsonNode enrichShopifyOrder(StoreConnection connection, JsonNode webhookOrder) {
+        String orderId = webhookOrder.path("id").asText(null);
+        if (orderId == null || orderId.isBlank()) {
+            return webhookOrder;
+        }
+        URI store = urlPolicy.requireShopifyStore(connection.getStoreUrl());
+        StoreCredentials credentials = credentialCipher.decrypt(connection.getEncryptedCredentials());
+        try {
+            JsonNode fullOrder = shopifyConnector.fetchOrder(store, credentials, orderId);
+            log.debug("enrichShopifyOrder: loaded Admin API order {} for connection {}", orderId, connection.getId());
+            return fullOrder;
+        } catch (TokenRefreshedException tre) {
+            var refreshed = tre.refreshed();
+            StoreCredentials updated = StoreCredentials.shopify(refreshed.accessToken(), refreshed.refreshToken(),
+                    refreshed.expiresIn() == null ? null
+                            : Instant.now().plusSeconds(refreshed.expiresIn()).getEpochSecond());
+            connection.setEncryptedCredentials(credentialCipher.encrypt(updated));
+            connectionRepository.save(connection);
+            return shopifyConnector.fetchOrder(store, updated, orderId);
+        } catch (Exception exception) {
+            log.warn("enrichShopifyOrder: Admin API fetch failed for order {} ({}), using webhook payload",
+                    orderId, exception.getMessage());
+            return webhookOrder;
+        }
+    }
+
+    private boolean hasImportableCustomer(Customer customer) {
+        if (customer == null) {
+            return false;
+        }
+        boolean hasName = customer.fullName() != null && !customer.fullName().isBlank();
+        boolean hasContact = (customer.email() != null && !customer.email().isBlank())
+                || (customer.phone() != null && !customer.phone().isBlank());
+        boolean hasCity = customer.city() != null && !customer.city().isBlank()
+                && !"N/A".equalsIgnoreCase(customer.city());
+        boolean hasAddress = customer.address() != null && !customer.address().isBlank()
+                && !customer.address().equalsIgnoreCase(customer.city())
+                && !customer.address().startsWith("Shopify Store Order");
+        return hasName && hasContact && hasCity && hasAddress;
     }
 
     private boolean isShopifyCod(JsonNode order) {
@@ -354,10 +420,22 @@ public class WebhookService {
             return "";
         String a1 = text(node, "address1", text(node, "address_1", ""));
         String a2 = text(node, "address2", text(node, "address_2", ""));
+        String zip = text(node, "zip", "");
+        String city = text(node, "city", "");
         String company = text(node, "company", "");
+        String province = text(node, "province", "");
         String country = text(node, "country_name", text(node, "country", ""));
-        String combined = join(join(a1, a2), join(company, country));
-        return combined.trim();
+
+        List<String> parts = new ArrayList<>();
+        String street = join(a1, a2);
+        if (!street.isBlank()) parts.add(street);
+        if (!company.isBlank()) parts.add(company);
+        String location = join(zip, city);
+        if (!location.isBlank()) parts.add(location);
+        if (!province.isBlank() && !province.equalsIgnoreCase(city)) parts.add(province);
+        if (!country.isBlank() && !country.equalsIgnoreCase(city)) parts.add(country);
+
+        return String.join(", ", parts).trim();
     }
 
     private String address(JsonNode node) {
@@ -369,8 +447,23 @@ public class WebhookService {
     }
 
     private String text(JsonNode node, String field, String fallback) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return fallback;
+        }
         String value = node.path(field).asText(null);
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private String valueOr(String value, String fallback) {

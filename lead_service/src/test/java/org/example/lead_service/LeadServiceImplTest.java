@@ -31,7 +31,7 @@ import java.util.Optional;
 import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import org.example.common.security.TenantContext;
 
@@ -147,6 +147,7 @@ class LeadServiceImplTest {
         // Arrange
         mockLead.setStatutLead(StatutLead.IN_PROGRESS);
         when(leadRepository.findByIdLeadAndEnterpriseId(1L, 7L)).thenReturn(Optional.of(mockLead));
+        when(leadRepository.findDetailedByIdLeadAndEnterpriseId(1L, 7L)).thenReturn(Optional.of(mockLead));
         when(leadRepository.save(any(Lead.class))).thenReturn(mockLead);
         when(commandeMapper.toDto(any(Commande.class))).thenReturn(new CommandeDTO());
         when(commandeRepository.findByReferenceAndLeadEnterpriseId(anyString(), eq(7L)))
@@ -188,14 +189,54 @@ class LeadServiceImplTest {
         Commande commandeGeneree = mockLead.getCommande();
         assertEquals(1500.00, commandeGeneree.getTotalPrix());
         assertEquals(2, commandeGeneree.getLignesCommande().size());
-        assertEquals(StatutCommande.EN_ATTENTE, commandeGeneree.getStatutCommande());
+        assertEquals(StatutCommande.CONFIRMEE, commandeGeneree.getStatutCommande());
 
         // On s'assure que le lead entier a été sauvegardé (ce qui propage l'enregistrement de la commande)
         verify(leadRepository, times(1)).save(mockLead);
+        verify(stockClient, times(2)).reserverStock(eq(10L), anyLong(), any(StockClient.ReservationRequest.class));
     }
 
     @Test
-    void importExternalOrder_UsesProviderTotalAndCreatesUnassignedConvertedLead() {
+    void convertirEnCommande_ReusesImportedOrderWithoutRepickingProductsOrDoubleReserving() {
+        mockLead.setStatutLead(StatutLead.IN_PROGRESS);
+        mockLead.setSource(LeadSource.SHOPIFY);
+        mockLead.setBoutiqueId(10L);
+        Commande imported = Commande.builder()
+                .lead(mockLead)
+                .reference("EXT-shopify-900")
+                .statutCommande(StatutCommande.EN_ATTENTE)
+                .statutPaiement(StatutPaiementCommande.PAID)
+                .stockLocationId(10L)
+                .stockReservationReference("EXT-shopify-900")
+                .totalPrix(100.0)
+                .infosClient(mockLead.getInfosClient())
+                .build();
+        imported.ajouterLigne(102L, 2, 50.0);
+        mockLead.setCommande(imported);
+
+        when(leadRepository.findByIdLeadAndEnterpriseId(1L, 7L)).thenReturn(Optional.of(mockLead));
+        when(leadRepository.findDetailedByIdLeadAndEnterpriseId(1L, 7L)).thenReturn(Optional.of(mockLead));
+        when(leadRepository.save(any(Lead.class))).thenReturn(mockLead);
+        when(commandeMapper.toDto(any(Commande.class))).thenReturn(new CommandeDTO());
+
+        CreationCommandeRequest request = new CreationCommandeRequest();
+        request.setIdempotencyKey("confirm-imported-1");
+        request.setStockLocationId(10L);
+        request.setItems(List.of());
+
+        CommandeDTO result = leadService.convertirEnCommande(1L, request);
+
+        assertNotNull(result);
+        assertEquals(StatutLead.CONVERTED, mockLead.getStatutLead());
+        assertEquals(StatutCommande.CONFIRMEE, mockLead.getCommande().getStatutCommande());
+        assertEquals("EXT-shopify-900", mockLead.getCommande().getReference());
+        assertEquals(1, mockLead.getCommande().getLignesCommande().size());
+        verify(stockClient, never()).reserverStock(anyLong(), anyLong(), any());
+        verifyNoInteractions(abonnementClient);
+    }
+
+    @Test
+    void importExternalOrder_UsesProviderTotalAndCreatesUnassignedNewLeadWithPendingOrder() {
         when(commandeRepository.findByReferenceAndLeadEnterpriseId(anyString(), eq(7L))).thenReturn(Optional.empty());
         when(abonnementClient.currentEntitlement()).thenReturn(new AbonnementClient.Entitlement(true, 100, null));
         when(stockClient.obtenirBoutique(10L)).thenReturn(new Object());
@@ -218,11 +259,12 @@ class LeadServiceImplTest {
         verify(leadRepository).save(leadCaptor.capture());
         Lead imported = leadCaptor.getValue();
         assertEquals(LeadSource.SHOPIFY, imported.getSource());
-        assertEquals(StatutLead.CONVERTED, imported.getStatutLead());
+        assertEquals(StatutLead.NEW_LEAD, imported.getStatutLead());
         assertNull(imported.getAgentId());
-        assertEquals(StatutCommande.CONFIRMEE, imported.getCommande().getStatutCommande());
+        assertEquals(StatutCommande.EN_ATTENTE, imported.getCommande().getStatutCommande());
         assertEquals(StatutPaiementCommande.PAID, imported.getCommande().getStatutPaiement());
         assertEquals(125.50, imported.getCommande().getTotalPrix());
+        assertEquals(1, imported.getCommande().getLignesCommande().size());
         assertTrue(imported.getCommande().getReference().startsWith("EXT-"));
         verify(stockClient).reserverStock(eq(10L), eq(102L), any(StockClient.ReservationRequest.class));
     }

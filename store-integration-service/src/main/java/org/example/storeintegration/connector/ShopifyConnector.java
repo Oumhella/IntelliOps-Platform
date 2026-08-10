@@ -157,6 +157,41 @@ public class ShopifyConnector implements StoreConnector {
                 && SignatureVerifier.base64HmacSha256(properties.shopify().clientSecret(), payload, hmac);
     }
 
+    /**
+     * Loads the full order from Admin REST API. Shopify order webhooks often redact
+     * protected customer fields (email, phone, street address); the Admin API returns
+     * them when the app has the required access and scopes.
+     */
+    public JsonNode fetchOrder(URI storeUrl, StoreCredentials credentials, String orderId) {
+        if (orderId == null || orderId.isBlank() || !orderId.chars().allMatch(Character::isDigit)) {
+            throw new IllegalArgumentException("Shopify order id must be numeric.");
+        }
+        URI endpoint = storeUrl.resolve("/admin/api/" + properties.shopify().apiVersion() + "/orders/" + orderId + ".json");
+        log.debug("fetchOrder: GET {}", endpoint);
+        JsonNode response = adminGet(storeUrl, credentials, endpoint);
+        JsonNode order = response.path("order");
+        if (!order.isObject() || order.path("id").isMissingNode()) {
+            throw new IllegalStateException("Shopify Admin API did not return order " + orderId + ".");
+        }
+        return order;
+    }
+
+    private JsonNode adminGet(URI storeUrl, StoreCredentials credentials, URI endpoint) {
+        try {
+            JsonNode response = restClientBuilder.clone().build().get().uri(endpoint)
+                    .header("X-Shopify-Access-Token", credentials.accessToken())
+                    .accept(MediaType.APPLICATION_JSON)
+                    .retrieve().body(JsonNode.class);
+            if (response == null) {
+                throw new IllegalStateException("Shopify Admin API returned an empty response.");
+            }
+            return response;
+        } catch (org.springframework.web.client.RestClientResponseException ex) {
+            maybeRefreshAndRethrow(storeUrl, credentials, ex);
+            throw ex;
+        }
+    }
+
     private JsonNode graphql(URI storeUrl, StoreCredentials credentials, String query, Map<String, ?> variables) {
         URI endpoint = storeUrl.resolve("/admin/api/" + properties.shopify().apiVersion() + "/graphql.json");
         log.debug("graphql: POST {} (query length={})", endpoint, query.length());
@@ -171,21 +206,26 @@ public class ShopifyConnector implements StoreConnector {
             }
             return response;
         } catch (org.springframework.web.client.RestClientResponseException ex) {
-            int status = ex.getRawStatusCode();
-            String body = ex.getResponseBodyAsString();
-            log.warn("graphql: Shopify responded with status={}, body={}", status, body);
-            if ((status == 401 || status == 403) && credentials.refreshToken() != null && !credentials.refreshToken().isBlank()) {
-                try {
-                    log.info("graphql: Shopify access token expired or invalid (status={}), attempting refresh...", status);
-                    ExchangeResult refreshed = refreshAccessToken(storeUrl, credentials.refreshToken());
-                    throw new TokenRefreshedException("Access token refreshed", refreshed);
-                } catch (TokenRefreshedException tre) {
-                    throw tre;
-                } catch (Exception refreshEx) {
-                    log.warn("graphql: Token refresh failed: {}", refreshEx.getMessage());
-                }
-            }
+            maybeRefreshAndRethrow(storeUrl, credentials, ex);
             throw ex;
+        }
+    }
+
+    private void maybeRefreshAndRethrow(URI storeUrl, StoreCredentials credentials,
+            org.springframework.web.client.RestClientResponseException ex) {
+        int status = ex.getRawStatusCode();
+        String body = ex.getResponseBodyAsString();
+        log.warn("Shopify Admin API responded with status={}, body={}", status, body);
+        if ((status == 401 || status == 403) && credentials.refreshToken() != null && !credentials.refreshToken().isBlank()) {
+            try {
+                log.info("Shopify access token expired or invalid (status={}), attempting refresh...", status);
+                ExchangeResult refreshed = refreshAccessToken(storeUrl, credentials.refreshToken());
+                throw new TokenRefreshedException("Access token refreshed", refreshed);
+            } catch (TokenRefreshedException tre) {
+                throw tre;
+            } catch (Exception refreshEx) {
+                log.warn("Shopify token refresh failed: {}", refreshEx.getMessage());
+            }
         }
     }
 

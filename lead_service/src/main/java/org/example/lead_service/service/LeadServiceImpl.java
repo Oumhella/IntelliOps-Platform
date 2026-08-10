@@ -140,6 +140,34 @@ public class LeadServiceImpl implements LeadService {
         Lead lead = findLead(idLead);
         assertAssignedToCurrentUser(lead);
         requireDeliveryDetails(lead);
+
+        Commande prebuilt = lead.getCommande();
+        boolean hasPrebuiltOrder = prebuilt != null
+                && prebuilt.getLignesCommande() != null
+                && !prebuilt.getLignesCommande().isEmpty();
+
+        if (hasPrebuiltOrder) {
+            if (lead.getStatutLead() == StatutLead.CONVERTED) {
+                return commandeMapper.toDto(prebuilt);
+            }
+            Long reservedLocation = prebuilt.getStockLocationId() != null
+                    ? prebuilt.getStockLocationId()
+                    : lead.getBoutiqueId();
+            if (reservedLocation == null) {
+                throw new IllegalStateException("The imported order has no fulfillment location.");
+            }
+            if (!reservedLocation.equals(request.getStockLocationId())) {
+                throw new IllegalArgumentException(
+                        "Imported channel orders must keep their mapped fulfillment location (#"
+                                + reservedLocation + ").");
+            }
+            // Stock was reserved at import under the EXT-* reference — do not reserve again.
+            Commande order = lead.convertirEnCommande(reservedLocation, prebuilt.getReference());
+            Lead savedLead = leadRepository.save(lead);
+            notifyOrderCreated(savedLead);
+            return commandeMapper.toDto(savedLead.getCommande());
+        }
+
         assertMonthlyOrderAllowance();
 
         String orderReference = deterministicReference(request.getIdempotencyKey());
@@ -150,6 +178,10 @@ public class LeadServiceImpl implements LeadService {
                 throw new IllegalStateException("This idempotency key belongs to another lead conversion.");
             }
             return commandeMapper.toDto(existing.get());
+        }
+
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            throw new IllegalArgumentException("At least one product is required to convert a manual lead.");
         }
 
         List<PreparedItem> items = prepareItems(request);
@@ -439,7 +471,8 @@ public class LeadServiceImpl implements LeadService {
     }
 
     private Lead findLead(Long idLead) {
-        return leadRepository.findByIdLeadAndEnterpriseId(idLead, TenantContext.requireEnterpriseId())
+        return leadRepository.findDetailedByIdLeadAndEnterpriseId(idLead, TenantContext.requireEnterpriseId())
+                .or(() -> leadRepository.findByIdLeadAndEnterpriseId(idLead, TenantContext.requireEnterpriseId()))
                 .orElseThrow(() -> new EntityNotFoundException("Lead not found: " + idLead));
     }
 

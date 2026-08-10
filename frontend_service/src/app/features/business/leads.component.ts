@@ -113,7 +113,23 @@ export class LeadsComponent implements OnInit {
   open(panel: LeadPanel, lead?: LeadResponse): void {
     this.selected.set(lead ?? null);
     this.panel = panel;
-    if (panel === 'convert') this.orderForm = this.emptyOrderForm();
+    if (panel === 'convert') {
+      this.orderForm = this.emptyOrderForm();
+      if (lead?.hasPrebuiltOrder) {
+        this.orderForm.stockLocationId = lead.stockLocationId ?? lead.boutiqueId;
+      }
+      if (lead) {
+        this.api.getLeadById(lead.idLead).subscribe({
+          next: (value) => {
+            this.selected.set(value);
+            if (value.hasPrebuiltOrder) {
+              this.orderForm.stockLocationId = value.stockLocationId ?? value.boutiqueId;
+            }
+          },
+          error: (error) => this.feedback.error(error),
+        });
+      }
+    }
     if (panel === 'assign') this.assignedAgentId = lead?.agentId ?? null;
     if (panel === 'interaction') {
       this.interactionForm = {
@@ -205,17 +221,26 @@ export class LeadsComponent implements OnInit {
   convert(): void {
     const lead = this.selected();
     const form = this.orderForm;
-    if (!lead || lead.statutLead !== 'IN_PROGRESS' || !form.productId
-      || !form.stockLocationId || form.quantity < 1) return;
+    if (!lead || lead.statutLead !== 'IN_PROGRESS' || !form.stockLocationId) return;
+
+    const prebuilt = !!lead.hasPrebuiltOrder;
+    if (!prebuilt && (!form.productId || form.quantity < 1)) return;
+
     this.busy = true;
     this.api.convertToOrder(lead.idLead, {
       idempotencyKey: form.idempotencyKey,
       stockLocationId: form.stockLocationId,
-      items: [{ productId: form.productId, quantity: form.quantity }],
+      items: prebuilt || !form.productId
+        ? []
+        : [{ productId: form.productId, quantity: form.quantity }],
     }).subscribe({
       next: (order) => {
         this.busy = false;
-        this.feedback.success(`Order ${order.reference} created with catalog pricing and reserved stock.`);
+        this.feedback.success(
+          prebuilt
+            ? `Imported order ${order.reference} confirmed — stock was already reserved at import.`
+            : `Order ${order.reference} created with catalog pricing and reserved stock.`,
+        );
         this.close();
         this.load();
       },
@@ -224,6 +249,15 @@ export class LeadsComponent implements OnInit {
         this.feedback.error(error);
       },
     });
+  }
+
+  productLabel(productId: number): string {
+    const product = this.products().find((candidate) => candidate.idProduit === productId);
+    return product ? `${product.nomProduit} · ${product.globalSku}` : `Product #${productId}`;
+  }
+
+  isChannelLead(lead = this.selected()): boolean {
+    return !!lead && (lead.source === 'SHOPIFY' || lead.source === 'WOOCOMMERCE' || !!lead.hasPrebuiltOrder);
   }
 
   allowedLeadStatuses(lead = this.selected()): readonly LeadStatus[] {

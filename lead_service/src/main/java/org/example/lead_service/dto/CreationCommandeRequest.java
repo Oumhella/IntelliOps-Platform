@@ -1,7 +1,6 @@
 package org.example.lead_service.dto;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.NotBlank;
@@ -18,8 +17,10 @@ public class CreationCommandeRequest {
     @NotNull
     private Long stockLocationId;
 
+    /**
+     * Required for manual leads. Ignored when the lead already has an imported order with lines.
+     */
     @Valid
-    @NotEmpty
     private List<ItemRequest> items;
 
     @Data

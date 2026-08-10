@@ -67,16 +67,22 @@ public class Lead {
         if (this.statutLead != StatutLead.IN_PROGRESS) {
             throw new IllegalStateException("Only a qualified lead in progress can be converted to an order.");
         }
-        if (this.statutLead == StatutLead.CONVERTED) {
-            throw new IllegalStateException("Ce lead a déjà été converti en commande.");
-        }
         this.statutLead = StatutLead.CONVERTED;
 
-        // Initialisation de la commande liée
+        if (this.commande != null) {
+            // Channel imports already persisted lines + stock reservations under EXT-*.
+            // Confirm that order; do not rebuild or re-reserve.
+            if (this.commande.getStockLocationId() == null) {
+                this.commande.setStockLocationId(stockLocationId);
+            }
+            this.commande.setStatutCommande(StatutCommande.CONFIRMEE);
+            return this.commande;
+        }
+
         this.commande = Commande.builder()
                 .lead(this)
                 .reference(orderReference)
-                .statutCommande(StatutCommande.EN_ATTENTE)
+                .statutCommande(StatutCommande.CONFIRMEE)
                 .infosClient(this.infosClient)
                 .stockLocationId(stockLocationId)
                 .stockReservationReference(orderReference)

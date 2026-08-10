@@ -128,7 +128,18 @@
           <div><dt>Address</dt><dd>{{ lead.infosClient.adresseLivraison || '—' }}</dd></div>
           <div><dt>Agent</dt><dd>{{ agentLabel(lead.agentId) }}</dd></div>
           @if (lead.boutiqueId) {<div><dt>Imported channel</dt><dd>#{{ lead.boutiqueId }}</dd></div>}
+          @if (lead.commandeReference) {<div><dt>Order ref</dt><dd>{{ lead.commandeReference }}</dd></div>}
         </dl>
+        @if (lead.hasPrebuiltOrder && lead.lignesCommande?.length) {
+          <div class="inline-action" style="margin-top:16px">
+            <h3>Imported order lines</h3>
+            <ul class="row-secondary" style="margin:0;padding-left:18px">
+              @for (line of lead.lignesCommande; track line.idLigne || line.produitId) {
+                <li>{{ productLabel(line.produitId) }} × {{ line.quantite }} · {{ line.prixUnitaireApplique }} MAD</li>
+              }
+            </ul>
+          </div>
+        }
       </div>
     }
 
@@ -152,13 +163,33 @@
 
     @if (panel === 'convert') {
       <form (ngSubmit)="convert()">
-        <div class="form-grid">
-          <label class="form-field form-field-full"><span>Fulfillment location</span><select name="location" [(ngModel)]="orderForm.stockLocationId" required><option [ngValue]="null" disabled>Select the location holding stock</option>@for (location of locations(); track location.idBoutique) {<option [ngValue]="location.idBoutique">{{ location.nomBoutique }} · {{ label(location.plateformeType) }}</option>}</select></label>
-          <label class="form-field form-field-full"><span>Catalog product</span><select name="product" [(ngModel)]="orderForm.productId" required><option [ngValue]="null" disabled>Select a product</option>@for (product of products(); track product.idProduit) {<option [ngValue]="product.idProduit">{{ product.nomProduit }} · {{ product.globalSku }} · {{ product.prixVente }} MAD</option>}</select></label>
-          <label class="form-field"><span>Quantity</span><input name="quantity" type="number" min="1" [(ngModel)]="orderForm.quantity" required /></label>
-        </div>
-        <p class="row-secondary">The backend applies the catalog price, verifies the monthly plan limit, and reserves inventory atomically for this order.</p>
-        <div class="form-actions"><button class="primary-button" [disabled]="busy || !orderForm.productId || !orderForm.stockLocationId">Create order</button></div>
+        @if (isChannelLead()) {
+          <div class="inline-action">
+            <h3>Confirm imported {{ label(selected()!.source) }} order</h3>
+            <p class="row-secondary">Products and stock reservation were created at import. Confirm after qualification — no catalog re-entry.</p>
+            @if (selected()?.commandeReference) {
+              <p class="row-secondary">Reference {{ selected()!.commandeReference }}</p>
+            }
+            @if (selected()?.lignesCommande?.length) {
+              <ul class="row-secondary" style="margin:8px 0 0;padding-left:18px">
+                @for (line of selected()!.lignesCommande!; track line.idLigne || line.produitId) {
+                  <li>{{ productLabel(line.produitId) }} × {{ line.quantite }} · {{ line.prixUnitaireApplique }} MAD</li>
+                }
+              </ul>
+            }
+          </div>
+          <input type="hidden" name="location" [(ngModel)]="orderForm.stockLocationId" />
+          <p class="row-secondary" style="margin-top:14px">Fulfillment location #{{ orderForm.stockLocationId }} (mapped channel stock). Logistics will move CONFIRMEE → PREPARATION → EXPEDIEE and consume reservations on ship.</p>
+          <div class="form-actions"><button class="primary-button" [disabled]="busy || !orderForm.stockLocationId">Confirm imported order</button></div>
+        } @else {
+          <div class="form-grid">
+            <label class="form-field form-field-full"><span>Fulfillment location</span><select name="location" [(ngModel)]="orderForm.stockLocationId" required><option [ngValue]="null" disabled>Select the location holding stock</option>@for (location of locations(); track location.idBoutique) {<option [ngValue]="location.idBoutique">{{ location.nomBoutique }} · {{ label(location.plateformeType) }}</option>}</select></label>
+            <label class="form-field form-field-full"><span>Catalog product</span><select name="product" [(ngModel)]="orderForm.productId" required><option [ngValue]="null" disabled>Select a product</option>@for (product of products(); track product.idProduit) {<option [ngValue]="product.idProduit">{{ product.nomProduit }} · {{ product.globalSku }} · {{ product.prixVente }} MAD</option>}</select></label>
+            <label class="form-field"><span>Quantity</span><input name="quantity" type="number" min="1" [(ngModel)]="orderForm.quantity" required /></label>
+          </div>
+          <p class="row-secondary">The backend applies the catalog price, verifies the monthly plan limit, and reserves inventory atomically for this order.</p>
+          <div class="form-actions"><button class="primary-button" [disabled]="busy || !orderForm.productId || !orderForm.stockLocationId">Create order</button></div>
+        }
       </form>
     }
   </aside>

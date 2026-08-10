@@ -152,7 +152,7 @@ public class InventaireServiceImpl implements InventaireService {
      */
     private Inventaire obtenirOuCreerInventaire(Long idBoutique, Long idProduit) {
         Long enterpriseId = TenantContext.requireEnterpriseId();
-        return inventaireRepository.findByBoutiqueIdBoutiqueAndProduitIdProduitAndBoutiqueEnterpriseId(
+        return inventaireRepository.findFirstByBoutiqueIdBoutiqueAndProduitIdProduitAndBoutiqueEnterpriseIdOrderByIdAsc(
                         idBoutique, idProduit, enterpriseId)
                 .orElseGet(() -> {
                     Boutique boutique = boutiqueRepository.findByIdBoutiqueAndEnterpriseId(idBoutique, enterpriseId)
@@ -185,7 +185,7 @@ public class InventaireServiceImpl implements InventaireService {
     }
 
     private Inventaire trouverInventaireOuLeverException(Long idBoutique, Long idProduit) {
-        return inventaireRepository.findByBoutiqueIdBoutiqueAndProduitIdProduitAndBoutiqueEnterpriseId(
+        return inventaireRepository.findFirstByBoutiqueIdBoutiqueAndProduitIdProduitAndBoutiqueEnterpriseIdOrderByIdAsc(
                         idBoutique, idProduit, TenantContext.requireEnterpriseId())
                 .orElseGet(() -> obtenirOuCreerInventaire(idBoutique, idProduit));
     }
