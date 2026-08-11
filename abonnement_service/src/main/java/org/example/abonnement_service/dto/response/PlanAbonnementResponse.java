@@ -14,6 +14,8 @@ public class PlanAbonnementResponse {
     private String description;
     private Double prix;
     private DureeOffre duree;
+    private int minJoursEntreDesactivation;
+    private int maxPeriodeDesactivation;
     private StatutOffre estActif;
     private int limiteCommandesMois;
 }

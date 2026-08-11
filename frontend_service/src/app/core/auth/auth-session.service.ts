@@ -1,6 +1,6 @@
 import { computed, inject, Injectable, PLATFORM_ID, signal } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
-import { AuthResponse } from '../api/models';
+import { AuthResponse, UserResponse } from '../api/models';
 
 const SESSION_STORAGE_KEY = 'intelliops.auth';
 
@@ -15,6 +15,7 @@ export class AuthSessionService {
     return session === null
       ? null
       : {
+          id: session.id,
           email: session.email,
           firstname: session.firstname,
           lastname: session.lastname,
@@ -22,7 +23,7 @@ export class AuthSessionService {
           enterpriseId: session.enterpriseId,
         };
   });
-  readonly isAuthenticated = computed(() => this.getToken() !== null);
+  readonly isAuthenticated = computed(() => this.sessionState() !== null);
 
   setSession(session: AuthResponse): void {
     this.sessionState.set(session);
@@ -38,13 +39,27 @@ export class AuthSessionService {
     }
   }
 
+  updateIdentity(profile: UserResponse): void {
+    const session = this.sessionState();
+    if (session === null) return;
+    this.setSession({
+      ...session,
+      email: profile.email,
+      firstname: profile.firstname,
+      lastname: profile.lastname,
+      role: profile.role,
+    });
+  }
+
   getToken(): string | null {
-    const token = this.sessionState()?.token ?? null;
-    if (token !== null && this.isExpired(token)) {
-      this.clear();
-      return null;
+    return this.sessionState()?.token ?? null;
+  }
+
+  updateToken(token: string): void {
+    const session = this.sessionState();
+    if (session !== null) {
+      this.setSession({ ...session, token });
     }
-    return token;
   }
 
   private readStoredSession(): AuthResponse | null {
@@ -59,7 +74,7 @@ export class AuthSessionService {
 
     try {
       const session = JSON.parse(storedValue) as AuthResponse;
-      if (!session.token || this.isExpired(session.token)) {
+      if (!session.token) {
         localStorage.removeItem(SESSION_STORAGE_KEY);
         return null;
       }
@@ -70,18 +85,4 @@ export class AuthSessionService {
     }
   }
 
-  private isExpired(token: string): boolean {
-    try {
-      const payloadPart = token.split('.')[1];
-      if (payloadPart === undefined) {
-        return true;
-      }
-      const normalized = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
-      const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
-      const payload = JSON.parse(atob(padded)) as { exp?: number };
-      return payload.exp !== undefined && payload.exp * 1000 <= Date.now();
-    } catch {
-      return true;
-    }
-  }
 }

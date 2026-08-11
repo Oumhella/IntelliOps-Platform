@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { Observable, tap } from 'rxjs';
+import { finalize, Observable, tap } from 'rxjs';
 import { AuthSessionService } from '../../auth/auth-session.service';
 import { API_BASE_URL, buildApiUrl } from '../api.config';
 import {
@@ -18,7 +18,7 @@ export class AuthApiService {
   private readonly usersUrl = buildApiUrl(this.baseUrl, '/api/v1/users');
 
   login(request: LoginRequest): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.usersUrl}/login`, request).pipe(
+    return this.http.post<AuthResponse>(`${this.usersUrl}/login`, request, { withCredentials: true }).pipe(
       tap((response) => this.session.setSession(response)),
     );
   }
@@ -28,6 +28,8 @@ export class AuthApiService {
   }
 
   logout(): void {
-    this.session.clear();
+    this.http.post<void>(`${this.usersUrl}/logout`, {}, { withCredentials: true }).pipe(
+      finalize(() => this.session.clear()),
+    ).subscribe({ error: () => undefined });
   }
 }

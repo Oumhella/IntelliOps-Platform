@@ -2,7 +2,6 @@ package org.example.delivery_service.strategy;
 
 import lombok.extern.slf4j.Slf4j;
 import org.example.delivery_service.entity.Livraison;
-import org.example.delivery_service.entity.StatutLivraison;
 import org.example.delivery_service.entity.TypeTransporteur;
 import org.springframework.stereotype.Component;
 
@@ -17,15 +16,15 @@ public class LivreurStrategy implements TransporteurStrategy {
 
     @Override
     public void executerLivraison(Livraison livraison) {
-        log.info("Pushing task for delivery #{} to Internal Driver App ID: {}",
-                livraison.getIdLivraison(), livraison.getExternalLivreurId());
-
-        // Dispatch via WebSocket / Internal Queue to Driver Mobile App
-        livraison.mettreAJourStatut(StatutLivraison.EN_COURS);
+        if (livraison.getLivreurId() == null) {
+            throw new IllegalArgumentException("An internal courier must be assigned");
+        }
+        log.info("Delivery {} assigned to internal courier {} and awaiting acceptance",
+                livraison.getCodeSuiviTracking(), livraison.getLivreurId());
     }
 
     @Override
     public String recupererStatutActuel(String trackingNum) {
-        return StatutLivraison.EN_COURS.name();
+        throw new UnsupportedOperationException("Internal courier status is updated by the assigned courier");
     }
 }

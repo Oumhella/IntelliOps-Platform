@@ -38,6 +38,10 @@ public class NotificationServiceImpl implements NotificationService {
         }
         org.example.notification_service.entity.TypeNotification entityType =
                 org.example.notification_service.entity.TypeNotification.valueOf(event.getType().name());
+        if (entityType != TypeNotification.EMAIL) {
+            throw new IllegalArgumentException(
+                    "Notification channel " + entityType + " has no configured delivery provider.");
+        }
 
         Notification notification = Notification.builder()
                 .enterpriseId(enterpriseId)

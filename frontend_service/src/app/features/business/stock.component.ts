@@ -1,0 +1,29 @@
+import { Component, inject, OnInit, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { InventoryResponse, PLATFORM_TYPES, PlatformType, ProductResponse, STOCK_MOVEMENT_TYPES, StockApiService, StockMovementType, StoreResponse } from '../../core/api';
+import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
+import { AuthSessionService } from '../../core/auth/auth-session.service';
+
+type StockTab='stores'|'products'|'inventory'; type StockPanel='store'|'product'|'inventory'|null;
+@Component({selector:'app-stock',imports:[FormsModule],templateUrl:'./stock.component.html',styleUrl:'./business-view.scss'})
+export class StockComponent implements OnInit{
+ private readonly api=inject(StockApiService);readonly feedback=inject(UiFeedbackService);readonly platforms=PLATFORM_TYPES;readonly movements=STOCK_MOVEMENT_TYPES;
+ readonly canManageIntegrations=inject(AuthSessionService).currentUser()?.role==='ROLE_ADMIN';
+ readonly stores=signal<readonly StoreResponse[]>([]);readonly products=signal<readonly ProductResponse[]>([]);readonly inventory=signal<readonly InventoryResponse[]>([]);readonly selectedInventory=signal<InventoryResponse|null>(null);readonly loading=signal(true);
+ tab:StockTab='stores';panel:StockPanel=null;busy=false;editingStore:StoreResponse|null=null;editingProduct:ProductResponse|null=null;inventoryStoreId:number|null=null;inventoryProductId:number|null=null;
+ storeForm={nomBoutique:'',plateformeType:'MANUAL' as PlatformType};productForm={nomProduit:'',prixAchat:0,prixVente:0,globalSku:''};stockForm={quantite:0,typeMouvement:'AJUSTEMENT' as StockMovementType};ruleForm={seuilAlerte:0,quantiteRecommandeAuto:0,estActif:true};
+ ngOnInit():void{this.loadBase()}
+ loadBase():void{this.loading.set(true);let pending=2;const done=()=>{pending--;if(!pending)this.loading.set(false)};this.api.getStores().subscribe({next:v=>{this.stores.set(v);done()},error:e=>{done();this.feedback.error(e)}});this.api.getProducts().subscribe({next:v=>{this.products.set(v);done()},error:e=>{done();this.feedback.error(e)}})}
+ setTab(tab:StockTab):void{this.tab=tab;if(tab==='inventory'&&this.inventoryStoreId)this.loadInventory()}
+ openStore(store?:StoreResponse):void{this.panel='store';this.editingStore=store??null;if(store){this.api.getStoreById(store.idBoutique).subscribe({next:v=>{this.editingStore=v;this.storeForm={nomBoutique:v.nomBoutique,plateformeType:'MANUAL'}},error:e=>this.feedback.error(e)})}else this.storeForm={nomBoutique:'',plateformeType:'MANUAL'}}
+ saveStore():void{const request={...this.storeForm};if(!request.nomBoutique)return;this.busy=true;const call=this.editingStore?this.api.updateStore(this.editingStore.idBoutique,request):this.api.createStore(request);call.subscribe({next:()=>{this.busy=false;this.feedback.success(this.editingStore?'Stock location updated.':'Stock location created.');this.close();this.loadBase()},error:e=>{this.busy=false;this.feedback.error(e)}})}
+ openProduct(product?:ProductResponse):void{this.panel='product';this.editingProduct=product??null;if(product){this.api.getProductById(product.idProduit).subscribe({next:v=>{this.editingProduct=v;this.productForm={nomProduit:v.nomProduit,prixAchat:v.prixAchat,prixVente:v.prixVente,globalSku:v.globalSku}},error:e=>this.feedback.error(e)})}else this.productForm={nomProduit:'',prixAchat:0,prixVente:0,globalSku:''}}
+ saveProduct():void{if(!this.productForm.nomProduit||!this.productForm.globalSku)return;this.busy=true;const call=this.editingProduct?this.api.updateProduct(this.editingProduct.idProduit,this.productForm):this.api.createProduct(this.productForm);call.subscribe({next:()=>{this.busy=false;this.feedback.success(this.editingProduct?'Product updated.':'Product created.');this.close();this.loadBase()},error:e=>{this.busy=false;this.feedback.error(e)}})}
+ deleteProduct(product:ProductResponse):void{if(!confirm(`Delete ${product.nomProduit}?`))return;this.api.deleteProduct(product.idProduit).subscribe({next:()=>{this.feedback.success('Product deleted.');this.loadBase()},error:e=>this.feedback.error(e)})}
+ loadInventory():void{if(!this.inventoryStoreId)return;this.loading.set(true);this.api.getStoreInventory(this.inventoryStoreId).subscribe({next:v=>{this.inventory.set(v);this.loading.set(false)},error:e=>{this.loading.set(false);this.feedback.error(e)}})}
+ lookupInventory():void{if(!this.inventoryStoreId||!this.inventoryProductId)return;this.api.getInventory(this.inventoryStoreId,this.inventoryProductId).subscribe({next:v=>{this.selectedInventory.set(v);this.panel='inventory';this.ruleForm=v.regleApprovisionnement?{seuilAlerte:v.regleApprovisionnement.seuilAlerte,quantiteRecommandeAuto:v.regleApprovisionnement.quantiteRecommandeAuto,estActif:v.regleApprovisionnement.estActif}:{seuilAlerte:0,quantiteRecommandeAuto:0,estActif:true}},error:e=>this.feedback.error(e)})}
+ openInventory(item:InventoryResponse):void{this.inventoryStoreId=item.boutique.idBoutique;this.inventoryProductId=item.produit.idProduit;this.lookupInventory()}
+ adjust():void{const i=this.selectedInventory();if(!i)return;this.busy=true;this.api.adjustStock(i.boutique.idBoutique,i.produit.idProduit,this.stockForm).subscribe({next:v=>{this.busy=false;this.selectedInventory.set(v);this.feedback.success('Stock adjusted.');this.loadInventory()},error:e=>{this.busy=false;this.feedback.error(e)}})}
+ configureRule():void{const i=this.selectedInventory();if(!i)return;this.busy=true;this.api.configureReplenishmentRule(i.id,this.ruleForm).subscribe({next:v=>{this.busy=false;this.selectedInventory.set(v);this.feedback.success('Replenishment rule saved.')},error:e=>{this.busy=false;this.feedback.error(e)}})}
+ close():void{this.panel=null;this.editingStore=null;this.editingProduct=null;this.selectedInventory.set(null)}label(v:string):string{return v.replaceAll('_',' ').toLowerCase().replace(/^./,c=>c.toUpperCase())}
+}

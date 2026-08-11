@@ -6,10 +6,11 @@ import org.springframework.stereotype.Service;
 @Getter
 @Setter
 @Data
-@AllArgsConstructor // <--- Crée le constructeur à 6 arguments requis par ton UserService
+@AllArgsConstructor
 @NoArgsConstructor  // <--- Crée un constructeur vide (obligatoire pour la désérialisation Jackson)
 public class AuthResponse {
     private String token;
+    private Long id;
     private String email;
     private String firstname;
     private String lastname;

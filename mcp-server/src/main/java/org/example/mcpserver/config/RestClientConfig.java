@@ -42,12 +42,8 @@ public class RestClientConfig {
         ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         if (attributes != null) {
             HttpServletRequest currentRequest = attributes.getRequest();
-            String userId = currentRequest.getHeader("X-User-Id");
             String authHeader = currentRequest.getHeader("Authorization");
 
-            if (userId != null) {
-                request.getHeaders().add("X-User-Id", userId);
-            }
             if (authHeader != null) {
                 request.getHeaders().add("Authorization", authHeader);
             }

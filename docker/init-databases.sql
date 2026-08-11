@@ -10,3 +10,4 @@ CREATE DATABASE erp_stocks;
 CREATE DATABASE erp_paiement;
 CREATE DATABASE erp_deliveries;
 CREATE DATABASE erp_notifications;
+CREATE DATABASE erp_integrations;

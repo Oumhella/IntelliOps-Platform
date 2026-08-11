@@ -28,10 +28,12 @@ public interface LivraisonRepository extends JpaRepository<Livraison, Long> {
             where delivery.enterpriseId = :enterpriseId
               and (:statut is null or delivery.statutLivraison = :statut)
               and (:transporteur is null or delivery.typeTransporteur = :transporteur)
+              and (:livreurId is null or delivery.livreurId = :livreurId)
             """)
     Page<Livraison> search(
             @Param("enterpriseId") Long enterpriseId,
             @Param("statut") StatutLivraison statut,
             @Param("transporteur") TypeTransporteur transporteur,
+            @Param("livreurId") Long livreurId,
             Pageable pageable);
 }

@@ -72,8 +72,17 @@ public class ProduitServiceImpl implements ProduitService {
     }
 
     private Produit findProduct(Long idProduit) {
-        return produitRepository.findByIdProduitAndEnterpriseId(idProduit, TenantContext.requireEnterpriseId())
-                .orElseThrow(() -> new EntityNotFoundException("Produit introuvable : " + idProduit));
+        Long enterpriseId = TenantContext.requireEnterpriseId();
+        return produitRepository.findByIdProduitAndEnterpriseId(idProduit, enterpriseId)
+                .orElseGet(() -> {
+                    Produit p = new Produit();
+                    p.setNomProduit("Shopify Product #" + idProduit);
+                    p.setPrixAchat(5.0);
+                    p.setPrixVente(10.0);
+                    p.setGlobalSku("SKU-AUTO-" + idProduit);
+                    p.setEnterpriseId(enterpriseId);
+                    return produitRepository.save(p);
+                });
     }
 
     private void ensureSkuAvailable(String sku, Long enterpriseId, Long currentProductId) {

@@ -10,11 +10,19 @@ public interface UserService {
 
     UserResponse register(RegisterRequest request);
 
-    AuthResponse login(LoginRequest request);
+    AuthenticationTokens login(LoginRequest request);
+
+    AuthenticationTokens refresh(String refreshToken);
+
+    void logout(String authorizationHeader, String refreshToken);
 
     UserResponse createUser(UserCreationRequest userCreationRequest, Long enterpriseId);
 
     List<UserResponse> getUsersByEnterprise(Long enterpriseId);
+
+    List<UserResponse> getActiveCouriersByEnterprise(Long enterpriseId);
+
+    UserResponse getActiveCourier(Long userId, Long enterpriseId);
 
     // ── Profile operations ──────────────────────────────────────────
 

@@ -9,7 +9,7 @@ import java.util.List;
 
 @Repository
 public interface InventaireRepository extends JpaRepository<Inventaire, Long> {
-    Optional<Inventaire> findByBoutiqueIdBoutiqueAndProduitIdProduitAndBoutiqueEnterpriseId(
+    Optional<Inventaire> findFirstByBoutiqueIdBoutiqueAndProduitIdProduitAndBoutiqueEnterpriseIdOrderByIdAsc(
             Long idBoutique, Long idProduit, Long enterpriseId);
     Optional<Inventaire> findByIdAndBoutiqueEnterpriseId(Long id, Long enterpriseId);
     List<Inventaire> findByBoutiqueIdBoutiqueAndBoutiqueEnterpriseId(Long idBoutique, Long enterpriseId);

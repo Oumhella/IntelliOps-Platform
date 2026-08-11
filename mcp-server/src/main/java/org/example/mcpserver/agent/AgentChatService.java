@@ -46,7 +46,7 @@ public class AgentChatService implements AgentChat {
             String answer = chatClient.prompt()
                     .user(message)
                     // This explicit provider is the only tool allow-list for this endpoint.
-                    .toolCallbacks(readOnlyToolProvider)
+                    .tools(readOnlyToolProvider)
                     .call()
                     .content();
             return new AgentReply(answer,

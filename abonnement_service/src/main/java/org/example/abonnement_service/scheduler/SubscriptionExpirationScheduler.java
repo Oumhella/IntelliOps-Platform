@@ -6,11 +6,13 @@ import org.example.abonnement_service.entity.Abonnement;
 import org.example.abonnement_service.entity.StatutAbonnement;
 import org.example.abonnement_service.event.AbonnementEventProducer;
 import org.example.abonnement_service.repository.AbonnementRepository;
+import org.example.abonnement_service.repository.DesactivationRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.time.temporal.ChronoUnit;
 
 @Slf4j
 @Component
@@ -18,6 +20,7 @@ import java.util.List;
 public class SubscriptionExpirationScheduler {
 
     private final AbonnementRepository abonnementRepository;
+    private final DesactivationRepository desactivationRepository;
     private final AbonnementEventProducer eventProducer;
 
     /**
@@ -26,20 +29,36 @@ public class SubscriptionExpirationScheduler {
     @Scheduled(cron = "0 0 1 * * ?")
     public void checkExpirations() {
         log.info("Running automated subscription expiration check...");
-        List<Abonnement> activeSubscriptions = abonnementRepository.findAll().stream()
-                .filter(a -> a.getStatut() == StatutAbonnement.ACTIF)
-                .toList();
+        List<Abonnement> subscriptions = abonnementRepository.findAll();
 
         LocalDate today = LocalDate.now();
-        for (Abonnement sub : activeSubscriptions) {
-            if (today.isAfter(sub.getDateFin())) {
+        for (Abonnement sub : subscriptions) {
+            if (sub.getStatut() == StatutAbonnement.SUSPENDU) {
+                desactivationRepository
+                        .findTopByAbonnementIdAbonnementOrderByDateFinDesactivationDesc(sub.getIdAbonnement())
+                        .filter(pause -> !today.isBefore(pause.getDateFinDesactivation()))
+                        .ifPresent(pause -> {
+                            long pausedDays = ChronoUnit.DAYS.between(
+                                    pause.getDateDebutDesactivation(), pause.getDateFinDesactivation());
+                            sub.setDateFin(sub.getDateFin().plusDays(Math.max(0, pausedDays)));
+                            sub.setStatut(StatutAbonnement.ACTIF);
+                            abonnementRepository.save(sub);
+                            eventProducer.sendSubscriptionNotification(
+                                    sub.getEnterpriseId(),
+                                    sub.getContactEmail(),
+                                    "Votre espace IntelliOps est réactivé",
+                                    "La pause planifiée est terminée. Votre abonnement est de nouveau actif."
+                            );
+                        });
+            }
+            if (sub.getStatut() == StatutAbonnement.ACTIF && today.isAfter(sub.getDateFin())) {
                 sub.setStatut(StatutAbonnement.EXPIRE);
                 abonnementRepository.save(sub);
                 log.info("Subscription ID {} has expired.", sub.getIdAbonnement());
 
                 eventProducer.sendSubscriptionNotification(
                         sub.getEnterpriseId(),
-                        "user" + sub.getUserId() + "@intelliops.local",
+                        sub.getContactEmail(),
                         "Alerte : Votre abonnement a expiré",
                         "Votre abonnement au plan " + sub.getPlanAbonnement().getNomPlan() + " a expiré le " + sub.getDateFin() + ". Veuillez le renouveler."
                 );

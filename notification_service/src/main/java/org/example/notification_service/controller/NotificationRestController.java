@@ -11,10 +11,12 @@ import org.springframework.web.bind.annotation.*;
 import org.example.common.dto.PageResponse;
 import org.example.notification_service.entity.StatutNotification;
 import org.example.notification_service.entity.TypeNotification;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @RestController
 @RequestMapping("/api/v1/notifications")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMIN')")
 public class NotificationRestController {
 
     private final NotificationService notificationService;

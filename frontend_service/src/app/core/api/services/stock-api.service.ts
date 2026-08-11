@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { API_BASE_URL, buildApiUrl } from '../api.config';
@@ -6,6 +6,7 @@ import {
   InventoryResponse,
   ProductRequest,
   ProductResponse,
+  SalesProductResponse,
   ReplenishmentRuleRequest,
   StoreRequest,
   StoreResponse,
@@ -36,14 +37,6 @@ export class StockApiService {
     return this.http.put<StoreResponse>(`${this.storesUrl}/${id}`, request);
   }
 
-  testStoreConnection(storeId: number): Observable<boolean> {
-    return this.http.post<boolean>(`${this.storesUrl}/${storeId}/tester-connexion`, null);
-  }
-
-  synchronizeStoreProducts(storeId: number): Observable<void> {
-    return this.http.post<void>(`${this.storesUrl}/${storeId}/synchroniser`, null);
-  }
-
   createProduct(request: ProductRequest): Observable<ProductResponse> {
     return this.http.post<ProductResponse>(this.productsUrl, request);
   }
@@ -54,6 +47,10 @@ export class StockApiService {
 
   getProducts(): Observable<readonly ProductResponse[]> {
     return this.http.get<readonly ProductResponse[]>(this.productsUrl);
+  }
+
+  getSalesCatalog(): Observable<readonly SalesProductResponse[]> {
+    return this.http.get<readonly SalesProductResponse[]>(`${this.productsUrl}/catalog`);
   }
 
   updateProduct(id: number, request: ProductRequest): Observable<ProductResponse> {
@@ -68,15 +65,6 @@ export class StockApiService {
     return this.http.patch<InventoryResponse>(
       `${this.inventoryUrl}/boutiques/${storeId}/produits/${productId}/ajuster`,
       request,
-    );
-  }
-
-  reserveStock(storeId: number, productId: number, quantity: number): Observable<InventoryResponse> {
-    const params = new HttpParams().set('quantite', quantity);
-    return this.http.post<InventoryResponse>(
-      `${this.inventoryUrl}/boutiques/${storeId}/produits/${productId}/reserver`,
-      null,
-      { params },
     );
   }
 

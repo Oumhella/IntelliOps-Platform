@@ -1,0 +1,95 @@
+<main class="view-page">
+  <header class="view-heading">
+    <div>
+      <p class="eyebrow"><span>Management</span><b>/</b> Team</p>
+      <h1>Team & access</h1>
+      <p>Create and manage customer-success, logistics, and internal courier accounts.</p>
+    </div>
+    <div class="view-actions">
+      <input class="filter-control" type="number" placeholder="User ID" [(ngModel)]="lookupId" />
+      <button class="secondary-button" (click)="lookup()">Open ID</button>
+      <button class="primary-button" (click)="panel='create'">+ Add member</button>
+    </div>
+  </header>
+
+  <section class="surface-card data-card">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Team member</th><th>Role</th><th>Phone</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          @if (loading()) {
+            @for (x of [1,2,3,4]; track x) {
+              <tr><td colspan="5" class="loading-row"></td></tr>
+            }
+          }
+          @for (user of staff(); track user.id) {
+            <tr>
+              <td>
+                <span class="row-primary">{{user.firstname}} {{user.lastname}}</span>
+                <span class="row-secondary">{{user.email}} · #{{user.id}}</span>
+              </td>
+              <td><span class="micro-tag">{{label(user.role)}}</span></td>
+              <td>{{user.phone || '—'}}</td>
+              <td>
+                <span class="status-badge" [class.status-badge-success]="user.active" [class.status-badge-neutral]="!user.active">
+                  <span></span>{{user.active ? 'Active' : 'Inactive'}}
+                </span>
+              </td>
+              <td>
+                <div class="row-actions">
+                  <button class="action-button" (click)="open(user)">View</button>
+                  <button class="action-button" (click)="toggle(user)">{{user.active ? 'Deactivate' : 'Activate'}}</button>
+                  <button class="action-button action-button-danger" (click)="delete(user)" [disabled]="!user.active">Deactivate</button>
+                </div>
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="5"><div class="empty-state"><div><strong>No staff accounts</strong><p>Add customer-success, logistics, or courier team members.</p></div></div></td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+@if (panel) {
+  <button class="drawer-backdrop" (click)="close()"></button>
+  <aside class="form-drawer">
+    <header class="drawer-header">
+      <div><h2>{{panel === 'create' ? 'Add team member' : 'Account details'}}</h2><p>Enterprise-scoped identity and access management.</p></div>
+      <button class="drawer-close" (click)="close()">×</button>
+    </header>
+
+    @if (panel === 'create') {
+      <form (ngSubmit)="create()">
+        <div class="form-grid">
+          <label class="form-field"><span>First name</span><input name="first" [(ngModel)]="form.firstname" required /></label>
+          <label class="form-field"><span>Last name</span><input name="last" [(ngModel)]="form.lastname" required /></label>
+          <label class="form-field form-field-full"><span>Email</span><input name="email" type="email" [(ngModel)]="form.email" required /></label>
+          <label class="form-field"><span>Phone</span><input name="phone" [(ngModel)]="form.phone" /></label>
+          <label class="form-field">
+            <span>Role</span>
+            <select name="role" [(ngModel)]="form.role">
+              @for (x of roles; track x) { <option [value]="x">{{label(x)}}</option> }
+            </select>
+          </label>
+          <label class="form-field form-field-full"><span>Temporary password</span><input name="password" type="password" autocomplete="new-password" [(ngModel)]="form.password" required /></label>
+        </div>
+        <div class="form-actions"><button class="primary-button" [disabled]="busy">Create account</button></div>
+      </form>
+    }
+
+    @if (panel === 'detail' && selected(); as user) {
+      <div class="detail-panel">
+        <dl class="detail-list">
+          <div><dt>Name</dt><dd>{{user.firstname}} {{user.lastname}}</dd></div>
+          <div><dt>User ID</dt><dd>#{{user.id}}</dd></div>
+          <div class="form-field-full"><dt>Email</dt><dd>{{user.email}}</dd></div>
+          <div><dt>Phone</dt><dd>{{user.phone || '—'}}</dd></div>
+          <div><dt>Role</dt><dd>{{label(user.role)}}</dd></div>
+          <div><dt>Status</dt><dd>{{user.active ? 'Active' : 'Inactive'}}</dd></div>
+        </dl>
+      </div>
+    }
+  </aside>
+}

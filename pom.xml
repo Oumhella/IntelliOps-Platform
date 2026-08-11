@@ -26,5 +26,6 @@
         <module>paiement_service</module>
         <module>delivery_service</module>
         <module>notification_service</module>
+        <module>store-integration-service</module>
     </modules>
 </project>

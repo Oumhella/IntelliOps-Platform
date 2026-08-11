@@ -44,7 +44,7 @@ jobs:
           service_name: mcp-server
           service_port: 8085
           image_name: erp-mcp-server
-          build_common_lib: 'false'
+          build_common_lib: 'true'
           run_tests: 'true'
           fail_on_vulnerabilities: 'true'
           push_image: ${{ github.event_name == 'push' }}

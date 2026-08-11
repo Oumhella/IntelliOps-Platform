@@ -54,10 +54,47 @@ public class GlobalExceptionHandler {
         return problemDetail;
     }
 
+    @ExceptionHandler(PaymentRequiredException.class)
+    public ProblemDetail handlePaymentRequiredException(PaymentRequiredException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.PAYMENT_REQUIRED, ex.getMessage());
+        problemDetail.setTitle("Payment Required");
+        return problemDetail;
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ProblemDetail handleIllegalStateException(IllegalStateException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problemDetail.setTitle("Business Rule Conflict");
+        return problemDetail;
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ProblemDetail handleAccessDeniedException(AccessDeniedException ex) {
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
         problemDetail.setTitle("Access Denied");
+        return problemDetail;
+    }
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ProblemDetail handleUnauthorizedException(UnauthorizedException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, ex.getMessage());
+        problemDetail.setTitle("Authentication Failed");
+        return problemDetail;
+    }
+
+    @ExceptionHandler(SecurityException.class)
+    public ProblemDetail handleSecurityException(SecurityException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+        problemDetail.setTitle("Security Violation");
+        return problemDetail;
+    }
+
+    @ExceptionHandler(org.springframework.web.client.RestClientResponseException.class)
+    public ProblemDetail handleRestClientResponseException(org.springframework.web.client.RestClientResponseException ex) {
+        HttpStatus status = HttpStatus.resolve(ex.getRawStatusCode());
+        HttpStatus targetStatus = status != null ? status : HttpStatus.BAD_GATEWAY;
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(targetStatus, ex.getResponseBodyAsString());
+        problemDetail.setTitle("External Integration Error");
         return problemDetail;
     }
 

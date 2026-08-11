@@ -34,14 +34,40 @@ export interface PlanResponse {
   readonly description: string | null;
   readonly prix: number;
   readonly duree: OfferDuration;
+  readonly minJoursEntreDesactivation: number;
+  readonly maxPeriodeDesactivation: number;
   readonly estActif: OfferStatus;
   readonly limiteCommandesMois: number;
 }
 
 export interface SubscriptionRequest {
-  readonly userId: number;
   readonly planId: number;
   readonly paiementId?: number;
+}
+
+export interface SubscriptionCheckoutRequest {
+  readonly planId: number;
+  readonly idempotencyKey: string;
+}
+
+export interface PaymentCheckoutRequest {
+  readonly idempotencyKey: string;
+}
+
+export interface UpgradeCheckoutRequest extends PaymentCheckoutRequest {
+  readonly newPlanId: number;
+}
+
+export interface CompletePaymentCheckoutRequest {
+  readonly paymentId: number;
+}
+
+export interface CheckoutPreparationResponse {
+  readonly paymentId: number;
+  readonly clientSecret: string;
+  readonly publishableKey: string;
+  readonly amount: number;
+  readonly currency: string;
 }
 
 export interface SubscriptionResponse {
