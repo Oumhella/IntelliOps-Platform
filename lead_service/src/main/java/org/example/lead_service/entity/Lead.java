@@ -33,6 +33,11 @@ public class Lead {
     private Long boutiqueId;
     private  Long agentId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, columnDefinition = "varchar(32) default 'MANUAL'")
+    @Builder.Default
+    private LeadSource source = LeadSource.MANUAL;
+
     @Column(name = "enterprise_id", nullable = false)
     private Long enterpriseId;
     @OneToOne(mappedBy = "lead", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
@@ -51,24 +56,67 @@ public class Lead {
     }
 
     public void changerStatut(StatutLead nouveauStatut) {
+        if (!isAllowedTransition(this.statutLead, nouveauStatut)) {
+            throw new IllegalStateException(
+                    "Invalid lead transition from " + this.statutLead + " to " + nouveauStatut + ".");
+        }
         this.statutLead = nouveauStatut;
     }
 
-    public Commande convertirEnCommande() {
-        if (this.statutLead == StatutLead.CONVERTED) {
-            throw new IllegalStateException("Ce lead a déjà été converti en commande.");
+    public Commande convertirEnCommande(Long stockLocationId, String orderReference) {
+        if (this.statutLead != StatutLead.IN_PROGRESS) {
+            throw new IllegalStateException("Only a qualified lead in progress can be converted to an order.");
         }
         this.statutLead = StatutLead.CONVERTED;
 
-        // Initialisation de la commande liée
+        if (this.commande != null) {
+            // Channel imports already persisted lines + stock reservations under EXT-*.
+            // Confirm that order; do not rebuild or re-reserve.
+            if (this.commande.getStockLocationId() == null) {
+                this.commande.setStockLocationId(stockLocationId);
+            }
+            this.commande.setStatutCommande(StatutCommande.CONFIRMEE);
+            return this.commande;
+        }
+
         this.commande = Commande.builder()
                 .lead(this)
-                .reference("CMD-" + System.currentTimeMillis())
-                .statutCommande(StatutCommande.EN_ATTENTE)
+                .reference(orderReference)
+                .statutCommande(StatutCommande.CONFIRMEE)
                 .infosClient(this.infosClient)
+                .stockLocationId(stockLocationId)
+                .stockReservationReference(orderReference)
                 .totalPrix(0.0)
                 .build();
 
         return this.commande;
+    }
+
+    private boolean isAllowedTransition(StatutLead current, StatutLead next) {
+        if (current == null || next == null || current == next || next == StatutLead.CONVERTED) {
+            return false;
+        }
+        return switch (current) {
+            case NEW_LEAD -> next == StatutLead.ATTEMPTED_CONTACT
+                    || next == StatutLead.IN_PROGRESS
+                    || next == StatutLead.SCHEDULED_RECALL
+                    || next == StatutLead.UNREACHABLE
+                    || next == StatutLead.REFUSED;
+            case ATTEMPTED_CONTACT -> next == StatutLead.IN_PROGRESS
+                    || next == StatutLead.SCHEDULED_RECALL
+                    || next == StatutLead.UNREACHABLE
+                    || next == StatutLead.REFUSED;
+            case IN_PROGRESS -> next == StatutLead.SCHEDULED_RECALL
+                    || next == StatutLead.UNREACHABLE
+                    || next == StatutLead.REFUSED;
+            case SCHEDULED_RECALL -> next == StatutLead.ATTEMPTED_CONTACT
+                    || next == StatutLead.IN_PROGRESS
+                    || next == StatutLead.UNREACHABLE
+                    || next == StatutLead.REFUSED;
+            case UNREACHABLE -> next == StatutLead.SCHEDULED_RECALL
+                    || next == StatutLead.ATTEMPTED_CONTACT
+                    || next == StatutLead.REFUSED;
+            case REFUSED, CONVERTED -> false;
+        };
     }
 }

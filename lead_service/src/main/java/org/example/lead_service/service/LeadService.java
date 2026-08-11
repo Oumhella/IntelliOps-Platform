@@ -4,6 +4,8 @@ import org.example.lead_service.dto.CommandeDTO;
 import org.example.lead_service.dto.CreationCommandeRequest;
 import org.example.lead_service.dto.LeadDTO;
 import org.example.lead_service.dto.NoteInteractionDTO;
+import org.example.lead_service.dto.ExternalOrderImportRequest;
+import org.example.lead_service.dto.ExternalOrderStateRequest;
 import org.example.lead_service.entity.StatutLead;
 import org.example.lead_service.entity.TypeInteraction;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,4 +25,10 @@ public interface LeadService {
 
     @Transactional
     CommandeDTO convertirEnCommande(Long idLead, CreationCommandeRequest request);
+
+    @Transactional
+    CommandeDTO importExternalOrder(ExternalOrderImportRequest request);
+
+    @Transactional
+    CommandeDTO syncExternalOrderState(ExternalOrderStateRequest request);
 }

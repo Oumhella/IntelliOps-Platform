@@ -6,6 +6,7 @@ import org.example.user_service.dto.response.UserResponse;
 import org.example.user_service.entity.Admin;
 import org.example.user_service.entity.AgentCSM;
 import org.example.user_service.entity.AgentLogistic;
+import org.example.user_service.entity.Livreur;
 import org.example.user_service.entity.User;
 import org.springframework.stereotype.Component;
 
@@ -22,8 +23,10 @@ public class UserMapper {
             user = new AgentCSM();
         } else if ("LOGISTIC".equalsIgnoreCase(request.getRole())) {
             user = new AgentLogistic();
+        } else if ("LIVREUR".equalsIgnoreCase(request.getRole())) {
+            user = new Livreur();
         } else {
-            throw new IllegalArgumentException("Rôle inconnu : " + request.getRole());
+            throw new IllegalArgumentException("Unknown staff role: " + request.getRole());
         }
 
         user.setEmail(request.getEmail());

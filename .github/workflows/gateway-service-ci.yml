@@ -7,6 +7,7 @@ on:
       - 'gateway_service/**'
       - 'Dockerfile.microservice'
       - '.github/actions/build-and-scan-service/**'
+      - '.github/workflows/update-gitops-image.yml'
       - '.github/workflows/gateway-service-ci.yml'
   pull_request:
     branches: [ main ]
@@ -14,6 +15,7 @@ on:
       - 'gateway_service/**'
       - 'Dockerfile.microservice'
       - '.github/actions/build-and-scan-service/**'
+      - '.github/workflows/update-gitops-image.yml'
       - '.github/workflows/gateway-service-ci.yml'
 
 jobs:
@@ -35,3 +37,14 @@ jobs:
           push_image: ${{ github.event_name == 'push' }}
           dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  update-gitops:
+    name: Promote gateway-service image to dev
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/GitOps-setup'
+    needs: build-and-scan
+    uses: ./.github/workflows/update-gitops-image.yml
+    with:
+      image_name: erp-gateway-service
+      image_tag: ${{ github.sha }}
+    secrets:
+      gitops_token: ${{ secrets.GITOPS_TOKEN }}

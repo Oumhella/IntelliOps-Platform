@@ -2,6 +2,7 @@ export * from './agent-api.service';
 export * from './auth-api.service';
 export * from './crm-api.service';
 export * from './deliveries-api.service';
+export * from './integrations-api.service';
 export * from './notifications-api.service';
 export * from './payments-api.service';
 export * from './platform-api.service';

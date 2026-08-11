@@ -19,9 +19,4 @@ public interface BoutiqueService {
     @Transactional
     BoutiqueResponseDTO modifierBoutique(Long idBoutique, BoutiqueRequestDTO request);
 
-    @Transactional
-    boolean testerConnexion(Long idBoutique);
-
-    @Transactional
-    void synchroniserProduits(Long idBoutique);
 }

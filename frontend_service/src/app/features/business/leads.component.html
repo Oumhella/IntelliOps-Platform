@@ -1,0 +1,196 @@
+<main class="view-page">
+  <header class="view-heading">
+    <div>
+      <p class="eyebrow"><span>CRM</span><b>/</b> Leads</p>
+      <h1>Lead pipeline</h1>
+      <p>Create, qualify, assign, and convert customer opportunities.</p>
+    </div>
+    <div class="view-actions">
+      <button class="secondary-button" type="button" (click)="load()">Refresh</button>
+      @if (canCreateAndContact) {
+        <button class="primary-button" type="button" (click)="open('create')">+ New lead</button>
+      }
+    </div>
+  </header>
+
+  <section class="surface-card data-card">
+    <div class="data-toolbar">
+      <div class="filter-group">
+        <select class="filter-control" [(ngModel)]="statusFilter" (change)="load()">
+          <option value="">All statuses</option>
+          @for (status of allFilterStatuses; track status) {
+            <option [value]="status">{{ label(status) }}</option>
+          }
+        </select>
+        @if (canAssign) {
+          <select class="filter-control" [(ngModel)]="agentFilter" (change)="load()">
+            <option [ngValue]="null">All CSM agents</option>
+            @for (agent of csmAgents(); track agent.id) {
+              <option [ngValue]="agent.id">{{ agent.firstname }} {{ agent.lastname }}</option>
+            }
+          </select>
+        }
+      </div>
+      <span class="record-summary">{{ page()?.totalElements || 0 }} leads</span>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Customer</th><th>Status</th><th>Priority</th><th>Source</th><th>Agent</th><th></th></tr>
+        </thead>
+        <tbody>
+          @if (loading()) {
+            @for (row of [1, 2, 3, 4, 5]; track row) {
+              <tr><td colspan="6" class="loading-row"></td></tr>
+            }
+          }
+          @for (lead of page()?.content || []; track lead.idLead) {
+            <tr>
+              <td>
+                <span class="row-primary">{{ lead.infosClient.nomComplet }}</span>
+                <span class="row-secondary">{{ lead.infosClient.email || 'No email' }} · {{ lead.infosClient.telephone }}</span>
+              </td>
+              <td><span class="status-badge" [class]="'status-badge status-badge-' + tone(lead.statutLead)"><span></span>{{ label(lead.statutLead) }}</span></td>
+              <td>{{ label(lead.ordrePriorite) }}</td>
+              <td>{{ label(lead.source) }}</td>
+              <td>{{ agentLabel(lead.agentId) }}</td>
+              <td>
+                <div class="row-actions">
+                  <button class="action-button" (click)="open('detail', lead)">View</button>
+                  @if (canCreateAndContact && allowedLeadStatuses(lead).length) {
+                    <button class="action-button" (click)="open('interaction', lead)">Contact</button>
+                  }
+                  @if (canCreateAndContact && lead.statutLead === 'IN_PROGRESS') {
+                    <button class="action-button action-button-success" (click)="open('convert', lead)">Convert</button>
+                  }
+                  @if (canAssign && lead.statutLead !== 'CONVERTED' && lead.statutLead !== 'REFUSED') {
+                    <button class="action-button" (click)="open('assign', lead)">Assign</button>
+                  }
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (!loading() && !(page()?.content?.length)) {
+      <div class="empty-state"><div><strong>No leads found</strong><p>Create the first lead or change your filters.</p></div></div>
+    }
+    @if (page(); as currentPage) {
+      <div class="pagination">
+        <p>Page {{ currentPage.page + 1 }} of {{ currentPage.totalPages || 1 }}</p>
+        <div class="pagination-actions">
+          <button [disabled]="currentPage.first" (click)="load(currentPage.page - 1)">Previous</button>
+          <button [disabled]="currentPage.last" (click)="load(currentPage.page + 1)">Next</button>
+        </div>
+      </div>
+    }
+  </section>
+</main>
+
+@if (panel) {
+  <button class="drawer-backdrop" type="button" (click)="close()"></button>
+  <aside class="form-drawer">
+    <header class="drawer-header">
+      <div>
+        <h2>{{ panel === 'create' ? 'Create lead' : panel === 'detail' ? 'Lead details' : panel === 'assign' ? 'Assign CSM' : panel === 'interaction' ? 'Record interaction' : 'Convert to order' }}</h2>
+        <p>@if (selected(); as lead) { Lead #{{ lead.idLead }} · {{ lead.infosClient.nomComplet }} } @else { Add a customer opportunity to your queue. }</p>
+      </div>
+      <button class="drawer-close" type="button" (click)="close()">×</button>
+    </header>
+
+    @if (panel === 'create') {
+      <form (ngSubmit)="create()">
+        <div class="form-grid">
+          <label class="form-field form-field-full"><span>Full name</span><input name="name" [(ngModel)]="createForm.nomComplet" required /></label>
+          <label class="form-field"><span>Email</span><input name="email" type="email" [(ngModel)]="createForm.email" /></label>
+          <label class="form-field"><span>Phone</span><input name="phone" [(ngModel)]="createForm.telephone" required /></label>
+          <label class="form-field form-field-full"><span>Delivery address</span><input name="address" [(ngModel)]="createForm.adresseLivraison" required /></label>
+          <label class="form-field"><span>City</span><input name="city" [(ngModel)]="createForm.ville" required /></label>
+          <label class="form-field"><span>Priority</span><select name="priority" [(ngModel)]="createForm.ordrePriorite">@for (priority of priorities; track priority) {<option [value]="priority">{{ label(priority) }}</option>}</select></label>
+        </div>
+        <p class="row-secondary">New leads always start in New lead and are assigned to you. Sales-channel links are created by integrations, not entered manually.</p>
+        <div class="form-actions"><button class="secondary-button" type="button" (click)="close()">Cancel</button><button class="primary-button" [disabled]="busy">Create lead</button></div>
+      </form>
+    }
+
+    @if (panel === 'detail' && selected(); as lead) {
+      <div class="detail-panel">
+        <dl class="detail-list">
+          <div><dt>Status</dt><dd>{{ label(lead.statutLead) }}</dd></div>
+          <div><dt>Priority</dt><dd>{{ label(lead.ordrePriorite) }}</dd></div>
+          <div><dt>Source</dt><dd>{{ label(lead.source) }}</dd></div>
+          <div><dt>Email</dt><dd>{{ lead.infosClient.email || '—' }}</dd></div>
+          <div><dt>Phone</dt><dd>{{ lead.infosClient.telephone }}</dd></div>
+          <div><dt>City</dt><dd>{{ lead.infosClient.ville || '—' }}</dd></div>
+          <div><dt>Address</dt><dd>{{ lead.infosClient.adresseLivraison || '—' }}</dd></div>
+          <div><dt>Agent</dt><dd>{{ agentLabel(lead.agentId) }}</dd></div>
+          @if (lead.boutiqueId) {<div><dt>Imported channel</dt><dd>#{{ lead.boutiqueId }}</dd></div>}
+          @if (lead.commandeReference) {<div><dt>Order ref</dt><dd>{{ lead.commandeReference }}</dd></div>}
+        </dl>
+        @if (lead.hasPrebuiltOrder && lead.lignesCommande?.length) {
+          <div class="inline-action" style="margin-top:16px">
+            <h3>Imported order lines</h3>
+            <ul class="row-secondary" style="margin:0;padding-left:18px">
+              @for (line of lead.lignesCommande; track line.idLigne || line.produitId) {
+                <li>{{ productLabel(line.produitId) }} × {{ line.quantite }} · {{ line.prixUnitaireApplique }} MAD</li>
+              }
+            </ul>
+          </div>
+        }
+      </div>
+    }
+
+    @if (panel === 'assign') {
+      <form (ngSubmit)="assign()">
+        <label class="form-field"><span>Active CSM</span><select name="agent" [(ngModel)]="assignedAgentId" required><option [ngValue]="null" disabled>Select a CSM</option>@for (agent of csmAgents(); track agent.id) {<option [ngValue]="agent.id">{{ agent.firstname }} {{ agent.lastname }} · {{ agent.email }}</option>}</select></label>
+        <div class="form-actions"><button class="primary-button" [disabled]="busy || !assignedAgentId">Assign lead</button></div>
+      </form>
+    }
+
+    @if (panel === 'interaction') {
+      <form (ngSubmit)="addInteraction()">
+        <div class="form-grid">
+          <label class="form-field"><span>Channel</span><select name="type" [(ngModel)]="interactionForm.typeInteraction">@for (type of interactionTypes; track type) {<option [value]="type">{{ label(type) }}</option>}</select></label>
+          <label class="form-field"><span>Valid next status</span><select name="newStatus" [(ngModel)]="interactionForm.nouveauStatut"><option value="">No change</option>@for (status of allowedLeadStatuses(); track status) {<option [value]="status">{{ label(status) }}</option>}</select></label>
+          <label class="form-field form-field-full"><span>Agent comment</span><textarea name="comment" [(ngModel)]="interactionForm.commentaireAgent" required></textarea></label>
+        </div>
+        <div class="form-actions"><button class="primary-button" [disabled]="busy">Save interaction</button></div>
+      </form>
+    }
+
+    @if (panel === 'convert') {
+      <form (ngSubmit)="convert()">
+        @if (isChannelLead()) {
+          <div class="inline-action">
+            <h3>Confirm imported {{ label(selected()!.source) }} order</h3>
+            <p class="row-secondary">Products and stock reservation were created at import. Confirm after qualification — no catalog re-entry.</p>
+            @if (selected()?.commandeReference) {
+              <p class="row-secondary">Reference {{ selected()!.commandeReference }}</p>
+            }
+            @if (selected()?.lignesCommande?.length) {
+              <ul class="row-secondary" style="margin:8px 0 0;padding-left:18px">
+                @for (line of selected()!.lignesCommande!; track line.idLigne || line.produitId) {
+                  <li>{{ productLabel(line.produitId) }} × {{ line.quantite }} · {{ line.prixUnitaireApplique }} MAD</li>
+                }
+              </ul>
+            }
+          </div>
+          <input type="hidden" name="location" [(ngModel)]="orderForm.stockLocationId" />
+          <p class="row-secondary" style="margin-top:14px">Fulfillment location #{{ orderForm.stockLocationId }} (mapped channel stock). Logistics will move CONFIRMEE → PREPARATION → EXPEDIEE and consume reservations on ship.</p>
+          <div class="form-actions"><button class="primary-button" [disabled]="busy || !orderForm.stockLocationId">Confirm imported order</button></div>
+        } @else {
+          <div class="form-grid">
+            <label class="form-field form-field-full"><span>Fulfillment location</span><select name="location" [(ngModel)]="orderForm.stockLocationId" required><option [ngValue]="null" disabled>Select the location holding stock</option>@for (location of locations(); track location.idBoutique) {<option [ngValue]="location.idBoutique">{{ location.nomBoutique }} · {{ label(location.plateformeType) }}</option>}</select></label>
+            <label class="form-field form-field-full"><span>Catalog product</span><select name="product" [(ngModel)]="orderForm.productId" required><option [ngValue]="null" disabled>Select a product</option>@for (product of products(); track product.idProduit) {<option [ngValue]="product.idProduit">{{ product.nomProduit }} · {{ product.globalSku }} · {{ product.prixVente }} MAD</option>}</select></label>
+            <label class="form-field"><span>Quantity</span><input name="quantity" type="number" min="1" [(ngModel)]="orderForm.quantity" required /></label>
+          </div>
+          <p class="row-secondary">The backend applies the catalog price, verifies the monthly plan limit, and reserves inventory atomically for this order.</p>
+          <div class="form-actions"><button class="primary-button" [disabled]="busy || !orderForm.productId || !orderForm.stockLocationId">Create order</button></div>
+        }
+      </form>
+    }
+  </aside>
+}

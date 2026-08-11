@@ -6,8 +6,12 @@ import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.util.Set;
+
 @Component
 public class StockMcpTools {
+
+    private static final Set<String> MANUAL_MOVEMENTS = Set.of("REASSORT", "RETOUR", "PERTE", "AJUSTEMENT");
 
     private final RestClient stockServiceClient;
     private final ApprovalService approvalService;
@@ -31,7 +35,7 @@ public class StockMcpTools {
 
     @Tool(description = "Read-only: lists products in the ERP catalog for product discovery and inventory investigation.")
     public String listerProduits() {
-        return stockServiceClient.get().uri("/api/v1/produits").retrieve().body(String.class);
+        return stockServiceClient.get().uri("/api/v1/produits/catalog").retrieve().body(String.class);
     }
 
     @Tool(description = "PREVIEW ONLY. It never changes stock. Returns a short-lived approval token and the exact stock adjustment that would be made. Present this preview to a human and wait for an explicit confirmation.")
@@ -39,7 +43,11 @@ public class StockMcpTools {
             @ToolParam(description = "Store ID") Long idBoutique,
             @ToolParam(description = "Product ID") Long idProduit,
             @ToolParam(description = "Quantity to add (positive) or remove (negative)") int quantite,
-            @ToolParam(description = "Movement type: REASSORT, VENTE, RETOUR, PERTE, or AJUSTEMENT") String typeMouvement) {
+            @ToolParam(description = "Manual movement type: REASSORT, RETOUR, PERTE, or AJUSTEMENT") String typeMouvement) {
+        if (typeMouvement == null || !MANUAL_MOVEMENTS.contains(typeMouvement)) {
+            throw new IllegalArgumentException(
+                    "Manual stock adjustments support REASSORT, RETOUR, PERTE, or AJUSTEMENT only.");
+        }
         StockAdjustment adjustment = new StockAdjustment(idBoutique, idProduit, quantite, typeMouvement);
         return approvalService.prepare("STOCK_ADJUSTMENT", adjustment,
                 "Adjust product %d in store %d by %+d (%s)".formatted(idProduit, idBoutique, quantite, typeMouvement));

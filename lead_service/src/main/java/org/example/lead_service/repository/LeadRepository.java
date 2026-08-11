@@ -19,6 +19,17 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
     Optional<Lead> findByIdLeadAndEnterpriseId(Long idLead, Long enterpriseId);
 
     @Query("""
+            select distinct lead from Lead lead
+            left join fetch lead.commande commande
+            left join fetch commande.lignesCommande
+            where lead.idLead = :idLead
+              and lead.enterpriseId = :enterpriseId
+            """)
+    Optional<Lead> findDetailedByIdLeadAndEnterpriseId(
+            @Param("idLead") Long idLead,
+            @Param("enterpriseId") Long enterpriseId);
+
+    @Query("""
             select lead from Lead lead
             where lead.enterpriseId = :enterpriseId
               and (:statut is null or lead.statutLead = :statut)

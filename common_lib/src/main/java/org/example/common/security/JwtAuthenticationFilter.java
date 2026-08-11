@@ -17,16 +17,13 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Filtre d'authentification hybride, partage par tous les microservices.
+ * Shared authentication boundary for every HTTP microservice.
  *
- * Chemin 1 (prioritaire) : fait confiance aux headers X-User-Email / X-User-Role /
- * X-Enterprise-Id injectes par gateway_service APRES validation du JWT.
- * Ce chemin suppose que gateway_service supprime systematiquement ces headers
- * s'ils sont presents dans une requete entrante (deja fait cote gateway).
- *
- * Chemin 2 (repli) : si ces headers sont absents (appel Feign direct
- * service-a-service via Eureka, contournant la gateway), le filtre revalide
- * le JWT brut lui-meme via JwtUtils.
+ * Identity is always derived from the signed bearer token. Forwarded identity
+ * headers are deliberately ignored: containers can be reached by other
+ * containers on the Docker network, so a header alone is never proof of who
+ * the caller is. Feign propagates the original Authorization header for
+ * service-to-service calls.
  */
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -45,17 +42,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
 
         if (SecurityContextHolder.getContext().getAuthentication() == null) {
-
-            String headerEmail = request.getHeader("X-User-Email");
-            String headerRole = request.getHeader("X-User-Role");
-            String headerEnterpriseId = request.getHeader("X-Enterprise-Id");
-            String headerUserId = request.getHeader("X-User-Id");
-
-            if (headerEmail != null && !headerEmail.isEmpty()
-                    && headerRole != null && !headerRole.isEmpty()
-                    && headerUserId != null && !headerUserId.isEmpty()) {
-                authenticate(headerEmail, headerRole, headerEnterpriseId, headerUserId , request);
-            } else {
             String authHeader = request.getHeader("Authorization");
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 String jwt = authHeader.substring(7);
@@ -66,21 +52,26 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         Object entIdClaim = jwtUtils.getClaimByName(jwt, "enterpriseId");
                         Object userIdClaim = jwtUtils.getClaimByName(jwt, "userId");
 
-                        authenticate(
-                                email,
-                                role,
-                                entIdClaim != null ? entIdClaim.toString() : null,
-                                userIdClaim != null ? userIdClaim.toString() : null,
-                                request
-                        );
+                        if (email != null && !email.isBlank()
+                                && role != null && !role.isBlank()
+                                && userIdClaim != null) {
+                            authenticate(
+                                    email,
+                                    role,
+                                    entIdClaim != null ? entIdClaim.toString() : null,
+                                    userIdClaim.toString(),
+                                    request
+                            );
+                        } else {
+                            logger.warn("JWT rejete : claims d'identite requis absents");
+                        }
                     } else {
-                        logger.warn("JWT rejete (fallback) : token invalide ou expire");
+                        logger.warn("JWT rejete : token invalide ou expire");
                     }
                 } catch (Exception e) {
-                    logger.warn("Echec extraction JWT (fallback) : " + e.getClass().getSimpleName() + " - " + e.getMessage());
+                    logger.warn("Echec extraction JWT : " + e.getClass().getSimpleName() + " - " + e.getMessage());
                 }
             }
-        }
         }
 
         try {

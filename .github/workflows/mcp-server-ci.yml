@@ -10,6 +10,7 @@ on:
       - 'docker-compose.yaml'
       - '.github/workflows/mcp-server-ci.yml'
       - '.github/actions/build-and-scan-service/**'
+      - '.github/workflows/update-gitops-image.yml'
   pull_request:
     branches: [main]
     paths:
@@ -19,6 +20,7 @@ on:
       - 'docker-compose.yaml'
       - '.github/workflows/mcp-server-ci.yml'
       - '.github/actions/build-and-scan-service/**'
+      - '.github/workflows/update-gitops-image.yml'
 
 permissions:
   contents: read
@@ -42,9 +44,20 @@ jobs:
           service_name: mcp-server
           service_port: 8085
           image_name: erp-mcp-server
-          build_common_lib: 'false'
+          build_common_lib: 'true'
           run_tests: 'true'
           fail_on_vulnerabilities: 'true'
           push_image: ${{ github.event_name == 'push' }}
           dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  update-gitops:
+    name: Promote MCP server image to dev
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/GitOps-setup'
+    needs: build-test-and-scan
+    uses: ./.github/workflows/update-gitops-image.yml
+    with:
+      image_name: erp-mcp-server
+      image_tag: ${{ github.sha }}
+    secrets:
+      gitops_token: ${{ secrets.GITOPS_TOKEN }}

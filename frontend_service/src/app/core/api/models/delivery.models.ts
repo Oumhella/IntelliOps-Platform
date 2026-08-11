@@ -11,11 +11,8 @@ export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
 export interface ShipDeliveryRequest {
   readonly referenceCommandeId: number;
   readonly typeTransporteur: CarrierType;
-  readonly montantACollecterCoD: number;
-  readonly clientEmail?: string;
   readonly nomSociete?: string;
-  readonly endpointApiUrl?: string;
-  readonly externalLivreurId?: number;
+  readonly livreurId?: number;
 }
 
 export interface UpdateDeliveryStatusRequest {
@@ -29,9 +26,14 @@ export interface DeliveryResponse {
   readonly statutLivraison: DeliveryStatus;
   readonly typeTransporteur: CarrierType;
   readonly nomSociete: string | null;
-  readonly externalLivreurId: number | null;
+  readonly livreurId: number | null;
   readonly shippingDate: IsoDateTime;
   readonly deliveryDate: IsoDateTime | null;
   readonly montantACollecterCoD: number;
   readonly delaiJours: number;
+  readonly clientNomComplet: string;
+  readonly clientEmail: string | null;
+  readonly clientTelephone: string;
+  readonly adresseLivraison: string;
+  readonly villeLivraison: string;
 }

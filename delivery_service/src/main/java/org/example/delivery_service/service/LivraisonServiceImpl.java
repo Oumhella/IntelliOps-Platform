@@ -1,6 +1,10 @@
 package org.example.delivery_service.service;
 
 import org.example.common.exception.ResourceNotFoundException;
+import org.example.delivery_service.client.UserClient;
+import org.example.delivery_service.client.UserSummary;
+import org.example.delivery_service.client.OrderClient;
+import org.example.delivery_service.client.PaymentClient;
 import org.example.delivery_service.dto.request.ExpedierLivraisonRequest;
 import org.example.delivery_service.dto.request.UpdateStatutRequest;
 import org.example.delivery_service.dto.response.LivraisonResponse;
@@ -23,6 +27,9 @@ import org.example.common.dto.PageResponse;
 import org.example.common.security.TenantContext;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
+import feign.FeignException;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +39,9 @@ public class LivraisonServiceImpl implements LivraisonService {
     private final TransporteurStrategyFactory strategyFactory;
     private final LivraisonMapper livraisonMapper;
     private final LivraisonEventProducer eventProducer;
+    private final UserClient userClient;
+    private final OrderClient orderClient;
+    private final PaymentClient paymentClient;
 
     @Override
     @Transactional
@@ -41,6 +51,11 @@ public class LivraisonServiceImpl implements LivraisonService {
                 request.getReferenceCommandeId(), enterpriseId)) {
             throw new IllegalArgumentException("Shipment already exists for order ID: " + request.getReferenceCommandeId());
         }
+        validateTransporter(request);
+        OrderClient.OrderSummary order = requireShippableOrder(request.getReferenceCommandeId());
+        OrderClient.CustomerSummary customer = order.infosClient();
+        double codAmount = "AWAITING_COLLECTION".equals(order.statutPaiement())
+                ? order.totalPrix().doubleValue() : 0.0;
 
         Livraison livraison = Livraison.builder()
                 .enterpriseId(enterpriseId)
@@ -49,10 +64,13 @@ public class LivraisonServiceImpl implements LivraisonService {
                 .statutLivraison(StatutLivraison.EN_PREPARATION)
                 .typeTransporteur(request.getTypeTransporteur())
                 .nomSociete(request.getNomSociete())
-                .endpointApiUrl(request.getEndpointApiUrl())
-                .externalLivreurId(request.getExternalLivreurId())
-                .montantACollecterCoD(request.getMontantACollecterCoD())
-                .clientEmail(request.getClientEmail())
+                .livreurId(request.getLivreurId())
+                .montantACollecterCoD(codAmount)
+                .clientEmail(customer.email())
+                .clientNomComplet(customer.nomComplet())
+                .clientTelephone(customer.telephone())
+                .adresseLivraison(customer.adresseLivraison())
+                .villeLivraison(customer.ville())
                 .shippingDate(LocalDateTime.now())
                 .build();
 
@@ -61,9 +79,9 @@ public class LivraisonServiceImpl implements LivraisonService {
         strategy.executerLivraison(livraison);
 
         Livraison saved = livraisonRepository.save(livraison);
-        String emailSubject = "Expédition de votre commande #" + saved.getReferenceCommandeId();
+        String emailSubject = "Livraison créée pour votre commande #" + saved.getReferenceCommandeId();
         String emailBody = String.format(
-                "Bonjour, votre commande #%d a été expédiée via %s ! Code de suivi: %s",
+                "Bonjour, la livraison de votre commande #%d est préparée via %s. Code de suivi: %s",
                 saved.getReferenceCommandeId(),
                 saved.getTypeTransporteur(),
                 saved.getCodeSuiviTracking()
@@ -92,7 +110,7 @@ public class LivraisonServiceImpl implements LivraisonService {
                 Sort.by(Sort.Direction.DESC, "shippingDate"));
         return PageResponse.from(
                 livraisonRepository.search(
-                        TenantContext.requireEnterpriseId(), statut, transporteur, pageable),
+                        TenantContext.requireEnterpriseId(), statut, transporteur, currentCourierId(), pageable),
                 livraisonMapper::toResponse);
     }
 
@@ -102,6 +120,7 @@ public class LivraisonServiceImpl implements LivraisonService {
         Livraison livraison = livraisonRepository.findByCodeSuiviTrackingAndEnterpriseId(
                         trackingNum, TenantContext.requireEnterpriseId())
                 .orElseThrow(() -> new ResourceNotFoundException("Livraison not found with tracking code: " + trackingNum));
+        ensureCourierAccess(livraison);
         return livraisonMapper.toResponse(livraison);
     }
 
@@ -111,6 +130,7 @@ public class LivraisonServiceImpl implements LivraisonService {
         Livraison livraison = livraisonRepository.findByReferenceCommandeIdAndEnterpriseId(
                         commandeId, TenantContext.requireEnterpriseId())
                 .orElseThrow(() -> new ResourceNotFoundException("Livraison not found for order ID: " + commandeId));
+        ensureCourierAccess(livraison);
         return livraisonMapper.toResponse(livraison);
     }
 
@@ -118,6 +138,22 @@ public class LivraisonServiceImpl implements LivraisonService {
     @Transactional
     public LivraisonResponse mettreAJourStatut(Long id, UpdateStatutRequest request) {
         Livraison livraison = findDelivery(id);
+
+        if (!isAllowedTransition(livraison, request.getStatut())) {
+            throw new IllegalStateException(
+                    "Invalid delivery transition from " + livraison.getStatutLivraison() + " to " + request.getStatut() + ".");
+        }
+
+        if (request.getStatut() == StatutLivraison.CHEZ_TRANSPORTEUR
+                || request.getStatut() == StatutLivraison.EN_COURS) {
+            orderClient.updateFulfillmentStatus(livraison.getReferenceCommandeId(),
+                    new OrderClient.StatusUpdate("EXPEDIEE"));
+        } else if (request.getStatut() == StatutLivraison.LIVREE) {
+            completeOrderDelivery(livraison);
+        } else if (request.getStatut() == StatutLivraison.RETOUR) {
+            orderClient.updateFulfillmentStatus(livraison.getReferenceCommandeId(),
+                    new OrderClient.StatusUpdate("RETOURNEE"));
+        }
 
         livraison.mettreAJourStatut(request.getStatut());
         Livraison saved = livraisonRepository.save(livraison);
@@ -129,6 +165,12 @@ public class LivraisonServiceImpl implements LivraisonService {
     public LivraisonResponse confirmerReception(Long id) {
         Livraison livraison = findDelivery(id);
 
+        if (livraison.getStatutLivraison() != StatutLivraison.EN_COURS
+                && livraison.getStatutLivraison() != StatutLivraison.CHEZ_TRANSPORTEUR) {
+            throw new IllegalStateException("Reception can only be confirmed for a dispatched delivery.");
+        }
+
+        completeOrderDelivery(livraison);
         livraison.mettreAJourStatut(StatutLivraison.LIVREE);
         Livraison saved = livraisonRepository.save(livraison);
 
@@ -144,7 +186,99 @@ public class LivraisonServiceImpl implements LivraisonService {
     }
 
     private Livraison findDelivery(Long id) {
-        return livraisonRepository.findByIdLivraisonAndEnterpriseId(id, TenantContext.requireEnterpriseId())
+        Livraison delivery = livraisonRepository.findByIdLivraisonAndEnterpriseId(
+                        id, TenantContext.requireEnterpriseId())
                 .orElseThrow(() -> new ResourceNotFoundException("Livraison not found with ID: " + id));
+        ensureCourierAccess(delivery);
+        return delivery;
+    }
+
+    private boolean isAllowedTransition(Livraison delivery, StatutLivraison next) {
+        StatutLivraison current = delivery.getStatutLivraison();
+        if (current == next) return false;
+        return switch (current) {
+            case EN_PREPARATION -> next == StatutLivraison.ECHEC
+                    || (delivery.getTypeTransporteur() == TypeTransporteur.LIVREUR_INTERNE
+                    ? next == StatutLivraison.EN_COURS
+                    : next == StatutLivraison.CHEZ_TRANSPORTEUR);
+            case CHEZ_TRANSPORTEUR -> next == StatutLivraison.EN_COURS
+                    || next == StatutLivraison.ECHEC || next == StatutLivraison.RETOUR;
+            case EN_COURS -> next == StatutLivraison.LIVREE
+                    || next == StatutLivraison.ECHEC || next == StatutLivraison.RETOUR;
+            case ECHEC -> next == StatutLivraison.EN_COURS || next == StatutLivraison.RETOUR;
+            case LIVREE, RETOUR -> false;
+        };
+    }
+
+    private void validateTransporter(ExpedierLivraisonRequest request) {
+        if (request.getTypeTransporteur() == TypeTransporteur.LIVREUR_INTERNE) {
+            if (request.getLivreurId() == null) {
+                throw new IllegalArgumentException("An internal courier must be selected");
+            }
+            if (hasText(request.getNomSociete())) {
+                throw new IllegalArgumentException("External carrier fields cannot be used for an internal courier");
+            }
+            UserSummary courier = userClient.getActiveCourier(request.getLivreurId());
+            if (!"ROLE_LIVREUR".equals(courier.role()) || !courier.active()) {
+                throw new IllegalArgumentException("The selected user is not an active internal courier");
+            }
+            return;
+        }
+
+        if (!hasText(request.getNomSociete())) {
+            throw new IllegalArgumentException("External delivery company name is required");
+        }
+        if (request.getLivreurId() != null) {
+            throw new IllegalArgumentException("An external-company shipment cannot be assigned to an internal courier");
+        }
+    }
+
+    private OrderClient.OrderSummary requireShippableOrder(Long orderId) {
+        OrderClient.OrderSummary order;
+        try {
+            order = orderClient.getOrder(orderId);
+        } catch (FeignException exception) {
+            throw new ResourceNotFoundException("Order not found: " + orderId);
+        }
+        if (order == null || !"PREPARATION".equals(order.statutCommande())) {
+            throw new IllegalStateException("Only an order in preparation can be shipped.");
+        }
+        if (!"PAID".equals(order.statutPaiement())
+                && !"AWAITING_COLLECTION".equals(order.statutPaiement())) {
+            throw new IllegalStateException(
+                    "The order must be paid or explicitly configured for cash on delivery before shipping.");
+        }
+        OrderClient.CustomerSummary customer = order.infosClient();
+        if (customer == null || !hasText(customer.nomComplet()) || !hasText(customer.telephone())
+                || !hasText(customer.adresseLivraison()) || !hasText(customer.ville())) {
+            throw new IllegalStateException("The order has incomplete delivery details.");
+        }
+        return order;
+    }
+
+    private void completeOrderDelivery(Livraison delivery) {
+        if (delivery.getMontantACollecterCoD() > 0) {
+            paymentClient.collectCashOnDelivery(delivery.getReferenceCommandeId());
+        }
+        orderClient.updateFulfillmentStatus(delivery.getReferenceCommandeId(),
+                new OrderClient.StatusUpdate("LIVREE"));
+    }
+
+    private void ensureCourierAccess(Livraison delivery) {
+        Long courierId = currentCourierId();
+        if (courierId != null && !courierId.equals(delivery.getLivreurId())) {
+            throw new AccessDeniedException("Couriers can access only deliveries assigned to them");
+        }
+    }
+
+    private Long currentCourierId() {
+        boolean courier = SecurityContextHolder.getContext().getAuthentication() != null
+                && SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_LIVREUR".equals(authority.getAuthority()));
+        return courier ? TenantContext.requireUserId() : null;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }

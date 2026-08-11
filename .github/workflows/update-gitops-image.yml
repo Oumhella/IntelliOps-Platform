@@ -1,0 +1,117 @@
+name: Update GitOps Image
+
+on:
+  workflow_call:
+    inputs:
+      image_name:
+        description: Docker image name as it appears after the registry namespace
+        required: true
+        type: string
+      image_tag:
+        description: Immutable Docker image tag to deploy
+        required: true
+        type: string
+      gitops_repository:
+        description: GitOps repository containing the Kustomize overlay
+        required: false
+        type: string
+        default: Oumhella/IntelliOps-GitOps
+      gitops_branch:
+        description: GitOps branch watched by Argo CD
+        required: false
+        type: string
+        default: feature/GitOps-setup
+      overlay_path:
+        description: Kustomize overlay to update
+        required: false
+        type: string
+        default: apps/intelliops/overlays/dev
+    secrets:
+      gitops_token:
+        description: Fine-grained token with Contents write access to the GitOps repository
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  update-image:
+    name: Promote ${{ inputs.image_name }} to dev
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout GitOps repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.gitops_repository }}
+          ref: ${{ inputs.gitops_branch }}
+          token: ${{ secrets.gitops_token }}
+          path: gitops
+          fetch-depth: 0
+
+      - name: Update and push image tag
+        shell: bash
+        env:
+          IMAGE_NAME: ${{ inputs.image_name }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          GITOPS_BRANCH: ${{ inputs.gitops_branch }}
+          OVERLAY_PATH: ${{ inputs.overlay_path }}
+        run: |
+          set -euo pipefail
+          cd gitops
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          for attempt in {1..20}; do
+            echo "GitOps update attempt ${attempt}/20"
+            git fetch origin "$GITOPS_BRANCH"
+            git checkout --detach "origin/$GITOPS_BRANCH"
+
+            KUSTOMIZATION="${OVERLAY_PATH}/kustomization.yaml"
+            TEMP_FILE="${KUSTOMIZATION}.tmp"
+
+            awk -v image="$IMAGE_NAME" -v tag="$IMAGE_TAG" '
+              $1 == "-" && $2 == "name:" {
+                current_image = $3
+                sub(/\r$/, "", current_image)
+                matching_image = current_image == image || current_image ~ ("/" image "$")
+              }
+              matching_image && $1 == "newTag:" {
+                sub(/newTag:.*/, "newTag: " tag)
+                matching_image = 0
+                updates++
+              }
+              { print }
+              END {
+                if (updates != 1) {
+                  print "Expected exactly one Kustomize image entry for " image ", found " updates > "/dev/stderr"
+                  exit 42
+                }
+              }
+            ' "$KUSTOMIZATION" > "$TEMP_FILE"
+
+            mv "$TEMP_FILE" "$KUSTOMIZATION"
+
+            if git diff --quiet -- "$KUSTOMIZATION"; then
+              echo "GitOps already references ${IMAGE_NAME}:${IMAGE_TAG}; nothing to commit."
+              exit 0
+            fi
+
+            git add "$KUSTOMIZATION"
+            git commit -m "chore(dev): deploy ${IMAGE_NAME} ${IMAGE_TAG:0:12}"
+
+            if git push origin "HEAD:${GITOPS_BRANCH}"; then
+              echo "Updated ${IMAGE_NAME} to ${IMAGE_TAG}."
+              exit 0
+            fi
+
+            if [ "$attempt" -eq 20 ]; then
+              echo "Could not push the GitOps update after 20 attempts."
+              exit 1
+            fi
+
+            echo "The GitOps branch changed concurrently; retrying from its latest commit."
+            sleep $((attempt + RANDOM % 5))
+          done

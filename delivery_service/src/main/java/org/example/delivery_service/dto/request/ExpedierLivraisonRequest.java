@@ -1,7 +1,7 @@
 package org.example.delivery_service.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Data;
 import org.example.delivery_service.entity.TypeTransporteur;
 
@@ -14,13 +14,8 @@ public class ExpedierLivraisonRequest {
     @NotNull(message = "typeTransporteur is required")
     private TypeTransporteur typeTransporteur;
 
-    @PositiveOrZero(message = "montantACollecterCoD must be >= 0")
-    private double montantACollecterCoD;
-
-    private String clientEmail;
-
     // Optional depending on strategy chosen
     private String nomSociete;
-    private String endpointApiUrl;
-    private Long externalLivreurId;
+    @JsonAlias("externalLivreurId")
+    private Long livreurId;
 }

@@ -1,24 +1,5 @@
-<main class="business-page">
-  <header class="business-header">
-    <div class="login-brand">
-      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 5.5h12v4H6zM6 14.5h5v4H6zM14 14.5h4v4h-4z" /></svg></span>
-      <span><strong>IntelliOps</strong><small>Business workspace</small></span>
-    </div>
-    <button class="secondary-button" type="button" (click)="logout()">Sign out</button>
-  </header>
-  <section class="business-content">
-    <p class="eyebrow">Business workspace</p>
-    <h1>Welcome, {{ user()?.firstname || 'team member' }}</h1>
-    <p class="business-intro">Your operational interfaces will live here, separated from platform administration.</p>
-    <div class="role-card surface-card">
-      <span class="avatar">{{ (user()?.firstname?.[0] || 'U') + (user()?.lastname?.[0] || '') }}</span>
-      <div><strong>{{ user()?.firstname }} {{ user()?.lastname }}</strong><p>{{ roleLabels[user()?.role || ''] || user()?.role }}</p></div>
-      <span class="status-badge status-badge-success"><span></span>Authenticated</span>
-    </div>
-    <div class="next-step-card">
-      <span>Next implementation phase</span>
-      <h2>Role-specific business workflows</h2>
-      <p>CRM for customer-success users, inventory and delivery operations for logistics users, and staff, subscription, and reporting tools for enterprise administrators.</p>
-    </div>
-  </section>
+<main class="view-page"><header class="view-heading"><div><p class="eyebrow"><span>Workspace</span><b>/</b> Overview</p><h1>Good to see you, {{ user()?.firstname || 'team member' }}</h1><p>Live totals from the services available to your role.</p></div><button class="secondary-button" type="button" (click)="load()">Refresh</button></header>
+  @if (loading()) { <div class="dashboard-loading">@for (item of [1,2,3,4]; track item) { <span class="loading-card"></span> }</div> }
+  @else { <section class="metric-grid">@for (metric of metrics(); track metric.label) { <a class="surface-card metric-card metric-link" [routerLink]="metric.route"><div class="metric-topline"><span class="metric-icon" [class]="'metric-icon metric-icon-' + metric.tone"><span class="metric-glyph">{{ metric.label[0] }}</span></span><span class="text-button">Open →</span></div><p>{{ metric.label }}</p><div class="metric-value"><strong>{{ metric.value }}</strong></div><small>{{ metric.note }}</small></a> }</section> }
+  <section class="surface-card workspace-guide"><div><span class="section-kicker">Role-based workspace</span><h2>Your operational tools are separated from platform control.</h2><p>Every value above comes from your enterprise-scoped backend. Use the navigation to manage records and complete business operations.</p></div><span class="role-chip">{{ user()?.role }}</span></section>
 </main>

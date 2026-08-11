@@ -1,7 +1,7 @@
-export const USER_ROLES = ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_CSM', 'ROLE_LOGISTIC'] as const;
+export const USER_ROLES = ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_CSM', 'ROLE_LOGISTIC', 'ROLE_LIVREUR'] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
-export const STAFF_ROLES = ['CSM', 'LOGISTIC'] as const;
+export const STAFF_ROLES = ['CSM', 'LOGISTIC', 'LIVREUR'] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
 
 export interface LoginRequest {
@@ -11,6 +11,7 @@ export interface LoginRequest {
 
 export interface AuthResponse {
   readonly token: string;
+  readonly id: number;
   readonly email: string;
   readonly firstname: string;
   readonly lastname: string;

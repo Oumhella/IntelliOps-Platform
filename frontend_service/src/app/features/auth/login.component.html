@@ -24,6 +24,10 @@
       <h2>Sign in to your workspace</h2>
       <p class="form-intro">Use the account assigned to your enterprise or platform role.</p>
 
+      @if (registrationMessage) {
+        <div class="login-success" role="status"><span></span>{{ registrationMessage }}</div>
+      }
+
       @if (errorMessage) {
         <div class="login-error" role="alert">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5m0 3h.01M10.3 4.2 3.2 16.5A2 2 0 0 0 4.9 19h14.2a2 2 0 0 0 1.7-2.5L13.7 4.2a2 2 0 0 0-3.4 0Z" /></svg>
@@ -59,7 +63,7 @@
       <button class="login-submit" type="submit" [disabled]="submitting">
         @if (submitting) { <span class="button-spinner"></span> Signing in... } @else { Sign in <span>→</span> }
       </button>
-      <p class="login-help">Access is managed by your organization administrator.</p>
+      <p class="login-help">New enterprise? <a routerLink="/">View plans and create a workspace</a></p>
     </form>
   </section>
 </main>

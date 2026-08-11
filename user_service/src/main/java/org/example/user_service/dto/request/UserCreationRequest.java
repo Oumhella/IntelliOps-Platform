@@ -27,5 +27,5 @@ public class UserCreationRequest {
     private String phone;
 
     @NotBlank(message = "Role is required")
-    private String role; // "CSM" or "LOGISTIC"
+    private String role; // "CSM", "LOGISTIC", or "LIVREUR"
 }

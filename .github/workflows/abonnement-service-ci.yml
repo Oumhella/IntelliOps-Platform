@@ -8,6 +8,7 @@ on:
       - 'common_lib/**'
       - 'Dockerfile.microservice'
       - '.github/actions/build-and-scan-service/**'
+      - '.github/workflows/update-gitops-image.yml'
       - '.github/workflows/abonnement-service-ci.yml'
   pull_request:
     branches: [ main ]
@@ -16,6 +17,7 @@ on:
       - 'common_lib/**'
       - 'Dockerfile.microservice'
       - '.github/actions/build-and-scan-service/**'
+      - '.github/workflows/update-gitops-image.yml'
       - '.github/workflows/abonnement-service-ci.yml'
 
 jobs:
@@ -35,3 +37,14 @@ jobs:
           push_image: ${{ github.event_name == 'push' }}
           dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  update-gitops:
+    name: Promote abonnement-service image to dev
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/GitOps-setup'
+    needs: build-and-scan
+    uses: ./.github/workflows/update-gitops-image.yml
+    with:
+      image_name: erp-abonnement-service
+      image_tag: ${{ github.sha }}
+    secrets:
+      gitops_token: ${{ secrets.GITOPS_TOKEN }}

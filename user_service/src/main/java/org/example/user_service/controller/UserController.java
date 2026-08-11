@@ -6,6 +6,10 @@ import org.example.user_service.dto.request.*;
 import org.example.user_service.dto.response.AuthResponse;
 import org.example.user_service.dto.response.UserResponse;
 import org.example.user_service.service.UserService;
+import org.example.user_service.service.AuthenticationTokens;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,12 +19,21 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.time.Duration;
 
 @RestController
 @RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
 public class UserController {
+    private static final String REFRESH_COOKIE = "intelliops_refresh";
+
     private final UserService userService;
+
+    @Value("${app.auth.refresh-token-ttl:7d}")
+    private Duration refreshTokenTtl;
+
+    @Value("${app.auth.refresh-cookie-secure:true}")
+    private boolean refreshCookieSecure;
 
     // ══════════════════════════════════════════════════════════════════
     //  PUBLIC ROUTES (no authentication required)
@@ -31,8 +44,25 @@ public class UserController {
      */
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest loginRequest) {
-        AuthResponse response = userService.login(loginRequest);
-        return ResponseEntity.ok(response);
+        AuthenticationTokens tokens = userService.login(loginRequest);
+        return withRefreshCookie(tokens);
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refresh(
+            @CookieValue(name = REFRESH_COOKIE) String refreshToken) {
+        return withRefreshCookie(userService.refresh(refreshToken));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorizationHeader,
+            @CookieValue(name = REFRESH_COOKIE, required = false) String refreshToken) {
+        userService.logout(authorizationHeader, refreshToken);
+        ResponseCookie expiredCookie = refreshCookie("").maxAge(Duration.ZERO).build();
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, expiredCookie.toString())
+                .build();
     }
 
     /**
@@ -86,7 +116,7 @@ public class UserController {
     // ══════════════════════════════════════════════════════════════════
 
     /**
-     * Create a new staff member (CSM or Logistic agent).
+     * Create a new staff member (CSM, logistics agent, or internal courier).
      * Only accessible by users with ADMIN role.
      */
     @PostMapping("/staff")
@@ -103,6 +133,7 @@ public class UserController {
      * Get all staff members belonging to the authenticated user's enterprise.
      */
     @GetMapping("/staff")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<UserResponse>> getEnterpriseStaff(
             @RequestAttribute("enterpriseId") Long enterpriseId
     ) {
@@ -111,9 +142,30 @@ public class UserController {
     }
 
     /**
+     * List active internal couriers available for delivery assignment.
+     */
+    @GetMapping("/staff/couriers")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC')")
+    public ResponseEntity<List<UserResponse>> getActiveCouriers(
+            @RequestAttribute("enterpriseId") Long enterpriseId
+    ) {
+        return ResponseEntity.ok(userService.getActiveCouriersByEnterprise(enterpriseId));
+    }
+
+    @GetMapping("/staff/couriers/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC')")
+    public ResponseEntity<UserResponse> getActiveCourier(
+            @PathVariable Long id,
+            @RequestAttribute("enterpriseId") Long enterpriseId
+    ) {
+        return ResponseEntity.ok(userService.getActiveCourier(id, enterpriseId));
+    }
+
+    /**
      * Get a single staff member by ID (within the same enterprise).
      */
     @GetMapping("/staff/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserResponse> getStaffMember(
             @PathVariable Long id,
             @RequestAttribute("enterpriseId") Long enterpriseId
@@ -140,7 +192,7 @@ public class UserController {
     }
 
     /**
-     * Permanently delete a staff member from the database.
+     * Deactivate a staff member while preserving historical ownership/audit references.
      * Only accessible by users with ADMIN role.
      */
     @DeleteMapping("/staff/{id}")
@@ -157,6 +209,7 @@ public class UserController {
      * Get a user by ID. Primarily used for inter-service communication.
      */
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserResponse> getUserById(
             @PathVariable Long id,
             @RequestAttribute("enterpriseId") Long enterpriseId) {
@@ -174,6 +227,23 @@ public class UserController {
     private String getCurrentUserEmail() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication.getName();
+    }
+
+    private ResponseEntity<AuthResponse> withRefreshCookie(AuthenticationTokens tokens) {
+        ResponseCookie cookie = refreshCookie(tokens.refreshToken())
+                .maxAge(refreshTokenTtl)
+                .build();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(tokens.response());
+    }
+
+    private ResponseCookie.ResponseCookieBuilder refreshCookie(String value) {
+        return ResponseCookie.from(REFRESH_COOKIE, value)
+                .httpOnly(true)
+                .secure(refreshCookieSecure)
+                .sameSite("Strict")
+                .path("/api/v1/users");
     }
 }
 

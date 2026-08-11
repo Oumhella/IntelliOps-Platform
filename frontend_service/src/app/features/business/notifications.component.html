@@ -1,0 +1,29 @@
+<main class="view-page">
+  <header class="view-heading"><div><p class="eyebrow"><span>Communication</span><b>/</b> Notifications</p><h1>Notifications</h1><p>Review delivery history and send direct customer email.</p></div><div class="view-actions"><button class="primary-button" (click)="panel='send'">+ Send email</button></div></header>
+  <section class="surface-card data-card">
+    <div class="data-toolbar"><div class="filter-group">
+      <select class="filter-control" [(ngModel)]="statusFilter" (change)="load()"><option value="">All statuses</option>@for(status of statuses;track status){<option [value]="status">{{label(status)}}</option>}</select>
+      <select class="filter-control" [(ngModel)]="typeFilter" (change)="load()"><option value="">All historical channels</option>@for(type of types;track type){<option [value]="type">{{type}}</option>}</select>
+      <input class="filter-control" type="number" placeholder="Notification ID" [(ngModel)]="lookupId"/><button class="action-button" (click)="lookup()">Open</button>
+    </div><span class="record-summary">{{page()?.totalElements||0}} messages</span></div>
+    <div class="table-wrap"><table><thead><tr><th>Recipient</th><th>Channel</th><th>Subject</th><th>Status</th><th>Created</th><th></th></tr></thead><tbody>
+      @for(notification of page()?.content||[];track notification.idNotification){<tr><td><span class="row-primary">{{notification.recipientContact}}</span><span class="row-secondary">#{{notification.idNotification}}</span></td><td><span class="micro-tag">{{notification.type}}</span></td><td>{{notification.subject||'—'}}</td><td><span class="status-badge" [class]="'status-badge status-badge-'+tone(notification.statut)"><span></span>{{label(notification.statut)}}</span></td><td>{{notification.createdAt|date:'short'}}</td><td><button class="action-button" (click)="open(notification)">View</button></td></tr>}@empty{<tr><td colspan="6"><div class="empty-state"><div><strong>No notifications</strong><p>Sent and queued communications will appear here.</p></div></div></td></tr>}
+    </tbody></table></div>
+    @if(page();as currentPage){<div class="pagination"><p>Page {{currentPage.page+1}} of {{currentPage.totalPages||1}}</p><div class="pagination-actions"><button [disabled]="currentPage.first" (click)="load(currentPage.page-1)">Previous</button><button [disabled]="currentPage.last" (click)="load(currentPage.page+1)">Next</button></div></div>}
+  </section>
+</main>
+
+@if(panel){
+  <button class="drawer-backdrop" (click)="close()"></button><aside class="form-drawer">
+    <header class="drawer-header"><div><h2>{{panel==='send'?'Send email':'Notification details'}}</h2><p>Only email is offered because it is the configured delivery provider.</p></div><button class="drawer-close" (click)="close()">×</button></header>
+    @if(panel==='send'){
+      <form (ngSubmit)="send()"><div class="form-grid">
+        <label class="form-field"><span>Configured channel</span><select name="type" [(ngModel)]="form.type">@for(type of sendTypes;track type){<option [value]="type">{{type}}</option>}</select></label>
+        <label class="form-field"><span>Recipient email</span><input name="recipient" type="email" [(ngModel)]="form.recipientContact" required/></label>
+        <label class="form-field form-field-full"><span>Subject</span><input name="subject" [(ngModel)]="form.subject"/></label>
+        <label class="form-field form-field-full"><span>Message</span><textarea name="content" [(ngModel)]="form.contenu" required></textarea></label>
+      </div><div class="form-actions"><button class="primary-button" [disabled]="busy">Send email</button></div></form>
+    }
+    @if(panel==='detail'&&selected();as notification){<div class="detail-panel"><dl class="detail-list"><div><dt>Channel</dt><dd>{{notification.type}}</dd></div><div><dt>Status</dt><dd>{{label(notification.statut)}}</dd></div><div class="form-field-full"><dt>Recipient</dt><dd>{{notification.recipientContact}}</dd></div><div class="form-field-full"><dt>Subject</dt><dd>{{notification.subject||'—'}}</dd></div><div class="form-field-full"><dt>Message</dt><dd>{{notification.contenu}}</dd></div><div><dt>Created</dt><dd>{{notification.createdAt|date:'medium'}}</dd></div><div><dt>Sent</dt><dd>{{notification.sentAt?(notification.sentAt|date:'medium'):'—'}}</dd></div>@if(notification.errorMessage){<div class="form-field-full"><dt>Error</dt><dd>{{notification.errorMessage}}</dd></div>}</dl></div>}
+  </aside>
+}

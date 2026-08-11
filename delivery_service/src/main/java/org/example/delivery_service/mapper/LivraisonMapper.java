@@ -17,11 +17,16 @@ public class LivraisonMapper {
                 .statutLivraison(entity.getStatutLivraison())
                 .typeTransporteur(entity.getTypeTransporteur())
                 .nomSociete(entity.getNomSociete())
-                .externalLivreurId(entity.getExternalLivreurId())
+                .livreurId(entity.getLivreurId())
                 .shippingDate(entity.getShippingDate())
                 .deliveryDate(entity.getDeliveryDate())
                 .montantACollecterCoD(entity.getMontantACollecterCoD())
                 .delaiJours(entity.calculerDelaiJours())
+                .clientNomComplet(entity.getClientNomComplet())
+                .clientEmail(entity.getClientEmail())
+                .clientTelephone(entity.getClientTelephone())
+                .adresseLivraison(entity.getAdresseLivraison())
+                .villeLivraison(entity.getVilleLivraison())
                 .build();
     }
 }

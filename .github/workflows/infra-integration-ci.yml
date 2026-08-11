@@ -50,9 +50,9 @@ jobs:
       - name: Build Images
         timeout-minutes: 20
         run: |
-          # Limit concurrent Maven downloads; excessive parallel builds can cause
-          # truncated artifacts from Maven Central on shared runners.
-          docker compose --parallel 4 build
+          # Keep cold Maven builds below Central's shared-runner rate limit.
+          # Two-way concurrency still overlaps image builds without causing 429 bursts.
+          docker compose --parallel 2 build
 
       # 4. Start the stack. --wait makes Compose block only until containers
       #    report healthy/running (not indefinitely), and returns non-zero

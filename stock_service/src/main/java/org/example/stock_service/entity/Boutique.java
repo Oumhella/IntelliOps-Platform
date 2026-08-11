@@ -25,7 +25,6 @@ public class Boutique {
     @Column(nullable = false)
     private TypePlateforme plateformeType;
 
-    private String cleApi;
     private Long adminId;
 
     @Column(name = "enterprise_id", nullable = false)
@@ -37,12 +36,4 @@ public class Boutique {
     private List<Inventaire> inventaires = new ArrayList<>();
 
     // Méthodes Métier d'encapsulation
-    public boolean connecterPlateforme(String cleApi) {
-        this.cleApi = cleApi;
-        return testerConnexionAPI();
-    }
-
-    public boolean testerConnexionAPI() {
-        return this.cleApi != null && !this.cleApi.isBlank();
-    }
 }

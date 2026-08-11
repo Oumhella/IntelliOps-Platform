@@ -3,7 +3,9 @@ package org.example.user_service.service;
 import lombok.RequiredArgsConstructor;
 import org.example.user_service.dto.response.PlatformOverviewResponse;
 import org.example.user_service.entity.Admin;
+import org.example.user_service.entity.Enterprise;
 import org.example.user_service.repository.AdminRepository;
+import org.example.user_service.repository.EnterpriseRepository;
 import org.example.user_service.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.client.discovery.DiscoveryClient;
@@ -15,6 +17,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -26,6 +29,7 @@ public class PlatformOverviewService {
 
     private final UserRepository userRepository;
     private final AdminRepository adminRepository;
+    private final EnterpriseRepository enterpriseRepository;
     private final DiscoveryClient discoveryClient;
 
     @Value("${platform.expected-services:user-service,gateway-service,lead-service,stock-service,abonnement-service,paiement-service,delivery-service,notification-service,mcp-server}")
@@ -33,11 +37,15 @@ public class PlatformOverviewService {
 
     @Transactional(readOnly = true)
     public PlatformOverviewResponse getOverview() {
-        List<PlatformOverviewResponse.TenantSummary> tenants = adminRepository
-                .findAllByEnterpriseIdNotOrderByCreatedAtDesc(PLATFORM_ENTERPRISE_ID)
-                .stream()
+        List<Enterprise> registeredEnterprises = enterpriseRepository.findAllByOrderByCreatedAtDesc();
+        Set<Long> registeredIds = registeredEnterprises.stream().map(Enterprise::getId).collect(Collectors.toSet());
+        List<PlatformOverviewResponse.TenantSummary> tenants = new java.util.ArrayList<>(registeredEnterprises.stream()
                 .map(this::toTenantSummary)
-                .toList();
+                .toList());
+        adminRepository.findAllByEnterpriseIdNotOrderByCreatedAtDesc(PLATFORM_ENTERPRISE_ID).stream()
+                .filter(admin -> !registeredIds.contains(admin.getEnterpriseId()))
+                .map(this::toLegacyTenantSummary)
+                .forEach(tenants::add);
 
         Map<String, String> registeredServices = discoveryClient.getServices().stream()
                 .collect(Collectors.toMap(
@@ -58,7 +66,7 @@ public class PlatformOverviewService {
                 .count();
 
         PlatformOverviewResponse.Totals totals = new PlatformOverviewResponse.Totals(
-                userRepository.countBusinessEnterprises(),
+                tenants.size(),
                 userRepository.countBusinessUsers(),
                 userRepository.countActiveBusinessUsers(),
                 onlineServices,
@@ -68,7 +76,18 @@ public class PlatformOverviewService {
         return new PlatformOverviewResponse(Instant.now(), totals, tenants, services);
     }
 
-    private PlatformOverviewResponse.TenantSummary toTenantSummary(Admin admin) {
+    private PlatformOverviewResponse.TenantSummary toTenantSummary(Enterprise enterprise) {
+        return new PlatformOverviewResponse.TenantSummary(
+                enterprise.getId(),
+                enterprise.getCompanyName(),
+                enterprise.getActivityType(),
+                userRepository.countByEnterpriseId(enterprise.getId()),
+                enterprise.isActive(),
+                enterprise.getCreatedAt()
+        );
+    }
+
+    private PlatformOverviewResponse.TenantSummary toLegacyTenantSummary(Admin admin) {
         return new PlatformOverviewResponse.TenantSummary(
                 admin.getEnterpriseId(),
                 admin.getCompanyName(),

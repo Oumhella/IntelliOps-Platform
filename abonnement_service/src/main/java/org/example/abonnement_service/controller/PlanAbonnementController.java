@@ -26,7 +26,7 @@ public class PlanAbonnementController {
      * Créer un nouveau plan d'abonnement.
      */
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<PlanAbonnementResponse> creerPlan(@Valid @RequestBody PlanAbonnementRequest request) {
         PlanAbonnementResponse response = planAbonnementService.creerPlan(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
@@ -51,7 +51,7 @@ public class PlanAbonnementController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<PlanAbonnementResponse> modifierPlan(
             @PathVariable Long id,
             @Valid @RequestBody PlanAbonnementRequest request) {
@@ -59,7 +59,7 @@ public class PlanAbonnementController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ResponseEntity<Void> supprimerPlan(@PathVariable Long id) {
         planAbonnementService.supprimerPlan(id);
         return ResponseEntity.noContent().build();

@@ -12,10 +12,12 @@ import org.springframework.web.bind.annotation.*;
 import org.example.common.dto.PageResponse;
 import org.example.delivery_service.entity.StatutLivraison;
 import org.example.delivery_service.entity.TypeTransporteur;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @RestController
 @RequestMapping("/api/v1/livraisons")
 @RequiredArgsConstructor
+@PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC', 'LIVREUR')")
 public class LivraisonController {
 
     private final LivraisonService livraisonService;
@@ -35,6 +37,7 @@ public class LivraisonController {
     }
 
     @PostMapping("/expedier")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC')")
     public ResponseEntity<LivraisonResponse> expedier(@Valid @RequestBody ExpedierLivraisonRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(livraisonService.expedierLivraison(request));
     }

@@ -1,5 +1,6 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
+import type { UserRole } from '../api/models';
 import { AuthSessionService } from './auth-session.service';
 
 function destinationForCurrentSession(): string {
@@ -37,4 +38,12 @@ export const businessUserGuard: CanActivateFn = () => {
   return session.currentUser()?.role === 'ROLE_SUPER_ADMIN'
     ? inject(Router).parseUrl('/super-admin')
     : true;
+};
+
+export const roleGuard: CanActivateFn = (route) => {
+  const role = inject(AuthSessionService).currentUser()?.role;
+  const allowedRoles = route.data['roles'] as readonly UserRole[] | undefined;
+  return role !== undefined && (allowedRoles === undefined || allowedRoles.includes(role))
+    ? true
+    : inject(Router).parseUrl('/app');
 };

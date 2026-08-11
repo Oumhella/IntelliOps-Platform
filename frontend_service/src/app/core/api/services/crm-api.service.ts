@@ -72,13 +72,11 @@ export class CrmApiService {
     orderId: number,
     productId: number,
     quantity: number,
-    unitPrice: number,
   ): Observable<OrderResponse> {
-    const params = new HttpParams()
-      .set('produitId', productId)
-      .set('quantite', quantity)
-      .set('prixUnitaire', unitPrice);
-    return this.http.post<OrderResponse>(`${this.ordersUrl}/${orderId}/lignes`, null, { params });
+    return this.http.post<OrderResponse>(`${this.ordersUrl}/${orderId}/lignes`, {
+      productId,
+      quantity,
+    });
   }
 
   changeOrderStatus(orderId: number, status: OrderStatus): Observable<OrderResponse> {
