@@ -8,6 +8,8 @@ on:
       - 'common_lib/**'
       - 'Dockerfile.microservice'
       - '.github/actions/build-and-scan-service/**'
+      - '.github/workflows/update-gitops-image.yml'
+      - '.github/workflows/store-integration-service-ci.yml'
   pull_request:
     branches: [ main ]
     paths:
@@ -15,6 +17,8 @@ on:
       - 'common_lib/**'
       - 'Dockerfile.microservice'
       - '.github/actions/build-and-scan-service/**'
+      - '.github/workflows/update-gitops-image.yml'
+      - '.github/workflows/store-integration-service-ci.yml'
 
 jobs:
   build-and-scan:
@@ -31,3 +35,17 @@ jobs:
           service_port: 8090
           image_name: erp-store-integration-service
           run_tests: 'true'
+          push_image: ${{ github.event_name == 'push' }}
+          dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  update-gitops:
+    name: Promote store-integration-service image to dev
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/GitOps-setup'
+    needs: build-and-scan
+    uses: ./.github/workflows/update-gitops-image.yml
+    with:
+      image_name: erp-store-integration-service
+      image_tag: ${{ github.sha }}
+    secrets:
+      gitops_token: ${{ secrets.GITOPS_TOKEN }}
