@@ -1,13 +1,13 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { InventoryResponse, PLATFORM_TYPES, PlatformType, ProductResponse, STOCK_MOVEMENT_TYPES, StockApiService, StockMovementType, StoreResponse } from '../../core/api';
+import { InventoryResponse, PlatformType, ProductResponse, STOCK_MOVEMENT_TYPES, StockApiService, StockMovementType, StoreResponse } from '../../core/api';
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
 import { AuthSessionService } from '../../core/auth/auth-session.service';
 
 type StockTab='stores'|'products'|'inventory'; type StockPanel='store'|'product'|'inventory'|null;
 @Component({selector:'app-stock',imports:[FormsModule],templateUrl:'./stock.component.html',styleUrl:'./business-view.scss'})
 export class StockComponent implements OnInit{
- private readonly api=inject(StockApiService);readonly feedback=inject(UiFeedbackService);readonly platforms=PLATFORM_TYPES;readonly movements=STOCK_MOVEMENT_TYPES;
+ private readonly api=inject(StockApiService);readonly feedback=inject(UiFeedbackService);readonly movements=STOCK_MOVEMENT_TYPES;
  readonly canManageIntegrations=inject(AuthSessionService).currentUser()?.role==='ROLE_ADMIN';
  readonly stores=signal<readonly StoreResponse[]>([]);readonly products=signal<readonly ProductResponse[]>([]);readonly inventory=signal<readonly InventoryResponse[]>([]);readonly selectedInventory=signal<InventoryResponse|null>(null);readonly loading=signal(true);
  tab:StockTab='stores';panel:StockPanel=null;busy=false;editingStore:StoreResponse|null=null;editingProduct:ProductResponse|null=null;inventoryStoreId:number|null=null;inventoryProductId:number|null=null;

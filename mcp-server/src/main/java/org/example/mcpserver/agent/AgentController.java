@@ -37,7 +37,7 @@ public class AgentController {
     public AgentStatus status() {
         return new AgentStatus(enabled, nvidiaKeyConfigured, model,
                 enabled && nvidiaKeyConfigured ? "ready for read-only conversational requests" : "waiting for AGENT_LLM_PROVIDER=openai and NVIDIA_API_KEY",
-                List.of("all documented read-only Swagger operations", "consult inventory", "list products", "consult leads", "list agent leads"),
+                List.of("all documented read-only Swagger operations", "business intelligence", "consult inventory", "list products", "consult leads", "list agent leads"),
                 "Write operations require a separate MCP preview and explicit CONFIRM call.");
     }
 

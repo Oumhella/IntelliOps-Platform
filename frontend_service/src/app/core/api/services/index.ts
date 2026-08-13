@@ -9,3 +9,4 @@ export * from './platform-api.service';
 export * from './stock-api.service';
 export * from './subscriptions-api.service';
 export * from './users-api.service';
+export * from './analytics-api.service';

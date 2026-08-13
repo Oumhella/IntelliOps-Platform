@@ -174,8 +174,21 @@ vault kv put secret/store-integration-service \
 
 vault kv put secret/mcp-server \
   spring.ai.openai.api-key="${NVIDIA_API_KEY}" \
-  spring.ai.openai.chat.options.model="${NVIDIA_MODEL}"\
-  agent.llm.provider="${AGENT_LLM_PROVIDER:-none}" \
+  spring.ai.openai.chat.options.model="${NVIDIA_MODEL}" \
+  agent.llm.provider="${AGENT_LLM_PROVIDER:-none}"
+
+vault kv put secret/analytics-service \
+  JWT_SECRET="${JWT_SECRET:-MaCleSecreteUltraSecuriseeEtTresLonguePourLeCRM2026!}" \
+  LLM_API_KEY="${NVIDIA_API_KEY:-}" \
+  LLM_BASE_URL="${NVIDIA_BASE_URL:-https://integrate.api.nvidia.com}/v1" \
+  LLM_MODEL="${NVIDIA_MODEL:-meta/llama-3.1-70b-instruct}" \
+  ANALYTICS_QUERY_PASSWORD="${ANALYTICS_QUERY_PASSWORD:-change-query-password}" \
+  ANALYTICS_SYNC_PASSWORD="${ANALYTICS_SYNC_PASSWORD:-change-sync-password}" \
+  ANALYTICS_DATABASE_URL="postgresql://analytics_query:${ANALYTICS_QUERY_PASSWORD:-change-query-password}@erp-db:5432/erp_analytics" \
+  SYNC_ANALYTICS_DATABASE_URL="postgresql://analytics_sync:${ANALYTICS_SYNC_PASSWORD:-change-sync-password}@erp-db:5432/erp_analytics" \
+  MIGRATION_DATABASE_URL="postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-changeme}@erp-db:5432/erp_analytics" \
+  LEAD_DATABASE_URL="postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-changeme}@erp-db:5432/erp_leads" \
+  STOCK_DATABASE_URL="postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-changeme}@erp-db:5432/erp_stocks"
 
 STRIPE_PUBLISHABLE_KEY_VALUE="${STRIPE_PUBLISHABLE_KEY:-}"
 if [ -z "$STRIPE_PUBLISHABLE_KEY_VALUE" ]; then

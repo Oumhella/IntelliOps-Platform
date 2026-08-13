@@ -3,6 +3,7 @@ package org.example.mcpserver.config;
 import org.example.mcpserver.tools.LeadMcpTools;
 import org.example.mcpserver.tools.OpenApiMcpTools;
 import org.example.mcpserver.tools.StockMcpTools;
+import org.example.mcpserver.tools.AnalyticsMcpTools;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.context.annotation.Bean;
@@ -29,5 +30,10 @@ public class McpToolConfig {
         return MethodToolCallbackProvider.builder()
                 .toolObjects(openApiMcpTools)
                 .build();
+    }
+
+    @Bean
+    public ToolCallbackProvider analyticsTools(AnalyticsMcpTools analyticsMcpTools) {
+        return MethodToolCallbackProvider.builder().toolObjects(analyticsMcpTools).build();
     }
 }

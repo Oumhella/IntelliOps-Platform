@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "intelliops-analytics-service"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115,<1",
+    "httpx>=0.28,<1",
+    "openai>=1.82,<3",
+    "psycopg[binary]>=3.2,<4",
+    "pydantic-settings>=2.7,<3",
+    "pyjwt>=2.10,<3",
+    "sqlglot>=26,<30",
+    "uvicorn[standard]>=0.34,<1"
+]
+
+[project.scripts]
+analytics-migrate = "app.migrate:main"
+analytics-sync = "app.sync.runner:main"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest-asyncio>=0.25,<2",
+    "pytest>=8.3,<9",
+    "ruff>=0.9,<1"
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

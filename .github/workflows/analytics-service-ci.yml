@@ -1,0 +1,37 @@
+name: Analytics Service CI
+on:
+  push:
+    branches: [main, develop, feature/**]
+    paths: ['analytics-service/**', '.github/workflows/analytics-service-ci.yml', '.github/actions/build-and-scan-service/**']
+  pull_request:
+    branches: [main]
+    paths: ['analytics-service/**', '.github/workflows/analytics-service-ci.yml', '.github/actions/build-and-scan-service/**']
+permissions:
+  contents: read
+jobs:
+  build-test-and-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: ./.github/actions/build-and-scan-service
+        with:
+          project_type: python
+          service_name: analytics-service
+          service_port: 8090
+          image_name: erp-analytics-service
+          run_tests: 'true'
+          fail_on_vulnerabilities: 'true'
+          push_image: ${{ github.event_name == 'push' }}
+          dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
+  update-gitops:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/GitOps-setup'
+    needs: build-test-and-scan
+    uses: ./.github/workflows/update-gitops-image.yml
+    with:
+      image_name: erp-analytics-service
+      image_tag: ${{ github.sha }}
+    secrets:
+      gitops_token: ${{ secrets.GITOPS_TOKEN }}

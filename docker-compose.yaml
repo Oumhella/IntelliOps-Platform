@@ -154,12 +154,15 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - CONFIG_SERVER_URL=http://config-server:8888
       - SPRING_DATA_REDIS_HOST=redis
+      - ANALYTICS_SERVICE_URI=http://analytics-service:8091
     depends_on:
       discovery-server:
         condition: service_started
       config-server:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      analytics-service:
         condition: service_healthy
 
   user-service:
@@ -369,6 +372,58 @@ services:
     dns:
       - ${DOCKER_DNS_PRIMARY:-8.8.8.8}
       - ${DOCKER_DNS_SECONDARY:-1.1.1.1}
+
+  analytics-service:
+    build:
+      context: ./analytics-service
+      dockerfile: Dockerfile
+    container_name: erp-analytics-service
+    expose:
+      - "8091"
+    env_file:
+      - .env
+    environment:
+      - ANALYTICS_DATABASE_URL=postgresql://analytics_query:${ANALYTICS_QUERY_PASSWORD}@erp-db:5432/erp_analytics
+      - SYNC_ANALYTICS_DATABASE_URL=postgresql://analytics_sync:${ANALYTICS_SYNC_PASSWORD}@erp-db:5432/erp_analytics
+      - MIGRATION_DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@erp-db:5432/erp_analytics
+      - LEAD_DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@erp-db:5432/erp_leads
+      - STOCK_DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@erp-db:5432/erp_stocks
+      - JWT_SECRET=${JWT_SECRET}
+      - LLM_API_KEY=${NVIDIA_API_KEY:-}
+      - LLM_BASE_URL=${NVIDIA_BASE_URL:-https://integrate.api.nvidia.com}/v1
+      - LLM_MODEL=${NVIDIA_MODEL:-meta/llama-3.1-70b-instruct}
+    depends_on:
+      database-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8091/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - erp-network
+
+  analytics-sync:
+    build:
+      context: ./analytics-service
+      dockerfile: Dockerfile
+    command: ["python", "-m", "app.sync.runner", "--once"]
+    env_file:
+      - .env
+    environment:
+      - ANALYTICS_DATABASE_URL=postgresql://analytics_query:${ANALYTICS_QUERY_PASSWORD}@erp-db:5432/erp_analytics
+      - SYNC_ANALYTICS_DATABASE_URL=postgresql://analytics_sync:${ANALYTICS_SYNC_PASSWORD}@erp-db:5432/erp_analytics
+      - MIGRATION_DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@erp-db:5432/erp_analytics
+      - LEAD_DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@erp-db:5432/erp_leads
+      - STOCK_DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@erp-db:5432/erp_stocks
+      - JWT_SECRET=${JWT_SECRET}
+      - ANALYTICS_QUERY_PASSWORD=${ANALYTICS_QUERY_PASSWORD}
+      - ANALYTICS_SYNC_PASSWORD=${ANALYTICS_SYNC_PASSWORD}
+    depends_on:
+      analytics-service:
+        condition: service_healthy
+    networks:
+      - erp-network
 
   # ─────────────── MINIO SERVER ───────────────
   minio:

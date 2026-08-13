@@ -3,6 +3,7 @@ package org.example.mcpserver.agent;
 import org.example.mcpserver.tools.LeadMcpTools;
 import org.example.mcpserver.tools.OpenApiMcpTools;
 import org.example.mcpserver.tools.StockMcpTools;
+import org.example.mcpserver.tools.AnalyticsMcpTools;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
@@ -18,11 +19,21 @@ public class ReadOnlyAgentTools {
     private final StockMcpTools stockTools;
     private final LeadMcpTools leadTools;
     private final OpenApiMcpTools openApiTools;
+    private final AnalyticsMcpTools analyticsTools;
 
-    public ReadOnlyAgentTools(StockMcpTools stockTools, LeadMcpTools leadTools, OpenApiMcpTools openApiTools) {
+    public ReadOnlyAgentTools(StockMcpTools stockTools, LeadMcpTools leadTools,
+                              OpenApiMcpTools openApiTools, AnalyticsMcpTools analyticsTools) {
         this.stockTools = stockTools;
         this.leadTools = leadTools;
         this.openApiTools = openApiTools;
+        this.analyticsTools = analyticsTools;
+    }
+
+    @Tool(description = "Read-only: answer aggregated business questions about revenue, orders, "
+            + "products and stock. Prefer this for trends, totals, rankings and comparisons.")
+    public String askBusinessQuestion(
+            @ToolParam(description = "Business question in plain language") String question) {
+        return analyticsTools.askBusinessQuestion(question);
     }
 
     @Tool(description = "Read-only: retrieve the current inventory for a product in a store before giving operational advice.")
