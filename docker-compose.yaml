@@ -579,6 +579,9 @@ services:
         condition: service_started
     networks:
       - erp-network
+    dns:
+      - ${DOCKER_DNS_PRIMARY:-8.8.8.8}
+      - ${DOCKER_DNS_SECONDARY:-1.1.1.1}
 
   frontend:
     build:

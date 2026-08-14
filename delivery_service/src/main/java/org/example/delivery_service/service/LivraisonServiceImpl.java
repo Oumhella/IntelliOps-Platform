@@ -7,6 +7,7 @@ import org.example.delivery_service.client.OrderClient;
 import org.example.delivery_service.client.PaymentClient;
 import org.example.delivery_service.dto.request.ExpedierLivraisonRequest;
 import org.example.delivery_service.dto.request.UpdateStatutRequest;
+import org.example.delivery_service.dto.request.AssignCourierRequest;
 import org.example.delivery_service.dto.response.LivraisonResponse;
 import org.example.delivery_service.entity.Livraison;
 import org.example.delivery_service.entity.StatutLivraison;
@@ -138,6 +139,7 @@ public class LivraisonServiceImpl implements LivraisonService {
     @Transactional
     public LivraisonResponse mettreAJourStatut(Long id, UpdateStatutRequest request) {
         Livraison livraison = findDelivery(id);
+        ensureStatusOwnership(livraison);
 
         if (!isAllowedTransition(livraison, request.getStatut())) {
             throw new IllegalStateException(
@@ -164,6 +166,7 @@ public class LivraisonServiceImpl implements LivraisonService {
     @Transactional
     public LivraisonResponse confirmerReception(Long id) {
         Livraison livraison = findDelivery(id);
+        ensureStatusOwnership(livraison);
 
         if (livraison.getStatutLivraison() != StatutLivraison.EN_COURS
                 && livraison.getStatutLivraison() != StatutLivraison.CHEZ_TRANSPORTEUR) {
@@ -183,6 +186,26 @@ public class LivraisonServiceImpl implements LivraisonService {
         }
 
         return livraisonMapper.toResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public LivraisonResponse assignerLivreur(Long id, AssignCourierRequest request) {
+        Livraison livraison = findDelivery(id);
+        if (livraison.getTypeTransporteur() != TypeTransporteur.LIVREUR_INTERNE) {
+            throw new IllegalStateException("Only an internal delivery can be assigned to a courier.");
+        }
+        if (livraison.getStatutLivraison() != StatutLivraison.EN_PREPARATION
+                && livraison.getStatutLivraison() != StatutLivraison.ECHEC) {
+            throw new IllegalStateException("A courier can be reassigned only before dispatch or after a failed attempt.");
+        }
+        UserSummary courier = userClient.getActiveCourier(request.livreurId());
+        if (!"ROLE_LIVREUR".equals(courier.role()) || !courier.active()) {
+            throw new IllegalArgumentException("The selected user is not an active internal courier");
+        }
+        livraison.setLivreurId(courier.id());
+        livraison.mettreAJourStatut(StatutLivraison.EN_PREPARATION);
+        return livraisonMapper.toResponse(livraisonRepository.save(livraison));
     }
 
     private Livraison findDelivery(Long id) {
@@ -271,10 +294,24 @@ public class LivraisonServiceImpl implements LivraisonService {
         }
     }
 
-    private Long currentCourierId() {
-        boolean courier = SecurityContextHolder.getContext().getAuthentication() != null
+    private void ensureStatusOwnership(Livraison delivery) {
+        boolean courier = hasRole("ROLE_LIVREUR");
+        if (delivery.getTypeTransporteur() == TypeTransporteur.LIVREUR_INTERNE && !courier) {
+            throw new AccessDeniedException("The assigned courier controls an internal delivery's execution status.");
+        }
+        if (delivery.getTypeTransporteur() == TypeTransporteur.SOCIETE_LIVRAISON && courier) {
+            throw new AccessDeniedException("External-carrier deliveries are managed by logistics.");
+        }
+    }
+
+    private boolean hasRole(String role) {
+        return SecurityContextHolder.getContext().getAuthentication() != null
                 && SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
-                .anyMatch(authority -> "ROLE_LIVREUR".equals(authority.getAuthority()));
+                .anyMatch(authority -> role.equals(authority.getAuthority()));
+    }
+
+    private Long currentCourierId() {
+        boolean courier = hasRole("ROLE_LIVREUR");
         return courier ? TenantContext.requireUserId() : null;
     }
 

@@ -64,3 +64,5 @@ export interface ChangePasswordRequest {
 export interface StaffStatusRequest {
   readonly active: boolean;
 }
+export interface EnterpriseProfile { readonly id:number; companyName:string; activityType:string; legalName:string|null; legalIdentifier:string|null; taxIdentifier:string|null; contactEmail:string|null; contactPhone:string|null; website:string|null; addressLine1:string|null; addressLine2:string|null; city:string|null; postalCode:string|null; countryCode:string|null; currencyCode:string|null; timezone:string|null; }
+export type EnterpriseUpdateRequest = Omit<EnterpriseProfile,'id'>;

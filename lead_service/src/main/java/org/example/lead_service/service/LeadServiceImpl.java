@@ -52,7 +52,9 @@ public class LeadServiceImpl implements LeadService {
         Lead lead = leadMapper.toEntity(leadDTO);
         lead.setIdLead(null);
         lead.setEnterpriseId(TenantContext.requireEnterpriseId());
-        lead.setAgentId(TenantContext.requireUserId());
+        // Manual intake is created by an administrator and deliberately remains
+        // unassigned until it is allocated to an active CSM.
+        lead.setAgentId(null);
         lead.setStatutLead(StatutLead.NEW_LEAD);
         lead.setSource(LeadSource.MANUAL);
         lead.setBoutiqueId(null);

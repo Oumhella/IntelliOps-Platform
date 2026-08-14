@@ -6,6 +6,7 @@ import {
   DeliveryResponse,
   ShipDeliveryRequest,
   UpdateDeliveryStatusRequest,
+  AssignCourierRequest,
   DeliveryStatus,
   CarrierType,
   PageResponse,
@@ -52,5 +53,9 @@ export class DeliveriesApiService {
 
   confirmReception(deliveryId: number): Observable<DeliveryResponse> {
     return this.http.post<DeliveryResponse>(`${this.url}/${deliveryId}/confirmer-reception`, null);
+  }
+
+  assignCourier(deliveryId: number, request: AssignCourierRequest): Observable<DeliveryResponse> {
+    return this.http.patch<DeliveryResponse>(`${this.url}/${deliveryId}/livreur`, request);
   }
 }

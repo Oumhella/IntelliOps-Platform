@@ -8,7 +8,8 @@ from fastapi.responses import JSONResponse
 
 from app.auth import Principal, authenticated_principal
 from app.config import Settings, get_settings
-from app.models import AskRequest, AskResponse
+from app.models import AskRequest, AskResponse, ConversationMessage, ConversationMessageCreate
+from app.history import add_message, clear_messages, list_messages
 from app.semantic import SUGGESTIONS
 from app.service import answer_question
 
@@ -68,3 +69,16 @@ async def ask(
             principal.enterprise_id,
         )
         raise HTTPException(502, "Analytics query could not be completed") from exc
+
+@app.get("/api/v1/analytics/conversations/{surface}",response_model=list[ConversationMessage])
+def history(surface:str,principal:Annotated[Principal,Depends(authenticated_principal)],settings:Annotated[Settings,Depends(get_settings)]):
+    surface=surface.upper()
+    if surface not in {"ASSISTANT","BI"}: raise HTTPException(400,"Invalid conversation surface")
+    return list_messages(settings,principal.enterprise_id,principal.user_id,surface)
+@app.post("/api/v1/analytics/conversations",response_model=ConversationMessage,status_code=201)
+def store(item:ConversationMessageCreate,principal:Annotated[Principal,Depends(authenticated_principal)],settings:Annotated[Settings,Depends(get_settings)]): return add_message(settings,principal.enterprise_id,principal.user_id,item)
+@app.delete("/api/v1/analytics/conversations/{surface}",status_code=204)
+def clear(surface:str,principal:Annotated[Principal,Depends(authenticated_principal)],settings:Annotated[Settings,Depends(get_settings)]):
+    surface=surface.upper()
+    if surface not in {"ASSISTANT","BI"}: raise HTTPException(400,"Invalid conversation surface")
+    clear_messages(settings,principal.enterprise_id,principal.user_id,surface)

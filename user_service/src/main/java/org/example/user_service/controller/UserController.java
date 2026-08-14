@@ -73,6 +73,8 @@ public class UserController {
         UserResponse response = userService.register(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
+    @PostMapping("/password/forgot") public ResponseEntity<Map<String,String>> forgot(@Valid @RequestBody ForgotPasswordRequest request){userService.requestPasswordReset(request);return ResponseEntity.accepted().body(Map.of("message","If an active account exists, a reset link has been sent."));}
+    @PostMapping("/password/reset") public ResponseEntity<Map<String,String>> reset(@Valid @RequestBody ResetPasswordRequest request){userService.resetPassword(request);return ResponseEntity.ok(Map.of("message","Password reset successfully."));}
 
     // ══════════════════════════════════════════════════════════════════
     //  PROFILE ROUTES (any authenticated user)
@@ -110,6 +112,8 @@ public class UserController {
         userService.changePassword(email, request);
         return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
     }
+    @GetMapping("/enterprise") @PreAuthorize("hasRole('ADMIN')") public ResponseEntity<org.example.user_service.dto.response.EnterpriseResponse> getEnterprise(@RequestAttribute("enterpriseId") Long id){return ResponseEntity.ok(userService.getEnterprise(id));}
+    @PutMapping("/enterprise") @PreAuthorize("hasRole('ADMIN')") public ResponseEntity<org.example.user_service.dto.response.EnterpriseResponse> updateEnterprise(@RequestAttribute("enterpriseId") Long id,@Valid @RequestBody EnterpriseUpdateRequest request){return ResponseEntity.ok(userService.updateEnterprise(id,request));}
 
     // ══════════════════════════════════════════════════════════════════
     //  STAFF MANAGEMENT ROUTES (admin operations)

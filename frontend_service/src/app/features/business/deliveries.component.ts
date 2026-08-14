@@ -39,11 +39,12 @@ export class DeliveriesComponent implements OnInit {
   readonly loading = signal(true);
   statusFilter: DeliveryStatus | '' = '';
   carrierFilter: CarrierType | '' = '';
-  panel: 'ship' | 'detail' | 'status' | null = null;
+  panel: 'ship' | 'detail' | 'status' | 'assign' | null = null;
   busy = false;
   lookupType: 'tracking' | 'order' = 'tracking';
   lookupValue = '';
   newStatus: DeliveryStatus = 'EN_PREPARATION';
+  assignedCourierId: number | null = null;
   shipForm = {
     referenceCommandeId: null as number | null,
     typeTransporteur: 'SOCIETE_LIVRAISON' as CarrierType,
@@ -81,13 +82,14 @@ export class DeliveriesComponent implements OnInit {
     });
   }
 
-  open(panel: 'ship' | 'detail' | 'status', delivery?: DeliveryResponse): void {
+  open(panel: 'ship' | 'detail' | 'status' | 'assign', delivery?: DeliveryResponse): void {
     if (panel === 'ship' && !this.canShip) return;
     this.selected.set(delivery ?? null);
     this.panel = panel;
     if (delivery && panel === 'status') {
       this.newStatus = this.allowedStatuses(delivery)[0] ?? delivery.statutLivraison;
     }
+    if (delivery && panel === 'assign') this.assignedCourierId = delivery.livreurId;
     if (delivery && panel === 'detail') {
       this.api.getById(delivery.idLivraison).subscribe({
         next: (value) => this.selected.set(value),
@@ -152,7 +154,21 @@ export class DeliveriesComponent implements OnInit {
     });
   }
 
+  assign(): void {
+    const delivery = this.selected();
+    if (!delivery || !this.assignedCourierId || !this.canReassign(delivery)) return;
+    this.busy = true;
+    this.api.assignCourier(delivery.idLivraison, { livreurId: this.assignedCourierId }).subscribe({
+      next: () => { this.busy = false; this.feedback.success('Courier assignment updated.'); this.close(); this.load(); },
+      error: (error) => { this.busy = false; this.feedback.error(error); },
+    });
+  }
+
   allowedStatuses(delivery: DeliveryResponse): readonly DeliveryStatus[] {
+    const ownsExecution = this.role === 'ROLE_LIVREUR'
+      ? delivery.typeTransporteur === 'LIVREUR_INTERNE'
+      : delivery.typeTransporteur === 'SOCIETE_LIVRAISON';
+    if (!ownsExecution) return [];
     switch (delivery.statutLivraison) {
       case 'EN_PREPARATION':
         return delivery.typeTransporteur === 'LIVREUR_INTERNE'
@@ -163,6 +179,22 @@ export class DeliveriesComponent implements OnInit {
       case 'ECHEC': return ['EN_COURS', 'RETOUR'];
       default: return [];
     }
+  }
+
+  canConfirm(delivery: DeliveryResponse): boolean {
+    return this.allowedStatuses(delivery).includes('LIVREE');
+  }
+
+  canReassign(delivery: DeliveryResponse): boolean {
+    return this.canShip && delivery.typeTransporteur === 'LIVREUR_INTERNE'
+      && (delivery.statutLivraison === 'EN_PREPARATION' || delivery.statutLivraison === 'ECHEC');
+  }
+
+  courierName(id: number | null): string {
+    if (id === null) return 'Unassigned';
+    if (this.role === 'ROLE_LIVREUR') return 'You';
+    const courier = this.couriers().find((item) => item.id === id);
+    return courier ? `${courier.firstname} ${courier.lastname}` : `Courier #${id}`;
   }
 
   label(value: string): string {

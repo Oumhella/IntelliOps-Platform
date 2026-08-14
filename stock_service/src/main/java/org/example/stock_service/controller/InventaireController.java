@@ -22,7 +22,7 @@ public class InventaireController {
     private final InventaireService inventaireService;
 
     @PatchMapping("/boutiques/{idBoutique}/produits/{idProduit}/ajuster")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CSM', 'LOGISTIC', 'INTEGRATION_SERVICE')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC')")
     public ResponseEntity<InventaireResponseDTO> ajusterStock(
             @PathVariable Long idBoutique,
             @PathVariable Long idProduit,
@@ -64,6 +64,7 @@ public class InventaireController {
     }
 
     @GetMapping("/boutiques/{idBoutique}/produits/{idProduit}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CSM', 'LOGISTIC', 'INTEGRATION_SERVICE')")
     public ResponseEntity<InventaireResponseDTO> obtenirInventaire(
             @PathVariable Long idBoutique,
             @PathVariable Long idProduit) {
@@ -71,6 +72,7 @@ public class InventaireController {
     }
 
     @GetMapping("/boutiques/{idBoutique}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CSM', 'LOGISTIC', 'INTEGRATION_SERVICE')")
     public ResponseEntity<List<InventaireResponseDTO>> obtenirInventairesParBoutique(@PathVariable Long idBoutique) {
         return ResponseEntity.ok(inventaireService.obtenirInventairesParBoutique(idBoutique));
     }

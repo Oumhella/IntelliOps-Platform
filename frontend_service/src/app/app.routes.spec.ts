@@ -21,7 +21,7 @@ describe('application routes', () => {
 
   it('restricts management routes to enterprise administrators', () => {
     const children = routes.find((route) => route.path === 'app')?.children ?? [];
-    for (const path of ['billing', 'subscriptions', 'integrations', 'team', 'notifications']) {
+    for (const path of ['billing', 'subscriptions', 'integrations', 'team', 'notifications', 'assistant', 'analytics']) {
       expect(children.find((route) => route.path === path)?.data?.['roles']).toEqual(['ROLE_ADMIN']);
     }
   });

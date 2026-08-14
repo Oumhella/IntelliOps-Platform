@@ -33,7 +33,8 @@ export class LeadsComponent implements OnInit {
   readonly feedback = inject(UiFeedbackService);
   private readonly currentUser = inject(AuthSessionService).currentUser;
 
-  readonly canCreateAndContact = this.currentUser()?.role === 'ROLE_CSM';
+  readonly canCreate = this.currentUser()?.role === 'ROLE_ADMIN';
+  readonly canContact = this.currentUser()?.role === 'ROLE_CSM';
   readonly canAssign = this.currentUser()?.role === 'ROLE_ADMIN';
   readonly priorities = LEAD_PRIORITIES;
   readonly interactionTypes = INTERACTION_TYPES;
@@ -79,7 +80,7 @@ export class LeadsComponent implements OnInit {
         error: (error) => this.feedback.error(error, 'CSM staff could not be loaded.'),
       });
     }
-    if (this.canCreateAndContact) {
+    if (this.canContact) {
       this.stockApi.getSalesCatalog().subscribe({
         next: (products) => this.products.set(products),
         error: (error) => this.feedback.error(error, 'Products could not be loaded.'),
@@ -93,7 +94,7 @@ export class LeadsComponent implements OnInit {
 
   load(page = 0): void {
     this.loading.set(true);
-    const agentId = this.canCreateAndContact ? this.currentUser()?.id : this.agentFilter ?? undefined;
+    const agentId = this.canContact ? this.currentUser()?.id : this.agentFilter ?? undefined;
     this.api.searchLeads(page, 20, this.statusFilter || undefined, agentId).subscribe({
       next: (value) => {
         this.page.set(value);

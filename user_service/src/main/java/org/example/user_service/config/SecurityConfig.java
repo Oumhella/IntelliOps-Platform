@@ -51,6 +51,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/users/login").permitAll() // URL standard pour l'authentification
                         .requestMatchers("/api/v1/users/register").permitAll()
                         .requestMatchers("/api/v1/users/refresh").permitAll()
+                        .requestMatchers("/api/v1/users/password/forgot", "/api/v1/users/password/reset").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .anyRequest().authenticated()
                 );

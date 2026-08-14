@@ -146,7 +146,6 @@ class LeadServiceImplTest {
     void convertirEnCommande_DevraitCreerCommandeEtChangerStatutEnConverted() {
         // Arrange
         mockLead.setStatutLead(StatutLead.IN_PROGRESS);
-        when(leadRepository.findByIdLeadAndEnterpriseId(1L, 7L)).thenReturn(Optional.of(mockLead));
         when(leadRepository.findDetailedByIdLeadAndEnterpriseId(1L, 7L)).thenReturn(Optional.of(mockLead));
         when(leadRepository.save(any(Lead.class))).thenReturn(mockLead);
         when(commandeMapper.toDto(any(Commande.class))).thenReturn(new CommandeDTO());
@@ -214,7 +213,6 @@ class LeadServiceImplTest {
         imported.ajouterLigne(102L, 2, 50.0);
         mockLead.setCommande(imported);
 
-        when(leadRepository.findByIdLeadAndEnterpriseId(1L, 7L)).thenReturn(Optional.of(mockLead));
         when(leadRepository.findDetailedByIdLeadAndEnterpriseId(1L, 7L)).thenReturn(Optional.of(mockLead));
         when(leadRepository.save(any(Lead.class))).thenReturn(mockLead);
         when(commandeMapper.toDto(any(Commande.class))).thenReturn(new CommandeDTO());

@@ -36,3 +36,20 @@ def test_authentication_rejects_forged_gateway_tenant() -> None:
     with pytest.raises(HTTPException) as error:
         authenticated_principal(f"Bearer {token}", "99", settings())
     assert error.value.status_code == 401
+
+
+def test_authentication_rejects_non_admin_business_role() -> None:
+    token = jwt.encode(
+        {
+            "sub": "csm@example.test",
+            "userId": 12,
+            "enterpriseId": 42,
+            "role": "ROLE_CSM",
+            "exp": datetime.now(UTC) + timedelta(minutes=5),
+        },
+        "x" * 32,
+        algorithm="HS256",
+    )
+    with pytest.raises(HTTPException) as error:
+        authenticated_principal(f"Bearer {token}", "42", settings())
+    assert error.value.status_code == 403

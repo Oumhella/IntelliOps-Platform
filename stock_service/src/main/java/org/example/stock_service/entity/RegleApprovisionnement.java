@@ -21,6 +21,7 @@ public class RegleApprovisionnement {
 
     @Builder.Default
     private Boolean estActif = true;
+    @Builder.Default private Boolean alerteDeclenchee = false;
 
     @OneToOne(mappedBy = "regleApprovisionnement")
     @ToString.Exclude
@@ -30,5 +31,6 @@ public class RegleApprovisionnement {
         this.seuilAlerte = seuilAlerte;
         this.quantiteRecommandeAuto = quantiteRecommandeAuto;
         this.estActif = estActif;
+        if (!estActif) this.alerteDeclenchee = false;
     }
 }

@@ -19,6 +19,8 @@ export interface UpdateDeliveryStatusRequest {
   readonly statut: DeliveryStatus;
 }
 
+export interface AssignCourierRequest { readonly livreurId: number; }
+
 export interface DeliveryResponse {
   readonly idLivraison: number;
   readonly referenceCommandeId: number;

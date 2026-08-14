@@ -2,6 +2,7 @@ package org.example.delivery_service.controller;
 
 import org.example.delivery_service.dto.request.ExpedierLivraisonRequest;
 import org.example.delivery_service.dto.request.UpdateStatutRequest;
+import org.example.delivery_service.dto.request.AssignCourierRequest;
 import org.example.delivery_service.dto.response.LivraisonResponse;
 import org.example.delivery_service.service.LivraisonService;
 import jakarta.validation.Valid;
@@ -62,5 +63,12 @@ public class LivraisonController {
     @PostMapping("/{id}/confirmer-reception")
     public ResponseEntity<LivraisonResponse> confirmerReception(@PathVariable Long id) {
         return ResponseEntity.ok(livraisonService.confirmerReception(id));
+    }
+
+    @PatchMapping("/{id}/livreur")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC')")
+    public ResponseEntity<LivraisonResponse> assignerLivreur(
+            @PathVariable Long id, @Valid @RequestBody AssignCourierRequest request) {
+        return ResponseEntity.ok(livraisonService.assignerLivreur(id, request));
     }
 }

@@ -2,6 +2,7 @@ package org.example.delivery_service.service;
 
 import org.example.delivery_service.dto.request.ExpedierLivraisonRequest;
 import org.example.delivery_service.dto.request.UpdateStatutRequest;
+import org.example.delivery_service.dto.request.AssignCourierRequest;
 import org.example.delivery_service.dto.response.LivraisonResponse;
 import org.example.delivery_service.entity.StatutLivraison;
 import org.example.delivery_service.entity.TypeTransporteur;
@@ -15,4 +16,5 @@ public interface LivraisonService {
     LivraisonResponse getByCommandeId(Long commandeId);
     LivraisonResponse mettreAJourStatut(Long id, UpdateStatutRequest request);
     LivraisonResponse confirmerReception(Long id);
+    LivraisonResponse assignerLivreur(Long id, AssignCourierRequest request);
 }

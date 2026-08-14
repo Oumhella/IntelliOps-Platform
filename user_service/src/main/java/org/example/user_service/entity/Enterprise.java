@@ -31,6 +31,20 @@ public class Enterprise {
     @Column(nullable = false, length = 120)
     private String activityType;
 
+    @Column(length = 160) private String legalName;
+    @Column(length = 80) private String legalIdentifier;
+    @Column(length = 80) private String taxIdentifier;
+    @Column(length = 160) private String contactEmail;
+    @Column(length = 40) private String contactPhone;
+    @Column(length = 255) private String website;
+    @Column(length = 255) private String addressLine1;
+    @Column(length = 255) private String addressLine2;
+    @Column(length = 100) private String city;
+    @Column(length = 30) private String postalCode;
+    @Column(length = 2) private String countryCode = "MA";
+    @Column(length = 3) private String currencyCode = "MAD";
+    @Column(length = 80) private String timezone = "Africa/Casablanca";
+
     @Column(nullable = false)
     private boolean active = true;
 

@@ -26,6 +26,8 @@ export class AuthApiService {
   register(request: RegisterRequest): Observable<UserResponse> {
     return this.http.post<UserResponse>(`${this.usersUrl}/register`, request);
   }
+  forgotPassword(email:string):Observable<{message:string}>{return this.http.post<{message:string}>(`${this.usersUrl}/password/forgot`,{email});}
+  resetPassword(token:string,newPassword:string,confirmPassword:string):Observable<{message:string}>{return this.http.post<{message:string}>(`${this.usersUrl}/password/reset`,{token,newPassword,confirmPassword});}
 
   logout(): void {
     this.http.post<void>(`${this.usersUrl}/logout`, {}, { withCredentials: true }).pipe(

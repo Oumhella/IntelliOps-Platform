@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     llm_model: str = "gpt-4o-mini"
     query_timeout_ms: PositiveInt = Field(default=5_000, le=30_000)
     query_max_rows: PositiveInt = Field(default=50, le=500)
-    allowed_roles: str = "ROLE_ADMIN,ROLE_CSM,ROLE_LOGISTIC"
+    allowed_roles: str = "ROLE_ADMIN"
 
     @property
     def allowed_role_set(self) -> set[str]:

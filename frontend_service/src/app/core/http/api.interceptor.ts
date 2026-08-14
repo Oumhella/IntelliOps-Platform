@@ -28,16 +28,21 @@ export const apiInterceptor: HttpInterceptorFn = (request, next) => {
       if (isApiRequest && error.status === 401) {
         if (!isAuthLifecycleRequest && token !== null) {
           return authRefresh.refresh().pipe(
-            switchMap((session) => next(request.clone({
-              setHeaders: { Authorization: `Bearer ${session.token}` },
-            }))),
             catchError((refreshError: unknown) => {
-              authSession.clear();
-              void router.navigateByUrl('/login');
+              const rejected = refreshError instanceof HttpErrorResponse
+                && (refreshError.status === 401 || refreshError.status === 403);
+              if (rejected) {
+                authSession.clear();
+                void router.navigateByUrl('/login');
+              }
               return throwError(() => refreshError instanceof HttpErrorResponse
                 ? ApiError.fromHttpError(refreshError)
                 : refreshError);
             }),
+            switchMap((session) => next(request.clone({
+              setHeaders: { Authorization: `Bearer ${session.token}` },
+            })).pipe(catchError((retryError: unknown) => throwError(() =>
+              retryError instanceof HttpErrorResponse ? ApiError.fromHttpError(retryError) : retryError)))),
           );
         }
         authSession.clear();

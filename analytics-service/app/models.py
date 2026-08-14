@@ -39,5 +39,15 @@ class AskResponse(BaseModel):
     visualization: Visualization
     metadata: Metadata
 
+class ConversationMessageCreate(BaseModel):
+    surface: Literal["ASSISTANT", "BI"]
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=12_000)
+    payload: dict | None = None
+
+class ConversationMessage(ConversationMessageCreate):
+    id: int
+    created_at: datetime
+
 
 JsonScalar = str | int | float | bool | None | Decimal | datetime

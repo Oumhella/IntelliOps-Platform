@@ -11,6 +11,8 @@ import org.example.stock_service.repository.*;
 import org.example.common.security.TenantContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.example.stock_service.event.StockAlertProducer;
 
 import jakarta.persistence.EntityNotFoundException;
 import java.util.List;
@@ -24,6 +26,7 @@ public class InventaireServiceImpl implements InventaireService {
     private final BoutiqueRepository boutiqueRepository; // <-- Ajouté pour récupérer l'entité Boutique
     private final ProduitRepository produitRepository;   // <-- Ajouté pour récupérer l'entité Produit
     private final StockMapper stockMapper;
+    private final StockAlertProducer stockAlertProducer;
 
     @Transactional
     @Override
@@ -36,6 +39,7 @@ public class InventaireServiceImpl implements InventaireService {
         inventaire.updateQuantity(request.getQuantite(), request.getTypeMouvement(), auteurId);
 
         Inventaire saved = inventaireRepository.save(inventaire);
+        evaluateReplenishment(saved);
         return stockMapper.toResponse(saved);
     }
 
@@ -73,6 +77,7 @@ public class InventaireServiceImpl implements InventaireService {
                 .inventaire(saved)
                 .auteurId(auteurId)
                 .build());
+        evaluateReplenishment(saved);
         return stockMapper.toResponse(saved);
     }
 
@@ -86,6 +91,7 @@ public class InventaireServiceImpl implements InventaireService {
             reservation.setStatut(StatutReservationStock.RELEASED);
             reservationStockRepository.save(reservation);
             inventaireRepository.save(reservation.getInventaire());
+            evaluateReplenishment(reservation.getInventaire());
         }
         return stockMapper.toResponse(reservation.getInventaire());
     }
@@ -103,6 +109,7 @@ public class InventaireServiceImpl implements InventaireService {
             reservation.setStatut(StatutReservationStock.CONSUMED);
             reservationStockRepository.save(reservation);
             inventaireRepository.save(reservation.getInventaire());
+            evaluateReplenishment(reservation.getInventaire());
         }
         return stockMapper.toResponse(reservation.getInventaire());
     }
@@ -143,7 +150,24 @@ public class InventaireServiceImpl implements InventaireService {
         }
 
         Inventaire saved = inventaireRepository.save(inventaire);
+        evaluateReplenishment(saved);
         return stockMapper.toResponse(saved);
+    }
+
+    private void evaluateReplenishment(Inventaire inventory) {
+        RegleApprovisionnement rule=inventory.getRegleApprovisionnement();
+        if(rule==null||!Boolean.TRUE.equals(rule.getEstActif())) return;
+        if(inventory.getQuantiteDisponible()>rule.getSeuilAlerte()){
+            rule.setAlerteDeclenchee(false);
+            return;
+        }
+        if(Boolean.TRUE.equals(rule.getAlerteDeclenchee())) return;
+        var authentication=SecurityContextHolder.getContext().getAuthentication();
+        String recipient=authentication==null?null:authentication.getName();
+        stockAlertProducer.send(inventory.getBoutique().getEnterpriseId(),recipient,
+                inventory.getProduit().getNomProduit(),inventory.getBoutique().getNomBoutique(),
+                inventory.getQuantiteDisponible(),rule.getSeuilAlerte(),rule.getQuantiteRecommandeAuto());
+        rule.setAlerteDeclenchee(true);
     }
 
     /**
@@ -156,29 +180,14 @@ public class InventaireServiceImpl implements InventaireService {
                         idBoutique, idProduit, enterpriseId)
                 .orElseGet(() -> {
                     Boutique boutique = boutiqueRepository.findByIdBoutiqueAndEnterpriseId(idBoutique, enterpriseId)
-                            .orElseGet(() -> boutiqueRepository.findAllByEnterpriseIdOrderByNomBoutiqueAsc(enterpriseId)
-                                    .stream().findFirst()
-                                    .orElseGet(() -> boutiqueRepository.save(Boutique.builder()
-                                            .nomBoutique("Main Location")
-                                            .plateformeType(TypePlateforme.MANUAL)
-                                            .adminId(0L)
-                                            .enterpriseId(enterpriseId)
-                                            .build())));
+                            .orElseThrow(() -> new EntityNotFoundException("Emplacement de stock introuvable."));
                     Produit produit = produitRepository.findByIdProduitAndEnterpriseId(idProduit, enterpriseId)
-                            .orElseGet(() -> {
-                                Produit p = new Produit();
-                                p.setNomProduit("Shopify Product #" + idProduit);
-                                p.setPrixAchat(5.0);
-                                p.setPrixVente(10.0);
-                                p.setGlobalSku("SKU-AUTO-" + idProduit);
-                                p.setEnterpriseId(enterpriseId);
-                                return produitRepository.save(p);
-                            });
+                            .orElseThrow(() -> new EntityNotFoundException("Produit introuvable."));
 
                     Inventaire nouvelInventaire = new Inventaire();
                     nouvelInventaire.setBoutique(boutique);
                     nouvelInventaire.setProduit(produit);
-                    nouvelInventaire.setQuantiteDisponible(100);
+                    nouvelInventaire.setQuantiteDisponible(0);
                     nouvelInventaire.setQuantiteReservee(0);
                     return inventaireRepository.save(nouvelInventaire);
                 });

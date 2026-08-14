@@ -8,7 +8,7 @@ import org.example.lead_service.entity.StatutPaiementCommande;
 
 public interface CommandeService {
     CommandeDTO obtenirCommandeParId(Long idCommande);
-    PageResponse<CommandeDTO> rechercherCommandes(StatutCommande statut, int page, int size);
+    PageResponse<CommandeDTO> rechercherCommandes(StatutCommande statut, Long agentId, int page, int size);
     CommandeDTO ajouterProduitACommande(Long idCommande, AddOrderLineRequest request);
     CommandeDTO changerStatutCommande(Long idCommande, StatutCommande nouveauStatut);
     CommandeDTO changerStatutPaiement(Long idCommande, StatutPaiementCommande nouveauStatut);
