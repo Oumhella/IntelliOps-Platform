@@ -19,7 +19,7 @@ jobs:
         with:
           project_type: python
           service_name: analytics-service
-          service_port: 8090
+          service_port: 8091
           image_name: erp-analytics-service
           run_tests: 'true'
           fail_on_vulnerabilities: 'true'
