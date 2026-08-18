@@ -13,3 +13,9 @@ def test_examples_rely_on_database_tenant_context() -> None:
     sql = (Path(__file__).parents[1] / "docs" / "example-queries.sql").read_text()
     assert "set_config('app.enterprise_id'" in sql
     assert "WHERE enterprise_id =" not in sql
+
+
+def test_role_aware_tables_have_forced_rls() -> None:
+    sql = (Path(__file__).parents[1] / "migrations" / "V5__role_aware_analytics.sql").read_text()
+    assert "ALTER TABLE dim_leads FORCE ROW LEVEL SECURITY" in sql
+    assert "ALTER TABLE fact_deliveries FORCE ROW LEVEL SECURITY" in sql

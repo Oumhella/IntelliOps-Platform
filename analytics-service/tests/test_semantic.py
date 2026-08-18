@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from app.semantic import deterministic_plan
+from app.semantic import deterministic_plan, ensure_metric_allowed, suggestions_for_role
 
 
 @pytest.mark.parametrize(
@@ -29,3 +29,28 @@ def test_order_status_remains_a_grouped_metric() -> None:
 
     assert plan is not None
     assert plan.metric == "orders_by_status"
+
+
+def test_csm_order_metrics_are_scoped_to_authenticated_user() -> None:
+    plan = deterministic_plan(
+        "Show my orders grouped by status",
+        datetime.now(UTC),
+        role="ROLE_CSM",
+        user_id="42",
+    )
+
+    assert plan is not None
+    assert "assigned_csm_id = %(actor_id)s" in plan.sql
+    assert plan.parameters == {"actor_id": 42}
+
+
+def test_csm_cannot_access_revenue_metric() -> None:
+    with pytest.raises(PermissionError, match="cannot access"):
+        ensure_metric_allowed("paid_revenue", "ROLE_CSM")
+
+
+def test_logistic_suggestions_are_operational() -> None:
+    suggestions = suggestions_for_role("ROLE_LOGISTIC")
+
+    assert any("stock" in item.lower() for item in suggestions)
+    assert all("revenue" not in item.lower() for item in suggestions)

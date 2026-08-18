@@ -20,7 +20,8 @@ class QueryResult(BaseModel):
 
 
 class Visualization(BaseModel):
-    type: Literal["none", "single_value", "table", "bar", "line"]
+    type: Literal["none", "single_value", "table", "bar", "line", "donut"]
+    title: str | None = None
     x: str | None = None
     y: str | None = None
 
@@ -38,6 +39,11 @@ class AskResponse(BaseModel):
     result: QueryResult
     visualization: Visualization
     metadata: Metadata
+
+
+class SuggestionsResponse(BaseModel):
+    role: str
+    suggestions: list[str]
 
 class ConversationMessageCreate(BaseModel):
     surface: Literal["ASSISTANT", "BI"]

@@ -1,16 +1,24 @@
+import csv
+import io
 import logging
 import time
 import uuid
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from app.auth import Principal, authenticated_principal
 from app.config import Settings, get_settings
 from app.history import add_message, clear_messages, list_messages
-from app.models import AskRequest, AskResponse, ConversationMessage, ConversationMessageCreate
-from app.semantic import SUGGESTIONS
+from app.models import (
+    AskRequest,
+    AskResponse,
+    ConversationMessage,
+    ConversationMessageCreate,
+    SuggestionsResponse,
+)
+from app.semantic import suggestions_for_role
 from app.service import answer_question
 
 LOGGER = logging.getLogger("analytics")
@@ -45,9 +53,12 @@ def health() -> dict[str, str]:
 
 @app.get("/api/v1/analytics/suggestions")
 def suggestions(
-    _principal: Annotated[Principal, Depends(authenticated_principal)],
-) -> dict[str, list[str]]:
-    return {"suggestions": SUGGESTIONS}
+    principal: Annotated[Principal, Depends(authenticated_principal)],
+) -> SuggestionsResponse:
+    return SuggestionsResponse(
+        role=principal.role,
+        suggestions=suggestions_for_role(principal.role),
+    )
 
 
 @app.post("/api/v1/analytics/ask", response_model=AskResponse)
@@ -57,11 +68,19 @@ async def ask(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> AskResponse:
     try:
-        return await answer_question(request.question.strip(), principal.enterprise_id, settings)
+        return await answer_question(
+            request.question.strip(),
+            principal.enterprise_id,
+            principal.role,
+            principal.user_id,
+            settings,
+        )
     except HTTPException:
         raise
     except ValueError:
         raise
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
     except Exception as exc:
         LOGGER.exception(
             "analytics_question_failed user_id=%s enterprise_id=%s",
@@ -69,6 +88,47 @@ async def ask(
             principal.enterprise_id,
         )
         raise HTTPException(502, "Analytics query could not be completed") from exc
+
+
+@app.post("/api/v1/analytics/reports/csv")
+async def export_csv_report(
+    request: AskRequest,
+    principal: Annotated[Principal, Depends(authenticated_principal)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Response:
+    try:
+        answer = await answer_question(
+            request.question.strip(),
+            principal.enterprise_id,
+            principal.role,
+            principal.user_id,
+            settings,
+        )
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
+    except ValueError:
+        raise
+    except Exception as exc:
+        LOGGER.exception("analytics_report_failed enterprise_id=%s", principal.enterprise_id)
+        raise HTTPException(502, "Analytics report could not be generated") from exc
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["IntelliOps analytics report"])
+    writer.writerow(["Question", answer.question])
+    writer.writerow(["Metric", answer.metadata.metric])
+    writer.writerow(["Generated for role", principal.role])
+    writer.writerow(["Data freshness", answer.metadata.data_freshness or "not available"])
+    writer.writerow([])
+    writer.writerow([column.name for column in answer.result.columns])
+    for row in answer.result.rows:
+        writer.writerow([row.get(column.name) for column in answer.result.columns])
+    filename = f"intelliops-{answer.metadata.metric}.csv"
+    return Response(
+        output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 @app.get(
     "/api/v1/analytics/conversations/{surface}",

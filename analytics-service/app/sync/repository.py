@@ -21,6 +21,8 @@ class ReportingRepository:
             "dim_products",
             "dim_stores",
             "fact_inventory",
+            "dim_leads",
+            "fact_deliveries",
         }
         if table not in allowed:
             raise ValueError(f"Unsupported reporting table: {table}")

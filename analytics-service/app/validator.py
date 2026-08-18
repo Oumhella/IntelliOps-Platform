@@ -2,7 +2,15 @@ import re
 
 from sqlglot import exp, parse
 
-ALLOWED_TABLES = {"fact_orders", "fact_order_lines", "dim_products", "dim_stores", "fact_inventory"}
+ALLOWED_TABLES = {
+    "dim_leads",
+    "dim_products",
+    "dim_stores",
+    "fact_deliveries",
+    "fact_inventory",
+    "fact_order_lines",
+    "fact_orders",
+}
 FORBIDDEN = (exp.Insert, exp.Update, exp.Delete, exp.Create, exp.Drop, exp.Alter, exp.Command)
 
 

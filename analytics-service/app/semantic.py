@@ -21,16 +21,96 @@ Allowed PostgreSQL reporting tables:
 - dim_stores(enterprise_id, store_id, name, platform)
 - fact_inventory(enterprise_id, inventory_id, store_id, product_id, available_quantity,
   reserved_quantity, alert_threshold, synchronized_at)
+- dim_leads(enterprise_id, lead_id, assigned_csm_id, status, source, synchronized_at)
+- fact_deliveries(enterprise_id, delivery_id, order_id, courier_id, status, carrier_type,
+  shipped_at, delivered_at, synchronized_at)
 Paid revenue excludes ANNULEE and RETOURNEE orders and requires payment_status=PAID.
 Tenant isolation is enforced by PostgreSQL RLS. Never generate an enterprise_id predicate.
 """
 
+ROLE_METRICS = {
+    "ROLE_ADMIN": {
+        "available_stock",
+        "delivery_count",
+        "deliveries_by_status",
+        "inventory_item_count",
+        "lead_count",
+        "leads_by_status",
+        "low_stock",
+        "order_count",
+        "orders_by_status",
+        "paid_revenue",
+        "product_count",
+        "product_revenue",
+    },
+    "ROLE_CSM": {"lead_count", "leads_by_status", "order_count", "orders_by_status"},
+    "ROLE_LOGISTIC": {
+        "available_stock",
+        "delivery_count",
+        "deliveries_by_status",
+        "inventory_item_count",
+        "low_stock",
+        "order_count",
+        "orders_by_status",
+        "product_count",
+    },
+}
 
-def deterministic_plan(question: str, now: datetime) -> QueryPlan | None:
+ROLE_SUGGESTIONS = {
+    "ROLE_ADMIN": [
+        "What is my paid revenue this month?",
+        "What are my top five products by revenue?",
+        "Show orders grouped by status.",
+        "Show deliveries grouped by status.",
+        "Which products are low in stock?",
+    ],
+    "ROLE_CSM": [
+        "How many leads are assigned to me?",
+        "Show my assigned leads grouped by status.",
+        "How many orders belong to my assigned leads?",
+        "Show my orders grouped by status.",
+    ],
+    "ROLE_LOGISTIC": [
+        "Show orders grouped by status.",
+        "Show deliveries grouped by status.",
+        "Which products are low in stock?",
+        "Show available stock by location.",
+    ],
+}
+
+
+def deterministic_plan(
+    question: str,
+    now: datetime,
+    role: str = "ROLE_ADMIN",
+    user_id: str | None = None,
+) -> QueryPlan | None:
     normalized = re.sub(r"\s+", " ", question.lower()).strip()
     count_requested = any(
         phrase in normalized for phrase in ("how many", "count", "number of")
     )
+    actor_id = int(user_id) if user_id and user_id.isdigit() else None
+    personal = role == "ROLE_CSM"
+
+    if "lead" in normalized and ("status" in normalized or "group" in normalized):
+        where = " WHERE assigned_csm_id = %(actor_id)s" if personal else ""
+        return QueryPlan(
+            "leads_by_status",
+            "SELECT status, COUNT(*) AS leads FROM dim_leads"
+            f"{where} GROUP BY status ORDER BY leads DESC",
+            {"actor_id": actor_id} if personal else {},
+            "donut",
+            ["Limited to leads assigned to the authenticated CSM."] if personal else [],
+        )
+    if "lead" in normalized and count_requested:
+        where = " WHERE assigned_csm_id = %(actor_id)s" if personal else ""
+        return QueryPlan(
+            "lead_count",
+            f"SELECT COUNT(*) AS leads FROM dim_leads{where}",
+            {"actor_id": actor_id} if personal else {},
+            "single_value",
+            ["Limited to leads assigned to the authenticated CSM."] if personal else [],
+        )
     if "low stock" in normalized or "below" in normalized and "stock" in normalized:
         return QueryPlan(
             "low_stock",
@@ -69,13 +149,16 @@ def deterministic_plan(question: str, now: datetime) -> QueryPlan | None:
             ["Interpreted the period as the current month to date."],
         )
     if "order" in normalized and ("status" in normalized or "distribution" in normalized):
+        where = " WHERE assigned_csm_id = %(actor_id)s" if personal else ""
         return QueryPlan(
             "orders_by_status",
-            "SELECT status, COUNT(*) AS orders FROM fact_orders "
-            "GROUP BY status ORDER BY orders DESC",
-            {},
-            "bar",
-            [],
+            "SELECT status, COUNT(*) AS orders FROM fact_orders"
+            f"{where} GROUP BY status ORDER BY orders DESC",
+            {"actor_id": actor_id} if personal else {},
+            "donut",
+            ["Limited to orders from leads assigned to the authenticated CSM."]
+            if personal
+            else [],
         )
     if count_requested and "product" in normalized:
         return QueryPlan(
@@ -86,17 +169,37 @@ def deterministic_plan(question: str, now: datetime) -> QueryPlan | None:
             [],
         )
     if count_requested and "order" in normalized:
+        where = " WHERE assigned_csm_id = %(actor_id)s" if personal else ""
         return QueryPlan(
             "order_count",
-            "SELECT COUNT(*) AS orders FROM fact_orders",
-            {},
+            f"SELECT COUNT(*) AS orders FROM fact_orders{where}",
+            {"actor_id": actor_id} if personal else {},
             "single_value",
-            [],
+            ["Limited to orders from leads assigned to the authenticated CSM."]
+            if personal
+            else [],
         )
     if count_requested and ("inventory" in normalized or "stock item" in normalized):
         return QueryPlan(
             "inventory_item_count",
             "SELECT COUNT(*) AS inventory_items FROM fact_inventory",
+            {},
+            "single_value",
+            [],
+        )
+    if "deliver" in normalized and ("status" in normalized or "group" in normalized):
+        return QueryPlan(
+            "deliveries_by_status",
+            "SELECT status, COUNT(*) AS deliveries FROM fact_deliveries "
+            "GROUP BY status ORDER BY deliveries DESC",
+            {},
+            "donut",
+            [],
+        )
+    if "deliver" in normalized and count_requested:
+        return QueryPlan(
+            "delivery_count",
+            "SELECT COUNT(*) AS deliveries FROM fact_deliveries",
             {},
             "single_value",
             [],
@@ -116,9 +219,12 @@ def deterministic_plan(question: str, now: datetime) -> QueryPlan | None:
     return None
 
 
-SUGGESTIONS = [
-    "What is my paid revenue this month?",
-    "What are my top five products by revenue?",
-    "Show orders grouped by status.",
-    "Which products are low in stock?",
-]
+def suggestions_for_role(role: str) -> list[str]:
+    return ROLE_SUGGESTIONS.get(role, [])
+
+
+def ensure_metric_allowed(metric: str, role: str) -> None:
+    if role == "ROLE_ADMIN":
+        return
+    if metric not in ROLE_METRICS.get(role, set()):
+        raise PermissionError(f"The {role.removeprefix('ROLE_')} role cannot access {metric}.")

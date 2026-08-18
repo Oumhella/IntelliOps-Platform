@@ -4,14 +4,25 @@ from app.config import Settings
 from app.executor import execute_query
 from app.llm import generate_plan
 from app.models import AskResponse, Column, Metadata, QueryResult, Visualization
-from app.semantic import deterministic_plan
+from app.semantic import deterministic_plan, ensure_metric_allowed
 from app.validator import validate_sql
 
 
-async def answer_question(question: str, tenant_id: int, settings: Settings) -> AskResponse:
-    plan = deterministic_plan(question, datetime.now(UTC))
+async def answer_question(
+    question: str,
+    tenant_id: int,
+    role: str,
+    user_id: str,
+    settings: Settings,
+) -> AskResponse:
+    plan = deterministic_plan(question, datetime.now(UTC), role, user_id)
     if plan is None:
+        if role != "ROLE_ADMIN":
+            raise PermissionError(
+                "This role can use only its approved operational analytics catalogue."
+            )
         plan = await generate_plan(question, settings)
+    ensure_metric_allowed(plan.metric, role)
     safe_sql = validate_sql(plan.sql, settings.query_max_rows)
     rows, freshness = execute_query(
         settings.analytics_database_url,
@@ -69,7 +80,7 @@ def choose_visualization(requested: str, columns: list[Column], row_count: int) 
         column.name for column in columns if column.type in {"integer", "decimal", "currency"}
     ]
     labels = [column.name for column in columns if column.name not in numeric]
-    if requested in {"bar", "line"} and numeric and labels:
+    if requested in {"bar", "line", "donut"} and numeric and labels:
         return Visualization(type=requested, x=labels[0], y=numeric[0])
     return Visualization(type="table")
 

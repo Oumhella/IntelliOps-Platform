@@ -15,7 +15,7 @@ SCHEMA = {
             "sql": {"type": "string"},
             "visualization": {
                 "type": "string",
-                "enum": ["none", "single_value", "table", "bar", "line"],
+                "enum": ["none", "single_value", "table", "bar", "line", "donut"],
             },
             "assumptions": {"type": "array", "items": {"type": "string"}},
         },

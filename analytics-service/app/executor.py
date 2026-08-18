@@ -12,7 +12,15 @@ def execute_query(
         conn.execute("SELECT set_config('statement_timeout', %s, true)", (str(timeout_ms),))
         rows = list(conn.execute(sql, parameters))
         freshness = conn.execute(
-            "SELECT MAX(synchronized_at) AS freshness FROM fact_orders"
+            """
+            SELECT MAX(freshness) AS freshness FROM (
+                SELECT MAX(synchronized_at) AS freshness FROM fact_orders
+                UNION ALL SELECT MAX(synchronized_at) FROM fact_inventory
+                UNION ALL SELECT MAX(synchronized_at) FROM dim_products
+                UNION ALL SELECT MAX(synchronized_at) FROM dim_leads
+                UNION ALL SELECT MAX(synchronized_at) FROM fact_deliveries
+            ) synchronized_sources
+            """
         ).fetchone()["freshness"]
     return [serialize_row(row) for row in rows], freshness
 

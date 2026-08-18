@@ -8,7 +8,8 @@ def extract_orders(database_url: str, after: datetime | None, limit: int) -> Ite
     with connection(database_url, readonly=True) as conn:
         yield from conn.execute(
             """
-            SELECT c.id_commande AS order_id, l.enterprise_id, c.reference,
+            SELECT c.id_commande AS order_id, l.enterprise_id, l.id_lead AS lead_id,
+                   l.agent_id AS assigned_csm_id, c.reference,
                    c.stock_location_id AS store_id, c.statut_commande AS status,
                    c.statut_paiement AS payment_status, c.total_prix AS total_amount,
                    c.created_at AS source_updated_at
@@ -17,6 +18,17 @@ def extract_orders(database_url: str, after: datetime | None, limit: int) -> Ite
             ORDER BY c.created_at, c.id_commande LIMIT %(limit)s
             """,
             {"after": after, "limit": limit},
+        )
+
+
+def extract_leads(database_url: str) -> Iterable[dict]:
+    with connection(database_url, readonly=True) as conn:
+        yield from conn.execute(
+            """
+            SELECT id_lead AS lead_id, enterprise_id, agent_id AS assigned_csm_id,
+                   statut_lead AS status, source
+            FROM leads
+            """
         )
 
 
@@ -69,3 +81,17 @@ def extract_stock(database_url: str) -> tuple[list[dict], list[dict], list[dict]
             )
         )
     return products, stores, inventory
+
+
+def extract_deliveries(database_url: str) -> Iterable[dict]:
+    with connection(database_url, readonly=True) as conn:
+        yield from conn.execute(
+            """
+            SELECT id_livraison AS delivery_id, enterprise_id,
+                   reference_commande_id AS order_id,
+                   external_livreur_id AS courier_id,
+                   statut_livraison AS status, type_transporteur AS carrier_type,
+                   shipping_date AS shipped_at, delivery_date AS delivered_at
+            FROM livraisons
+            """
+        )

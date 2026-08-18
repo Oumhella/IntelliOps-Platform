@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     analytics_sync_password: str = ""
     lead_database_url: str = ""
     stock_database_url: str = ""
+    delivery_database_url: str = ""
     sync_batch_size: PositiveInt = Field(default=100, le=5_000)
     sync_interval_seconds: PositiveInt = Field(default=300, le=86_400)
     jwt_secret: str
