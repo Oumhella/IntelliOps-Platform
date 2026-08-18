@@ -28,6 +28,9 @@ Tenant isolation is enforced by PostgreSQL RLS. Never generate an enterprise_id 
 
 def deterministic_plan(question: str, now: datetime) -> QueryPlan | None:
     normalized = re.sub(r"\s+", " ", question.lower()).strip()
+    count_requested = any(
+        phrase in normalized for phrase in ("how many", "count", "number of")
+    )
     if "low stock" in normalized or "below" in normalized and "stock" in normalized:
         return QueryPlan(
             "low_stock",
@@ -72,6 +75,30 @@ def deterministic_plan(question: str, now: datetime) -> QueryPlan | None:
             "GROUP BY status ORDER BY orders DESC",
             {},
             "bar",
+            [],
+        )
+    if count_requested and "product" in normalized:
+        return QueryPlan(
+            "product_count",
+            "SELECT COUNT(*) AS products FROM dim_products",
+            {},
+            "single_value",
+            [],
+        )
+    if count_requested and "order" in normalized:
+        return QueryPlan(
+            "order_count",
+            "SELECT COUNT(*) AS orders FROM fact_orders",
+            {},
+            "single_value",
+            [],
+        )
+    if count_requested and ("inventory" in normalized or "stock item" in normalized):
+        return QueryPlan(
+            "inventory_item_count",
+            "SELECT COUNT(*) AS inventory_items FROM fact_inventory",
+            {},
+            "single_value",
             [],
         )
     if "stock" in normalized:
