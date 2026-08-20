@@ -99,6 +99,12 @@ public class CommandeServiceImpl implements CommandeService {
     public CommandeDTO changerStatutCommande(Long idCommande, StatutCommande nouveauStatut) {
         Commande order = findOrder(idCommande);
         assertCsmOwnsOrder(order);
+        boolean csm = hasCurrentRole("ROLE_CSM");
+        if (csm && (order.getStatutCommande() != StatutCommande.EN_ATTENTE
+                || (nouveauStatut != StatutCommande.CONFIRMEE && nouveauStatut != StatutCommande.ANNULEE))) {
+            throw new AccessDeniedException(
+                    "CSM ownership ends when a pending order is confirmed and handed to logistics.");
+        }
         if (order.getStatutCommande() == nouveauStatut) {
             return commandeMapper.toDto(order);
         }
@@ -179,12 +185,16 @@ public class CommandeServiceImpl implements CommandeService {
     }
 
     private void assertCsmOwnsOrder(Commande order) {
-        boolean csm = SecurityContextHolder.getContext().getAuthentication() != null
-                && SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
-                .anyMatch(authority -> "ROLE_CSM".equals(authority.getAuthority()));
+        boolean csm = hasCurrentRole("ROLE_CSM");
         if (csm && !TenantContext.requireUserId().equals(order.getLead().getAgentId())) {
             throw new AccessDeniedException("CSM users can access only orders from their assigned leads.");
         }
+    }
+
+    private boolean hasCurrentRole(String role) {
+        return SecurityContextHolder.getContext().getAuthentication() != null
+                && SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(authority -> role.equals(authority.getAuthority()));
     }
 
     private boolean isAllowedTransition(StatutCommande current, StatutCommande next) {

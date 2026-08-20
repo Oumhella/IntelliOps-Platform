@@ -239,8 +239,8 @@ export class LeadsComponent implements OnInit {
         this.busy = false;
         this.feedback.success(
           prebuilt
-            ? `Imported order ${order.reference} confirmed — stock was already reserved at import.`
-            : `Order ${order.reference} created with catalog pricing and reserved stock.`,
+            ? `Imported order ${order.reference} is confirmed and visible in the logistics queue; stock was reserved at import.`
+            : `Order ${order.reference} is pending your confirmation. Confirm it in Orders to hand it to logistics.`,
         );
         this.close();
         this.load();

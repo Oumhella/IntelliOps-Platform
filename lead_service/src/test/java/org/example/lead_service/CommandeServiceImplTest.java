@@ -18,6 +18,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.ArrayList;
 import java.util.Optional;
@@ -50,6 +54,7 @@ class CommandeServiceImplTest {
     @AfterEach
     void tearDown() {
         TenantContext.clear();
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -103,6 +108,24 @@ class CommandeServiceImplTest {
 
         assertThrows(IllegalStateException.class,
                 () -> commandeService.changerStatutCommande(1L, StatutCommande.EXPEDIEE));
+        verify(commandeRepository, never()).save(any());
+    }
+
+    @Test
+    void changerStatutCommande_EndsCsmOwnershipAfterConfirmation() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("csm", null,
+                        java.util.List.of(new SimpleGrantedAuthority("ROLE_CSM"))));
+        Commande commande = Commande.builder()
+                .idCommande(1L)
+                .statutCommande(StatutCommande.CONFIRMEE)
+                .lead(Lead.builder().agentId(42L).enterpriseId(7L).build())
+                .build();
+        when(commandeRepository.findByIdCommandeAndLeadEnterpriseId(1L, 7L))
+                .thenReturn(Optional.of(commande));
+
+        assertThrows(AccessDeniedException.class,
+                () -> commandeService.changerStatutCommande(1L, StatutCommande.ANNULEE));
         verify(commandeRepository, never()).save(any());
     }
 }
