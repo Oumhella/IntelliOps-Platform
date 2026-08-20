@@ -4,5 +4,5 @@ public record ExternalProductImportResponse(
         Long productId,
         boolean productCreated,
         boolean inventoryCreated,
-        int availableQuantity) {
+        Integer availableQuantity) {
 }

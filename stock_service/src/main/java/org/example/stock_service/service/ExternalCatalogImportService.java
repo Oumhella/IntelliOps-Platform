@@ -26,7 +26,10 @@ public class ExternalCatalogImportService {
         Long enterpriseId = TenantContext.requireEnterpriseId();
         String sku = request.sku().trim();
 
-        Produit product = produitRepository.findByGlobalSkuAndEnterpriseId(sku, enterpriseId).orElse(null);
+        Produit product = request.internalProductId() == null
+                ? produitRepository.findByGlobalSkuAndEnterpriseId(sku, enterpriseId).orElse(null)
+                : produitRepository.findByIdProduitAndEnterpriseId(request.internalProductId(), enterpriseId)
+                        .orElseThrow(() -> new EntityNotFoundException("Produit lie introuvable."));
         boolean productCreated = product == null;
         if (productCreated) {
             product = Produit.builder()
@@ -39,6 +42,10 @@ public class ExternalCatalogImportService {
         } else {
             product.setNomProduit(request.name().trim());
             product.setPrixVente(request.salePrice().doubleValue());
+            Produit skuOwner = produitRepository.findByGlobalSkuAndEnterpriseId(sku, enterpriseId).orElse(null);
+            if (skuOwner == null || skuOwner.getIdProduit().equals(product.getIdProduit())) {
+                product.setGlobalSku(sku);
+            }
         }
         product = produitRepository.save(product);
 
@@ -46,7 +53,7 @@ public class ExternalCatalogImportService {
                 .findFirstByBoutiqueIdBoutiqueAndProduitIdProduitAndBoutiqueEnterpriseIdOrderByIdAsc(
                         request.stockLocationId(), product.getIdProduit(), enterpriseId)
                 .orElse(null);
-        boolean inventoryCreated = inventory == null;
+        boolean inventoryCreated = inventory == null && request.availableQuantity() != null;
         if (inventoryCreated) {
             var location = boutiqueRepository
                     .findByIdBoutiqueAndEnterpriseId(request.stockLocationId(), enterpriseId)
@@ -56,13 +63,24 @@ public class ExternalCatalogImportService {
             inventory.setProduit(product);
             inventory.setQuantiteDisponible(0);
             inventory.setQuantiteReservee(0);
-            if (request.initialAvailableQuantity() > 0) {
-                inventory.updateQuantity(request.initialAvailableQuantity(), TypeMouvement.AJUSTEMENT, 0L);
+            if (request.availableQuantity() > 0) {
+                inventory.updateQuantity(request.availableQuantity(), TypeMouvement.AJUSTEMENT, 0L);
             }
             inventory = inventaireRepository.save(inventory);
+        } else if (inventory != null && request.availableQuantity() != null
+                && inventory.getQuantiteDisponible() == 0
+                && inventory.getQuantiteReservee() == 0
+                && inventory.getMouvements().isEmpty()) {
+            // Backfill legacy imports that were created with the former hardcoded zero.
+            // Once a location has stock movements or reservations, IntelliOps remains
+            // authoritative and a catalogue refresh must never overwrite that lifecycle.
+            if (request.availableQuantity() > 0) {
+                inventory.updateQuantity(request.availableQuantity(), TypeMouvement.AJUSTEMENT, 0L);
+                inventory = inventaireRepository.save(inventory);
+            }
         }
 
         return new ExternalProductImportResponse(product.getIdProduit(), productCreated, inventoryCreated,
-                inventory.getQuantiteDisponible());
+                inventory == null ? null : inventory.getQuantiteDisponible());
     }
 }

@@ -30,10 +30,12 @@ public final class IntegrationDtos {
     public record ExternalProduct(String productId, String variantId, String sku, String name,
                                   BigDecimal salePrice, Integer availableQuantity) {}
     public record ExternalProductImportRequest(String name, String sku, BigDecimal salePrice,
-                                               Long stockLocationId, int initialAvailableQuantity) {}
+                                               Long stockLocationId, Integer availableQuantity,
+                                               Long internalProductId) {}
     public record ExternalProductImportResponse(Long productId, boolean productCreated,
-                                                boolean inventoryCreated, int availableQuantity) {}
-    public record AutoImportResponse(int importedCount, int skippedCount, List<ProductMappingResponse> mappings) {}
+                                                boolean inventoryCreated, Integer availableQuantity) {}
+    public record AutoImportResponse(int importedCount, int synchronizedCount, int skippedCount,
+                                     List<ProductMappingResponse> mappings) {}
     public record EventResponse(Long id, Long connectionId, String externalEventId, String topic,
                                 WebhookEventStatus status, String errorMessage, Instant receivedAt, Instant processedAt) {}
     public record WooAuthorizationCallback(

@@ -253,8 +253,16 @@ public class LeadServiceImpl implements LeadService {
         List<PreparedItem> reserved = new ArrayList<>();
         try {
             for (PreparedItem item : prepared) {
-                stockClient.reserverStock(request.stockLocationId(), item.productId(),
-                        new StockClient.ReservationRequest(item.quantity(), orderReference));
+                try {
+                    stockClient.reserverStock(request.stockLocationId(), item.productId(),
+                            new StockClient.ReservationRequest(item.quantity(), orderReference));
+                } catch (FeignException.Conflict insufficientStock) {
+                    throw new ConflictException("Insufficient available stock for product " + item.productId()
+                            + ". Synchronize the connected store inventory and retry the order.");
+                } catch (FeignException stockUnavailable) {
+                    throw new IllegalStateException("The stock service could not reserve product "
+                            + item.productId() + ".");
+                }
                 reserved.add(item);
             }
             ExternalOrderImportRequest.Customer externalCustomer = request.customer();

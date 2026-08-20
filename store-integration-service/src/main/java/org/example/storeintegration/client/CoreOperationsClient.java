@@ -56,13 +56,13 @@ public class CoreOperationsClient {
     }
 
     public Long importProduct(Long enterpriseId, String name, String sku, BigDecimal price,
-            Long stockLocationId, int initialAvailableQuantity) {
+            Long stockLocationId, Integer availableQuantity, Long internalProductId) {
         String safeName = (name == null || name.isBlank()) ? "Unnamed Product" : (name.length() > 180 ? name.substring(0, 180) : name);
         String safeSku = (sku != null && !sku.isBlank())
                 ? (sku.length() > 100 ? sku.substring(0, 100) : sku)
                 : "EXT-" + Integer.toUnsignedString(safeName.hashCode());
         var body = new ExternalProductImportRequest(safeName, safeSku, price, stockLocationId,
-                Math.max(0, initialAvailableQuantity));
+                availableQuantity == null ? null : Math.max(0, availableQuantity), internalProductId);
         ExternalProductImportResponse response = executeWithRetry(() -> restClientBuilder.clone().baseUrl(stockUrl)
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + tokenProvider.forTenant(enterpriseId)).build()
                 .post().uri("/api/v1/internal/integrations/catalog/products").body(body).retrieve()

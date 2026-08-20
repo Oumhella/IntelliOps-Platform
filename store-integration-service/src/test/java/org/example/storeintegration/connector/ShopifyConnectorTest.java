@@ -43,7 +43,7 @@ class ShopifyConnectorTest {
                         "unused"), builder);
         server.expect(requestTo("https://demo.myshopify.com/admin/api/2026-07/graphql.json"))
                 .andRespond(withSuccess("""
-                        {"data":{"products":{"edges":[{"node":{"id":"gid://shopify/Product/10","title":"Board","variants":{"edges":[{"node":{"id":"gid://shopify/ProductVariant/20","title":"Blue","sku":"BOARD-BLUE","price":"249.90","inventoryQuantity":14}}]}}}]}}}
+                        {"data":{"productVariants":{"nodes":[{"id":"gid://shopify/ProductVariant/20","title":"Blue","sku":"BOARD-BLUE","price":"249.90","inventoryQuantity":14,"inventoryItem":{"tracked":true},"product":{"id":"gid://shopify/Product/10","title":"Board"}}],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}
                         """, MediaType.APPLICATION_JSON));
 
         var products = productConnector.listProducts(URI.create("https://demo.myshopify.com"),
@@ -55,6 +55,36 @@ class ShopifyConnectorTest {
             assertThat(product.salePrice()).isEqualByComparingTo(new BigDecimal("249.90"));
             assertThat(product.availableQuantity()).isEqualTo(14);
         });
+        server.verify();
+    }
+
+    @Test
+    void reconcilesExistingWebhookSubscriptionsToCurrentPublicUrl() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        ShopifyConnector webhookConnector = new ShopifyConnector(
+                new IntegrationProperties("https://api.example.com", "https://app.example.com", false, 60, "MAD",
+                        new IntegrationProperties.Shopify("client", "secret", "read_orders,read_products", "2026-07"),
+                        "unused"), builder);
+        String endpoint = "https://demo.myshopify.com/admin/api/2026-07/graphql.json";
+        server.expect(requestTo(endpoint)).andRespond(withSuccess("""
+                {"data":{"webhookSubscriptions":{"nodes":[
+                  {"id":"gid://shopify/WebhookSubscription/1","topic":"ORDERS_CREATE","uri":"https://old.example/api/create"},
+                  {"id":"gid://shopify/WebhookSubscription/2","topic":"ORDERS_UPDATED","uri":"https://old.example/api/update"},
+                  {"id":"gid://shopify/WebhookSubscription/3","topic":"ORDERS_CANCELLED","uri":"https://old.example/api/cancel"}
+                ]}}}
+                """, MediaType.APPLICATION_JSON));
+        for (int id = 1; id <= 3; id++) {
+            final int subscriptionId = id;
+            server.expect(requestTo(endpoint)).andRespond(withSuccess("""
+                    {"data":{"webhookSubscriptionUpdate":{"webhookSubscription":{"id":"gid://shopify/WebhookSubscription/%d","uri":"https://current.example/webhook"},"userErrors":[]}}}
+                    """.formatted(subscriptionId), MediaType.APPLICATION_JSON));
+        }
+
+        webhookConnector.registerOrderWebhook(URI.create("https://demo.myshopify.com"),
+                org.example.storeintegration.security.CredentialCipher.StoreCredentials.shopify("token"),
+                "https://current.example/webhook");
+
         server.verify();
     }
 }

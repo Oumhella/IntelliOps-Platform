@@ -15,6 +15,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -102,20 +103,27 @@ public class ShopifyConnector implements StoreConnector {
 
     @Override
     public List<ExternalProduct> listProducts(URI storeUrl, StoreCredentials credentials) {
-        String query = "query { products(first: 100) { edges { node { id title variants(first: 100) { edges { node { id title sku price inventoryQuantity } } } } } } }";
-        JsonNode edges = graphql(storeUrl, credentials, query, Map.of()).path("data").path("products").path("edges");
+        String query = "query ProductVariants($after: String) { productVariants(first: 250, after: $after) { nodes { id title sku price inventoryQuantity inventoryItem { tracked } product { id title } } pageInfo { hasNextPage endCursor } } }";
         List<ExternalProduct> result = new ArrayList<>();
-        for (JsonNode productEdge : edges) {
-            JsonNode product = productEdge.path("node");
-            for (JsonNode variantEdge : product.path("variants").path("edges")) {
-                JsonNode variant = variantEdge.path("node");
+        String after = null;
+        do {
+            Map<String, Object> variables = new HashMap<>();
+            variables.put("after", after);
+            JsonNode connection = graphql(storeUrl, credentials, query, variables)
+                    .path("data").path("productVariants");
+            for (JsonNode variant : connection.path("nodes")) {
+                JsonNode product = variant.path("product");
                 String name = product.path("title").asText() + " — " + variant.path("title").asText();
+                Integer quantity = variant.path("inventoryItem").path("tracked").asBoolean(false)
+                        ? nullableNonNegativeInt(variant, "inventoryQuantity") : null;
                 result.add(new ExternalProduct(
                         idTail(product.path("id").asText()), idTail(variant.path("id").asText()),
                         variant.path("sku").asText(""), name, decimalOrNull(variant, "price"),
-                        nullableNonNegativeInt(variant, "inventoryQuantity")));
+                        quantity));
             }
-        }
+            boolean hasNextPage = connection.path("pageInfo").path("hasNextPage").asBoolean(false);
+            after = hasNextPage ? connection.path("pageInfo").path("endCursor").asText(null) : null;
+        } while (after != null && !after.isBlank());
         return result;
     }
 
@@ -136,27 +144,41 @@ public class ShopifyConnector implements StoreConnector {
 
     @Override
     public void registerOrderWebhook(URI storeUrl, StoreCredentials credentials, String deliveryUrl) {
-        String mutation = "mutation CreateWebhook($topic: WebhookSubscriptionTopic!, $subscription: WebhookSubscriptionInput!) { webhookSubscriptionCreate(topic: $topic, webhookSubscription: $subscription) { webhookSubscription { id } userErrors { field message } } }";
+        String listQuery = "query { webhookSubscriptions(first: 250) { nodes { id topic uri } } }";
+        JsonNode subscriptions = graphql(storeUrl, credentials, listQuery, Map.of())
+                .path("data").path("webhookSubscriptions").path("nodes");
         List<String> failedTopics = new ArrayList<>();
         List<String> protectedDataTopics = new ArrayList<>();
 
         for (String topic : List.of("ORDERS_CREATE", "ORDERS_UPDATED", "ORDERS_CANCELLED")) {
-            Map<String, Object> subscription = Map.of("callbackUrl", deliveryUrl, "format", "JSON");
-            JsonNode payload = graphql(storeUrl, credentials, mutation, Map.of("topic", topic, "subscription", subscription));
-            JsonNode result = payload.path("data").path("webhookSubscriptionCreate");
-            if (result.path("webhookSubscription").path("id").asText().isBlank()) {
-                Map<String, Object> fallbackSubscription = Map.of("uri", deliveryUrl, "format", "JSON");
-                payload = graphql(storeUrl, credentials, mutation, Map.of("topic", topic, "subscription", fallbackSubscription));
-                result = payload.path("data").path("webhookSubscriptionCreate");
-                if (result.path("webhookSubscription").path("id").asText().isBlank()) {
-                    String userErrors = result.path("userErrors").toString();
-                    if (userErrors.contains("protected customer data")) {
-                        protectedDataTopics.add(topic);
-                    } else if (userErrors.contains("already been taken")) {
-                        log.info("registerOrderWebhook: Webhook subscription for topic {} already exists.", topic);
-                    } else {
-                        failedTopics.add(topic + ": " + userErrors);
-                    }
+            List<JsonNode> topicSubscriptions = new ArrayList<>();
+            for (JsonNode subscription : subscriptions) {
+                if (topic.equals(subscription.path("topic").asText())) topicSubscriptions.add(subscription);
+            }
+            JsonNode current = topicSubscriptions.stream()
+                    .filter(subscription -> deliveryUrl.equals(subscription.path("uri").asText()))
+                    .findFirst().orElse(null);
+            try {
+                if (current == null && topicSubscriptions.isEmpty()) {
+                    createWebhook(storeUrl, credentials, topic, deliveryUrl);
+                    log.info("registerOrderWebhook: created {} at {}", topic, deliveryUrl);
+                } else if (current == null) {
+                    current = topicSubscriptions.remove(0);
+                    updateWebhook(storeUrl, credentials, current.path("id").asText(), deliveryUrl);
+                    log.info("registerOrderWebhook: updated {} callback to {}", topic, deliveryUrl);
+                } else {
+                    topicSubscriptions.remove(current);
+                    log.info("registerOrderWebhook: verified {} callback at {}", topic, deliveryUrl);
+                }
+                for (JsonNode stale : topicSubscriptions) {
+                    deleteWebhook(storeUrl, credentials, stale.path("id").asText());
+                    log.info("registerOrderWebhook: removed stale {} callback {}", topic, stale.path("uri").asText());
+                }
+            } catch (IllegalStateException exception) {
+                if (exception.getMessage().toLowerCase().contains("protected customer data")) {
+                    protectedDataTopics.add(topic);
+                } else {
+                    failedTopics.add(topic + ": " + exception.getMessage());
                 }
             }
         }
@@ -166,6 +188,37 @@ public class ShopifyConnector implements StoreConnector {
         }
         if (!failedTopics.isEmpty()) {
             throw new IllegalStateException("Shopify webhook registration failed: " + String.join("; ", failedTopics));
+        }
+    }
+
+    private void createWebhook(URI storeUrl, StoreCredentials credentials, String topic, String deliveryUrl) {
+        String mutation = "mutation CreateWebhook($topic: WebhookSubscriptionTopic!, $subscription: WebhookSubscriptionInput!) { webhookSubscriptionCreate(topic: $topic, webhookSubscription: $subscription) { webhookSubscription { id uri } userErrors { field message } } }";
+        JsonNode result = graphql(storeUrl, credentials, mutation,
+                Map.of("topic", topic, "subscription", Map.of("uri", deliveryUrl, "format", "JSON")))
+                .path("data").path("webhookSubscriptionCreate");
+        requireWebhookMutation(result, "create");
+    }
+
+    private void updateWebhook(URI storeUrl, StoreCredentials credentials, String id, String deliveryUrl) {
+        String mutation = "mutation UpdateWebhook($id: ID!, $subscription: WebhookSubscriptionInput!) { webhookSubscriptionUpdate(id: $id, webhookSubscription: $subscription) { webhookSubscription { id uri } userErrors { field message } } }";
+        JsonNode result = graphql(storeUrl, credentials, mutation,
+                Map.of("id", id, "subscription", Map.of("uri", deliveryUrl, "format", "JSON")))
+                .path("data").path("webhookSubscriptionUpdate");
+        requireWebhookMutation(result, "update");
+    }
+
+    private void deleteWebhook(URI storeUrl, StoreCredentials credentials, String id) {
+        String mutation = "mutation DeleteWebhook($id: ID!) { webhookSubscriptionDelete(id: $id) { deletedWebhookSubscriptionId userErrors { field message } } }";
+        JsonNode result = graphql(storeUrl, credentials, mutation, Map.of("id", id))
+                .path("data").path("webhookSubscriptionDelete");
+        if (result.path("deletedWebhookSubscriptionId").asText().isBlank()) {
+            throw new IllegalStateException("Shopify webhook delete failed: " + result.path("userErrors"));
+        }
+    }
+
+    private void requireWebhookMutation(JsonNode result, String operation) {
+        if (result.path("webhookSubscription").path("id").asText().isBlank()) {
+            throw new IllegalStateException("Shopify webhook " + operation + " failed: " + result.path("userErrors"));
         }
     }
 

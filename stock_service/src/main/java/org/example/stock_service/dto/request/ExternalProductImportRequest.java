@@ -13,5 +13,6 @@ public record ExternalProductImportRequest(
         @NotBlank @Size(max = 100) String sku,
         @NotNull @Positive BigDecimal salePrice,
         @NotNull @Positive Long stockLocationId,
-        @PositiveOrZero int initialAvailableQuantity) {
+        @PositiveOrZero Integer availableQuantity,
+        @Positive Long internalProductId) {
 }

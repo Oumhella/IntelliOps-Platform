@@ -44,7 +44,7 @@ public class WebhookService {
     private final ProductMappingRepository mappingRepository;
     private final WebhookEventRepository eventRepository;
 
-    @Transactional
+    @Transactional(noRollbackFor = RuntimeException.class)
     public WebhookEvent receiveShopify(Long connectionId, byte[] payload, String hmac, String eventId, String topic,
             String shopDomain) {
         StoreConnection connection = publicConnection(connectionId, StorePlatform.SHOPIFY);
@@ -56,7 +56,7 @@ public class WebhookService {
                 required(eventId, "Shopify webhook ID is required."), true);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = RuntimeException.class)
     public WebhookEvent receiveWooCommerce(Long connectionId, byte[] payload, String signature, String eventId,
             String topic) {
         StoreConnection connection = publicConnection(connectionId, StorePlatform.WOOCOMMERCE);
@@ -118,7 +118,7 @@ public class WebhookService {
                     } catch (Exception missingProduct) {
                         Long newInternalId = coreClient.importProduct(connection.getEnterpriseId(), line.label(),
                                 connection.getPlatform().name() + "-" + line.externalVariantId(), line.unitPrice(),
-                                connection.getStockLocationId(), 0);
+                                connection.getStockLocationId(), null, null);
                         if (newInternalId != null) {
                             mapping.setInternalProductId(newInternalId);
                             mapping = mappingRepository.save(mapping);
@@ -130,7 +130,7 @@ public class WebhookService {
                 if (mapping == null) {
                     Long newInternalId = coreClient.importProduct(connection.getEnterpriseId(), line.label(),
                             connection.getPlatform().name() + "-" + line.externalVariantId(), line.unitPrice(),
-                            connection.getStockLocationId(), 0);
+                            connection.getStockLocationId(), null, null);
                     if (newInternalId != null) {
                         mapping = ProductMapping.builder()
                                 .connection(connection)
@@ -171,10 +171,15 @@ public class WebhookService {
             if (shopify && !hasImportableCustomer(order.customer())) {
                 return actionRequired(event, incompleteShopifyCustomerMessage(order.customer()));
             }
-            coreClient.importOrder(connection.getEnterpriseId(),
-                    new ExternalOrderRequest(connection.getPlatform().name(), order.id(), order.reference(),
-                            connection.getStockLocationId(), order.customer(), order.initialPaymentStatus(),
-                            order.currency(), order.totalAmount(), items));
+            try {
+                coreClient.importOrder(connection.getEnterpriseId(),
+                        new ExternalOrderRequest(connection.getPlatform().name(), order.id(), order.reference(),
+                                connection.getStockLocationId(), order.customer(), order.initialPaymentStatus(),
+                                order.currency(), order.totalAmount(), items));
+            } catch (HttpClientErrorException.Conflict businessConflict) {
+                return actionRequired(event,
+                        "Order could not reserve its mapped inventory. Synchronize store products and retry it.");
+            }
             if (!order.initialPaymentStatus().equals(order.currentPaymentStatus()) || order.cancelled()
                     || !createTopic) {
                 coreClient.syncOrderState(connection.getEnterpriseId(), new ExternalOrderStateRequest(
