@@ -10,7 +10,6 @@ services:
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
       - erp-db-data:/var/lib/postgresql/data
-      - ./docker/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
@@ -34,7 +33,23 @@ services:
       - PGPASSWORD=${DB_PASSWORD}
     volumes:
       - ./docker/ensure-databases.sql:/scripts/ensure-databases.sql:ro
-    command: ["psql", "-v", "ON_ERROR_STOP=1", "-f", "/scripts/ensure-databases.sql"]
+    # pg_isready can briefly succeed against PostgreSQL's temporary bootstrap
+    # server before the final server restart. Retry the idempotent provisioning
+    # script so a fresh CI volume cannot fail with psql exit code 2.
+    command:
+      - sh
+      - -ec
+      - |
+        attempt=1
+        until psql -v ON_ERROR_STOP=1 -f /scripts/ensure-databases.sql; do
+          if [ "$$attempt" -ge 15 ]; then
+            echo "Database provisioning failed after $$attempt attempts." >&2
+            exit 1
+          fi
+          echo "PostgreSQL bootstrap transition detected; retrying database provisioning ($$attempt/15)..." >&2
+          attempt=$$((attempt + 1))
+          sleep 2
+        done
     networks:
       - erp-network
 
@@ -190,6 +205,8 @@ services:
     depends_on:
       erp-db:
         condition: service_started
+      database-init:
+        condition: service_completed_successfully
       discovery-server:
         condition: service_started
       config-server:
@@ -221,6 +238,8 @@ services:
     depends_on:
       erp-db:
         condition: service_started
+      database-init:
+        condition: service_completed_successfully
       discovery-server:
         condition: service_started
       config-server:
@@ -251,6 +270,8 @@ services:
     depends_on:
       erp-db:
         condition: service_started
+      database-init:
+        condition: service_completed_successfully
       discovery-server:
         condition: service_started
       config-server:
@@ -282,6 +303,8 @@ services:
     depends_on:
       erp-db:
         condition: service_started
+      database-init:
+        condition: service_completed_successfully
       discovery-server:
         condition: service_started
       config-server:
@@ -490,6 +513,8 @@ services:
     depends_on:
       erp-db:
         condition: service_started
+      database-init:
+        condition: service_completed_successfully
       discovery-server:
         condition: service_started
       config-server:
@@ -522,6 +547,8 @@ services:
     depends_on:
       erp-db:
         condition: service_started
+      database-init:
+        condition: service_completed_successfully
       discovery-server:
         condition: service_started
       config-server:
@@ -575,6 +602,8 @@ services:
     depends_on:
       erp-db:
         condition: service_started
+      database-init:
+        condition: service_completed_successfully
       discovery-server:
         condition: service_started
       config-server:

@@ -52,7 +52,8 @@ public class WooCommerceConnector implements StoreConnector {
                 result.addAll(listVariations(storeUrl, credentials, product));
             } else {
                 result.add(new ExternalProduct(productId, productId,
-                        product.path("sku").asText(""), product.path("name").asText()));
+                        product.path("sku").asText(""), product.path("name").asText(),
+                        decimalOrNull(product, "price"), nullableStock(product)));
             }
         }
         return result;
@@ -102,9 +103,25 @@ public class WooCommerceConnector implements StoreConnector {
             String variationId = variation.path("id").asText();
             String sku = variation.path("sku").asText(productSku);
             result.add(new ExternalProduct(productId, variationId, sku,
-                    productName + " - " + variationLabel(variation, variationId)));
+                    productName + " - " + variationLabel(variation, variationId),
+                    decimalOrNull(variation, "price"), nullableStock(variation)));
         }
         return result;
+    }
+
+    private java.math.BigDecimal decimalOrNull(JsonNode node, String field) {
+        String value = node.path(field).asText("");
+        if (value.isBlank()) return null;
+        try {
+            return new java.math.BigDecimal(value);
+        } catch (NumberFormatException exception) {
+            return null;
+        }
+    }
+
+    private Integer nullableStock(JsonNode node) {
+        JsonNode quantity = node.path("stock_quantity");
+        return quantity.isIntegralNumber() ? Math.max(0, quantity.asInt()) : null;
     }
 
     private String variationLabel(JsonNode variation, String variationId) {

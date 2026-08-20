@@ -3,6 +3,8 @@ package org.example.storeintegration.client;
 import lombok.RequiredArgsConstructor;
 import org.example.storeintegration.dto.IntegrationDtos.ExternalOrderRequest;
 import org.example.storeintegration.dto.IntegrationDtos.ExternalOrderStateRequest;
+import org.example.storeintegration.dto.IntegrationDtos.ExternalProductImportRequest;
+import org.example.storeintegration.dto.IntegrationDtos.ExternalProductImportResponse;
 import org.example.storeintegration.security.ServiceTokenProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -12,6 +14,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.ResourceAccessException;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.function.Supplier;
 
@@ -52,20 +55,19 @@ public class CoreOperationsClient {
                 .toBodilessEntity());
     }
 
-    public Long createProduct(Long enterpriseId, String name, String sku, double price) {
-        String token = tokenProvider.forTenant(enterpriseId);
-        RestClient stock = restClientBuilder.clone().baseUrl(stockUrl)
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token).build();
+    public Long importProduct(Long enterpriseId, String name, String sku, BigDecimal price,
+            Long stockLocationId, int initialAvailableQuantity) {
         String safeName = (name == null || name.isBlank()) ? "Unnamed Product" : (name.length() > 180 ? name.substring(0, 180) : name);
-        String safeSku = (sku != null && !sku.isBlank()) ? (sku.length() > 100 ? sku.substring(0, 100) : sku) : "SKU-" + System.currentTimeMillis();
-        var body = java.util.Map.of(
-                "nomProduit", safeName,
-                "prixAchat", 0.0,
-                "prixVente", price > 0 ? price : 10.0,
-                "globalSku", safeSku
-        );
-        com.fasterxml.jackson.databind.JsonNode response = stock.post().uri("/api/v1/produits").body(body).retrieve().body(com.fasterxml.jackson.databind.JsonNode.class);
-        return response != null && response.has("idProduit") ? response.path("idProduit").asLong() : null;
+        String safeSku = (sku != null && !sku.isBlank())
+                ? (sku.length() > 100 ? sku.substring(0, 100) : sku)
+                : "EXT-" + Integer.toUnsignedString(safeName.hashCode());
+        var body = new ExternalProductImportRequest(safeName, safeSku, price, stockLocationId,
+                Math.max(0, initialAvailableQuantity));
+        ExternalProductImportResponse response = executeWithRetry(() -> restClientBuilder.clone().baseUrl(stockUrl)
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + tokenProvider.forTenant(enterpriseId)).build()
+                .post().uri("/api/v1/internal/integrations/catalog/products").body(body).retrieve()
+                .body(ExternalProductImportResponse.class));
+        return response == null ? null : response.productId();
     }
 
     private <T> T executeWithRetry(Supplier<T> operation) {

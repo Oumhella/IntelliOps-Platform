@@ -116,8 +116,9 @@ public class WebhookService {
                         coreClient.verifyProductAndLocation(connection.getEnterpriseId(),
                                 mapping.getInternalProductId(), connection.getStockLocationId());
                     } catch (Exception missingProduct) {
-                        Long newInternalId = coreClient.createProduct(connection.getEnterpriseId(), line.label(),
-                                "SKU-" + line.externalVariantId(), line.unitPrice().doubleValue());
+                        Long newInternalId = coreClient.importProduct(connection.getEnterpriseId(), line.label(),
+                                connection.getPlatform().name() + "-" + line.externalVariantId(), line.unitPrice(),
+                                connection.getStockLocationId(), 0);
                         if (newInternalId != null) {
                             mapping.setInternalProductId(newInternalId);
                             mapping = mappingRepository.save(mapping);
@@ -127,8 +128,9 @@ public class WebhookService {
                     }
                 }
                 if (mapping == null) {
-                    Long newInternalId = coreClient.createProduct(connection.getEnterpriseId(), line.label(),
-                            "SKU-" + line.externalVariantId(), line.unitPrice().doubleValue());
+                    Long newInternalId = coreClient.importProduct(connection.getEnterpriseId(), line.label(),
+                            connection.getPlatform().name() + "-" + line.externalVariantId(), line.unitPrice(),
+                            connection.getStockLocationId(), 0);
                     if (newInternalId != null) {
                         mapping = ProductMapping.builder()
                                 .connection(connection)

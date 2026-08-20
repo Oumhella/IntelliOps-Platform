@@ -234,6 +234,7 @@ public class IntegrationService {
                             : Instant.now().plusSeconds(refreshed.expiresIn()).getEpochSecond());
             connection.setEncryptedCredentials(credentialCipher.encrypt(updated));
             connectionRepository.save(connection);
+            credentials = updated;
             externalProducts = connectorFactory.require(connection.getPlatform()).listProducts(storeUrl, updated);
         }
 
@@ -250,7 +251,18 @@ public class IntegrationService {
                 continue;
             }
 
-            Long internalId = coreClient.createProduct(connection.getEnterpriseId(), ep.name(), ep.sku(), 10.0);
+            if (ep.salePrice() == null || ep.salePrice().signum() <= 0) {
+                log.warn("autoImportProducts: skipping variant {} because its sale price is absent or invalid",
+                        ep.variantId());
+                skippedCount++;
+                continue;
+            }
+            String sku = ep.sku() == null || ep.sku().isBlank()
+                    ? connection.getPlatform().name() + "-" + ep.variantId()
+                    : ep.sku();
+            int initialAvailable = ep.availableQuantity() == null ? 0 : Math.max(0, ep.availableQuantity());
+            Long internalId = coreClient.importProduct(connection.getEnterpriseId(), ep.name(), sku, ep.salePrice(),
+                    connection.getStockLocationId(), initialAvailable);
             if (internalId != null) {
                 ProductMapping mapping = ProductMapping.builder()
                         .connection(connection)

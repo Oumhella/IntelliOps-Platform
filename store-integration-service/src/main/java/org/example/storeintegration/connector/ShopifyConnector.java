@@ -102,19 +102,36 @@ public class ShopifyConnector implements StoreConnector {
 
     @Override
     public List<ExternalProduct> listProducts(URI storeUrl, StoreCredentials credentials) {
-        String query = "query { products(first: 100) { edges { node { id title variants(first: 100) { edges { node { id title sku } } } } } } }";
+        String query = "query { products(first: 100) { edges { node { id title variants(first: 100) { edges { node { id title sku price inventoryQuantity } } } } } } }";
         JsonNode edges = graphql(storeUrl, credentials, query, Map.of()).path("data").path("products").path("edges");
         List<ExternalProduct> result = new ArrayList<>();
         for (JsonNode productEdge : edges) {
             JsonNode product = productEdge.path("node");
             for (JsonNode variantEdge : product.path("variants").path("edges")) {
                 JsonNode variant = variantEdge.path("node");
-                result.add(new ExternalProduct(idTail(product.path("id").asText()), idTail(variant.path("id").asText()),
-                        variant.path("sku").asText(""),
-                        product.path("title").asText() + " — " + variant.path("title").asText()));
+                String name = product.path("title").asText() + " — " + variant.path("title").asText();
+                result.add(new ExternalProduct(
+                        idTail(product.path("id").asText()), idTail(variant.path("id").asText()),
+                        variant.path("sku").asText(""), name, decimalOrNull(variant, "price"),
+                        nullableNonNegativeInt(variant, "inventoryQuantity")));
             }
         }
         return result;
+    }
+
+    private java.math.BigDecimal decimalOrNull(JsonNode node, String field) {
+        String value = node.path(field).asText("");
+        if (value.isBlank()) return null;
+        try {
+            return new java.math.BigDecimal(value);
+        } catch (NumberFormatException exception) {
+            return null;
+        }
+    }
+
+    private Integer nullableNonNegativeInt(JsonNode node, String field) {
+        JsonNode value = node.path(field);
+        return value.isIntegralNumber() ? Math.max(0, value.asInt()) : null;
     }
 
     @Override
