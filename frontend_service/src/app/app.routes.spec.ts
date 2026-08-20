@@ -14,16 +14,26 @@ describe('application routes', () => {
 
     expect(childPaths).toEqual(jasmine.arrayContaining([
       '', 'leads', 'orders', 'stock', 'integrations', 'deliveries', 'billing',
-      'subscriptions', 'team', 'notifications', 'assistant', 'profile',
+      'subscriptions', 'team', 'notifications', 'assistant', 'analytics', 'profile',
     ]));
     expect(businessRoute?.children?.every((route) => route.loadComponent !== undefined)).toBeTrue();
   });
 
   it('restricts management routes to enterprise administrators', () => {
     const children = routes.find((route) => route.path === 'app')?.children ?? [];
-    for (const path of ['billing', 'subscriptions', 'integrations', 'team', 'notifications', 'assistant', 'analytics']) {
+    for (const path of ['billing', 'subscriptions', 'integrations', 'team', 'notifications', 'assistant']) {
       expect(children.find((route) => route.path === path)?.data?.['roles']).toEqual(['ROLE_ADMIN']);
     }
+  });
+
+  it('allows business intelligence for operational decision makers', () => {
+    const children = routes.find((route) => route.path === 'app')?.children ?? [];
+
+    expect(children.find((route) => route.path === 'analytics')?.data?.['roles']).toEqual([
+      'ROLE_ADMIN',
+      'ROLE_CSM',
+      'ROLE_LOGISTIC',
+    ]);
   });
 
   it('allows couriers into deliveries and profile only', () => {
