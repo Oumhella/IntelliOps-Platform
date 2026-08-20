@@ -14,6 +14,13 @@ import org.example.common.dto.PageResponse;
 import org.example.delivery_service.entity.StatutLivraison;
 import org.example.delivery_service.entity.TypeTransporteur;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.example.delivery_service.dto.request.CompleteDeliveryRequest;
+import org.example.delivery_service.dto.request.FailedDeliveryAttemptRequest;
+import org.example.delivery_service.dto.response.CourierDashboardResponse;
+import org.example.delivery_service.dto.response.ProofPhotoResponse;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.CacheControl;
 
 @RestController
 @RequestMapping("/api/v1/livraisons")
@@ -61,6 +68,7 @@ public class LivraisonController {
     }
 
     @PostMapping("/{id}/confirmer-reception")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC')")
     public ResponseEntity<LivraisonResponse> confirmerReception(@PathVariable Long id) {
         return ResponseEntity.ok(livraisonService.confirmerReception(id));
     }
@@ -70,5 +78,60 @@ public class LivraisonController {
     public ResponseEntity<LivraisonResponse> assignerLivreur(
             @PathVariable Long id, @Valid @RequestBody AssignCourierRequest request) {
         return ResponseEntity.ok(livraisonService.assignerLivreur(id, request));
+    }
+
+    @GetMapping("/me/dashboard")
+    @PreAuthorize("hasRole('LIVREUR')")
+    public ResponseEntity<CourierDashboardResponse> courierDashboard() {
+        return ResponseEntity.ok(livraisonService.courierDashboard());
+    }
+
+    @PostMapping("/{id}/accept")
+    @PreAuthorize("hasRole('LIVREUR')")
+    public ResponseEntity<LivraisonResponse> accept(@PathVariable Long id) {
+        return ResponseEntity.ok(livraisonService.acceptAssignment(id));
+    }
+
+    @PostMapping("/{id}/start")
+    @PreAuthorize("hasRole('LIVREUR')")
+    public ResponseEntity<LivraisonResponse> start(@PathVariable Long id) {
+        return ResponseEntity.ok(livraisonService.startDelivery(id));
+    }
+
+    @PostMapping("/{id}/failed-attempt")
+    @PreAuthorize("hasRole('LIVREUR')")
+    public ResponseEntity<LivraisonResponse> failedAttempt(
+            @PathVariable Long id, @Valid @RequestBody FailedDeliveryAttemptRequest request) {
+        return ResponseEntity.ok(livraisonService.reportFailedAttempt(id, request));
+    }
+
+    @PostMapping("/{id}/request-return")
+    @PreAuthorize("hasRole('LIVREUR')")
+    public ResponseEntity<LivraisonResponse> requestReturn(@PathVariable Long id) {
+        return ResponseEntity.ok(livraisonService.requestReturn(id));
+    }
+
+    @PostMapping(value = "/{id}/complete", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('LIVREUR')")
+    public ResponseEntity<LivraisonResponse> complete(
+            @PathVariable Long id,
+            @Valid @RequestPart("details") CompleteDeliveryRequest request,
+            @RequestPart(value = "proofPhoto", required = false) MultipartFile proofPhoto) {
+        return ResponseEntity.ok(livraisonService.completeDelivery(id, request, proofPhoto));
+    }
+
+    @PostMapping("/{id}/reconcile-cod")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC')")
+    public ResponseEntity<LivraisonResponse> reconcileCod(@PathVariable Long id) {
+        return ResponseEntity.ok(livraisonService.reconcileCod(id));
+    }
+
+    @GetMapping("/{id}/proof-photo")
+    public ResponseEntity<byte[]> proofPhoto(@PathVariable Long id) {
+        ProofPhotoResponse proof = livraisonService.getProofPhoto(id);
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .contentType(MediaType.parseMediaType(proof.contentType()))
+                .body(proof.content());
     }
 }

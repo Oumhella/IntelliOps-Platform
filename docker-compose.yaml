@@ -488,6 +488,7 @@ services:
       /bin/sh -c "
       /usr/bin/mc alias set myminio http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD;
       /usr/bin/mc mb myminio/invoices-erp --ignore-existing;
+      /usr/bin/mc mb myminio/delivery-proofs --ignore-existing;
       /usr/bin/mc anonymous set download myminio/invoices-erp;
       exit 0;
       "
@@ -545,6 +546,10 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
       - CONFIG_SERVER_URL=http://config-server:8888
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=erp-kafka:29092
+      - MINIO_URL=http://minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - MINIO_BUCKET_NAME=delivery-proofs
     depends_on:
       erp-db:
         condition: service_started
@@ -553,6 +558,8 @@ services:
       discovery-server:
         condition: service_started
       config-server:
+        condition: service_healthy
+      minio:
         condition: service_healthy
       kafka:
         condition: service_started

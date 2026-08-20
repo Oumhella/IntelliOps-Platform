@@ -209,7 +209,11 @@ vault kv put secret/paiement-service \
 
 vault kv put secret/delivery-service \
   spring.datasource.username="${DB_USER:-postgres}" \
-  spring.datasource.password="${DB_PASSWORD:-changeme}"
+  spring.datasource.password="${DB_PASSWORD:-changeme}" \
+  minio.url="http://minio:9000" \
+  minio.access-key="${MINIO_ROOT_USER}" \
+  minio.secret-key="${MINIO_ROOT_PASSWORD}" \
+  minio.bucket-name="delivery-proofs"
 
 vault kv put secret/notification-service \
     spring.datasource.username="${DB_USER:-postgres}" \

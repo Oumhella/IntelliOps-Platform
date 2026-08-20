@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.math.BigDecimal;
 
 @Entity
 @Table(
@@ -52,6 +53,38 @@ public class Livraison {
 
     private LocalDateTime shippingDate;
     private LocalDateTime deliveryDate;
+    private LocalDateTime acceptedAt;
+    private LocalDateTime startedAt;
+    private LocalDateTime lastAttemptAt;
+    private LocalDateTime returnRequestedAt;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private int attemptCount = 0;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 40)
+    private MotifEchecLivraison failureReason;
+
+    @Column(length = 1000)
+    private String failureNote;
+
+    private Double lastLatitude;
+    private Double lastLongitude;
+
+    private String deliveredTo;
+    private String proofSignature;
+    private String proofPhotoObjectKey;
+    private LocalDateTime proofCapturedAt;
+
+    @Column(precision = 14, scale = 2)
+    private BigDecimal codCollectedAmount;
+
+    @Column(length = 1000)
+    private String codDiscrepancyNote;
+
+    private LocalDateTime codReconciledAt;
+    private Long codReconciledBy;
 
     private String clientEmail;
 

@@ -11,6 +11,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.example.delivery_service.entity.StatutLivraison;
 import org.example.delivery_service.entity.TypeTransporteur;
+import java.time.LocalDateTime;
+import java.math.BigDecimal;
+import java.util.Collection;
 
 @Repository
 public interface LivraisonRepository extends JpaRepository<Livraison, Long> {
@@ -36,4 +39,28 @@ public interface LivraisonRepository extends JpaRepository<Livraison, Long> {
             @Param("transporteur") TypeTransporteur transporteur,
             @Param("livreurId") Long livreurId,
             Pageable pageable);
+
+    long countByEnterpriseIdAndLivreurIdAndShippingDateGreaterThanEqual(
+            Long enterpriseId, Long livreurId, LocalDateTime since);
+
+    long countByEnterpriseIdAndLivreurIdAndDeliveryDateGreaterThanEqual(
+            Long enterpriseId, Long livreurId, LocalDateTime since);
+
+    long countByEnterpriseIdAndLivreurIdAndStatutLivraison(
+            Long enterpriseId, Long livreurId, StatutLivraison status);
+
+    long countByEnterpriseIdAndLivreurIdAndStatutLivraisonIn(
+            Long enterpriseId, Long livreurId, Collection<StatutLivraison> statuses);
+
+    @Query("""
+            select coalesce(sum(delivery.codCollectedAmount), 0) from Livraison delivery
+            where delivery.enterpriseId = :enterpriseId
+              and delivery.livreurId = :livreurId
+              and delivery.statutLivraison = org.example.delivery_service.entity.StatutLivraison.LIVREE
+              and delivery.codCollectedAmount > 0
+              and delivery.codReconciledAt is null
+            """)
+    BigDecimal sumUnreconciledCod(
+            @Param("enterpriseId") Long enterpriseId,
+            @Param("livreurId") Long livreurId);
 }

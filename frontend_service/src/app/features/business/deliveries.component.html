@@ -1,14 +1,24 @@
-<main class="view-page">
+<main class="view-page" [class.courier-workspace]="isCourier">
   <header class="view-heading">
     <div>
-      <p class="eyebrow"><span>Operations</span><b>/</b> Deliveries</p>
-      <h1>Deliveries</h1>
-      <p>{{ canShip ? 'Assign internal couriers or manage external-company shipments.' : 'View and update deliveries assigned to you.' }}</p>
+      <p class="eyebrow"><span>Operations</span><b>/</b> {{ isCourier ? 'My route' : 'Deliveries' }}</p>
+      <h1>{{ isCourier ? 'My deliveries' : 'Deliveries' }}</h1>
+      <p>{{ canShip ? 'Assign couriers, manage carrier shipments and reconcile collected cash.' : 'Your secure execution queue with customer, navigation, proof and collection details.' }}</p>
     </div>
     @if (canShip) {
       <div class="view-actions"><button class="primary-button" (click)="open('ship')">+ Ship order</button></div>
     }
   </header>
+
+  @if (isCourier && dashboard(); as summary) {
+    <section class="courier-metrics" aria-label="Today delivery summary">
+      <article><span>Assigned today</span><strong>{{ summary.assignedToday }}</strong></article>
+      <article><span>Active</span><strong>{{ summary.activeDeliveries }}</strong></article>
+      <article><span>Completed today</span><strong>{{ summary.completedToday }}</strong></article>
+      <article><span>Failed attempts</span><strong>{{ summary.failedAttempts }}</strong></article>
+      <article class="metric-cod"><span>COD awaiting reconciliation</span><strong>{{ summary.codAwaitingReconciliation }} MAD</strong></article>
+    </section>
+  }
 
   <section class="surface-card data-card">
     <div class="data-toolbar">
@@ -17,45 +27,94 @@
           <option value="">All statuses</option>
           @for (status of statuses; track status) { <option [value]="status">{{ label(status) }}</option> }
         </select>
-        <select class="filter-control" [(ngModel)]="carrierFilter" (change)="load()">
-          <option value="">All carriers</option>
-          @for (carrier of carriers; track carrier) { <option [value]="carrier">{{ label(carrier) }}</option> }
-        </select>
-        <select class="filter-control" [(ngModel)]="lookupType">
-          <option value="tracking">Tracking</option><option value="order">Order ID</option>
-        </select>
-        <input class="filter-control" [(ngModel)]="lookupValue" placeholder="Lookup value" />
-        <button class="action-button" (click)="lookup()">Find</button>
+        @if (!isCourier) {
+          <select class="filter-control" [(ngModel)]="carrierFilter" (change)="load()">
+            <option value="">All carriers</option>
+            @for (carrier of carriers; track carrier) { <option [value]="carrier">{{ label(carrier) }}</option> }
+          </select>
+          <select class="filter-control" [(ngModel)]="lookupType">
+            <option value="tracking">Tracking</option><option value="order">Order ID</option>
+          </select>
+          <input class="filter-control" [(ngModel)]="lookupValue" placeholder="Lookup value" />
+          <button class="action-button" (click)="lookup()">Find</button>
+        }
       </div>
       <span class="record-summary">{{ page()?.totalElements || 0 }} deliveries</span>
     </div>
 
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Tracking</th><th>Order</th><th>Status</th><th>Carrier</th><th>COD amount</th><th></th></tr></thead>
-        <tbody>
-          @if (loading()) { @for (item of [1,2,3,4]; track item) { <tr><td colspan="6" class="loading-row"></td></tr> } }
-          @for (delivery of page()?.content || []; track delivery.idLivraison) {
-            <tr>
-              <td><span class="row-primary">{{ delivery.codeSuiviTracking }}</span><span class="row-secondary">#{{ delivery.idLivraison }}</span></td>
-              <td>#{{ delivery.referenceCommandeId }}</td>
-              <td><span class="status-badge" [class]="'status-badge status-badge-' + tone(delivery.statutLivraison)"><span></span>{{ label(delivery.statutLivraison) }}</span></td>
-              <td>
-                <span class="row-primary">{{ delivery.nomSociete || label(delivery.typeTransporteur) }}</span>
-                @if(delivery.typeTransporteur === 'LIVREUR_INTERNE'){<span class="row-secondary">{{ courierName(delivery.livreurId) }}</span>}
-              </td>
-              <td>{{ delivery.montantACollecterCoD }} MAD</td>
-              <td><div class="row-actions">
-                <button class="action-button" (click)="open('detail', delivery)">View</button>
-                @if(canReassign(delivery)){<button class="action-button" (click)="open('assign', delivery)">Assign</button>}
-                @if(allowedStatuses(delivery).length){<button class="action-button" (click)="open('status', delivery)">Update status</button>}
-                @if(canConfirm(delivery)){<button class="action-button action-button-success" (click)="confirm(delivery)">Mark delivered</button>}
-              </div></td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
+    @if (isCourier) {
+      <div class="courier-delivery-list">
+        @if (loading()) { @for (item of [1,2,3]; track item) { <div class="courier-card loading-row"></div> } }
+        @for (delivery of page()?.content || []; track delivery.idLivraison) {
+          <article class="courier-card">
+            <header class="courier-card-header">
+              <div><span class="row-secondary">{{ delivery.codeSuiviTracking }}</span><h2>{{ delivery.clientNomComplet }}</h2></div>
+              <span class="status-badge" [class]="'status-badge status-badge-' + tone(delivery.statutLivraison)"><span></span>{{ label(delivery.statutLivraison) }}</span>
+            </header>
+            <div class="courier-customer-grid">
+              <div><span>Address</span><strong>{{ delivery.adresseLivraison }}, {{ delivery.villeLivraison }}</strong></div>
+              <div><span>Phone</span><strong>{{ delivery.clientTelephone }}</strong></div>
+              <div><span>Order</span><strong>#{{ delivery.referenceCommandeId }}</strong></div>
+              <div><span>Cash to collect</span><strong [class.cod-due]="delivery.montantACollecterCoD > 0">{{ delivery.montantACollecterCoD }} MAD</strong></div>
+            </div>
+            @if (delivery.statutLivraison === 'ECHEC') {
+              <div class="attempt-alert"><strong>{{ delivery.failureReason ? label(delivery.failureReason) : 'Failed attempt' }}</strong><span>{{ delivery.failureNote || 'No note supplied' }} · attempt {{ delivery.attemptCount }}</span></div>
+            }
+            @if (delivery.statutLivraison === 'RETOUR_DEMANDE') {
+              <div class="attempt-alert"><strong>Return awaiting logistics approval</strong><span>No further execution is allowed until logistics reviews it.</span></div>
+            }
+            <div class="courier-contact-actions">
+              <a class="action-button" [href]="'tel:' + delivery.clientTelephone">Call customer</a>
+              <a class="action-button" [href]="mapsUrl(delivery)" target="_blank" rel="noopener noreferrer">Open navigation</a>
+              <button class="action-button" (click)="open('detail', delivery)">Full details</button>
+            </div>
+            <div class="courier-primary-actions">
+              @if (delivery.statutLivraison === 'ASSIGNEE' || delivery.statutLivraison === 'EN_PREPARATION') {
+                <button class="primary-button" [disabled]="busy" (click)="accept(delivery)">Accept assignment</button>
+              }
+              @if (delivery.statutLivraison === 'ACCEPTEE') {
+                <button class="primary-button" [disabled]="busy" (click)="start(delivery)">Start delivery</button>
+              }
+              @if (delivery.statutLivraison === 'EN_COURS') {
+                <button class="primary-button" (click)="open('complete', delivery)">Complete with proof</button>
+              }
+              @if (delivery.statutLivraison === 'ASSIGNEE' || delivery.statutLivraison === 'ACCEPTEE' || delivery.statutLivraison === 'EN_COURS') {
+                <button class="action-button action-button-danger" (click)="open('failure', delivery)">Report failed attempt</button>
+              }
+              @if (delivery.statutLivraison === 'ECHEC') {
+                <button class="primary-button" [disabled]="busy" (click)="start(delivery)">Retry delivery</button>
+                <button class="action-button action-button-danger" [disabled]="busy" (click)="requestReturn(delivery)">Request return</button>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tracking</th><th>Order</th><th>Status</th><th>Carrier</th><th>COD</th><th></th></tr></thead>
+          <tbody>
+            @if (loading()) { @for (item of [1,2,3,4]; track item) { <tr><td colspan="6" class="loading-row"></td></tr> } }
+            @for (delivery of page()?.content || []; track delivery.idLivraison) {
+              <tr>
+                <td><span class="row-primary">{{ delivery.codeSuiviTracking }}</span><span class="row-secondary">#{{ delivery.idLivraison }}</span></td>
+                <td>#{{ delivery.referenceCommandeId }}</td>
+                <td><span class="status-badge" [class]="'status-badge status-badge-' + tone(delivery.statutLivraison)"><span></span>{{ label(delivery.statutLivraison) }}</span></td>
+                <td><span class="row-primary">{{ delivery.nomSociete || label(delivery.typeTransporteur) }}</span>@if(delivery.typeTransporteur === 'LIVREUR_INTERNE'){<span class="row-secondary">{{ courierName(delivery.livreurId) }}</span>}</td>
+                <td><span class="row-primary">{{ delivery.montantACollecterCoD }} MAD</span>@if(delivery.codCollectedAmount){<span class="row-secondary">Collected: {{delivery.codCollectedAmount}} · {{delivery.codReconciledAt ? 'reconciled' : 'pending reconciliation'}}</span>}</td>
+                <td><div class="row-actions">
+                  <button class="action-button" (click)="open('detail', delivery)">View</button>
+                  @if(canReassign(delivery)){<button class="action-button" (click)="open('assign', delivery)">Assign</button>}
+                  @if(allowedStatuses(delivery).length){<button class="action-button" (click)="open('status', delivery)">Update status</button>}
+                  @if(canConfirm(delivery)){<button class="action-button action-button-success" (click)="confirm(delivery)">Mark delivered</button>}
+                  @if(delivery.codCollectedAmount && !delivery.codReconciledAt){<button class="action-button action-button-success" (click)="reconcileCod(delivery)">Reconcile COD</button>}
+                </div></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
 
     @if (!loading() && !(page()?.content?.length)) {
       <div class="empty-state"><div><strong>No deliveries found</strong><p>{{ canShip ? 'Ship an order or change the active filters.' : 'No shipments are currently assigned to you.' }}</p></div></div>
@@ -70,42 +129,59 @@
   <button class="drawer-backdrop" (click)="close()"></button>
   <aside class="form-drawer">
     <header class="drawer-header">
-      <div><h2>{{ panel === 'ship' ? 'Ship an order' : panel === 'status' ? 'Update delivery' : panel === 'assign' ? 'Assign courier' : 'Delivery details' }}</h2><p>@if (selected(); as delivery) { Tracking {{ delivery.codeSuiviTracking }} } @else { Create a carrier shipment record. }</p></div>
+      <div><h2>{{ panel === 'ship' ? 'Ship an order' : panel === 'status' ? 'Update delivery' : panel === 'assign' ? 'Assign courier' : panel === 'failure' ? 'Report failed attempt' : panel === 'complete' ? 'Complete delivery' : 'Delivery details' }}</h2><p>@if (selected(); as delivery) { Tracking {{ delivery.codeSuiviTracking }} } @else { Create a carrier shipment record. }</p></div>
       <button class="drawer-close" (click)="close()">×</button>
     </header>
 
     @if (panel === 'ship' && canShip) {
-      <form (ngSubmit)="ship()">
-        <div class="form-grid">
-          <label class="form-field form-field-full"><span>Order ready to ship</span><select name="order" [(ngModel)]="shipForm.referenceCommandeId" required><option [ngValue]="null" disabled>Select an order in preparation</option>@for (order of shippableOrders(); track order.idCommande) {<option [ngValue]="order.idCommande">{{ order.reference }} · {{ order.infosClient.nomComplet }} · {{ label(order.statutPaiement) }}</option>}</select></label>
-          <label class="form-field"><span>Carrier type</span><select name="carrier" [(ngModel)]="shipForm.typeTransporteur">@for (carrier of carriers; track carrier) { <option [value]="carrier">{{ label(carrier) }}</option> }</select></label>
-          @if (shipForm.typeTransporteur === 'SOCIETE_LIVRAISON') {
-            <label class="form-field form-field-full"><span>External delivery company</span><input name="company" [(ngModel)]="shipForm.nomSociete" required /><small class="form-help">This creates a manually managed carrier shipment. Automated carrier APIs require a configured provider adapter.</small></label>
-          } @else {
-            <label class="form-field form-field-full"><span>Internal courier</span><select name="courier" [(ngModel)]="shipForm.livreurId" required><option [ngValue]="null">Select an active courier</option>@for (courier of couriers(); track courier.id) { <option [ngValue]="courier.id">{{ courier.firstname }} {{ courier.lastname }} · #{{ courier.id }}</option> }</select><small class="form-help">Only active courier accounts from this enterprise are available.</small></label>
-          }
-        </div>
-        <div class="form-actions"><button class="primary-button" [disabled]="busy">Create shipment</button></div>
-      </form>
+      <form (ngSubmit)="ship()"><div class="form-grid">
+        <label class="form-field form-field-full"><span>Order ready to ship</span><select name="order" [(ngModel)]="shipForm.referenceCommandeId" required><option [ngValue]="null" disabled>Select an order in preparation</option>@for (order of shippableOrders(); track order.idCommande) {<option [ngValue]="order.idCommande">{{ order.reference }} · {{ order.infosClient.nomComplet }} · {{ label(order.statutPaiement) }}</option>}</select></label>
+        <label class="form-field"><span>Carrier type</span><select name="carrier" [(ngModel)]="shipForm.typeTransporteur">@for (carrier of carriers; track carrier) { <option [value]="carrier">{{ label(carrier) }}</option> }</select></label>
+        @if (shipForm.typeTransporteur === 'SOCIETE_LIVRAISON') {<label class="form-field form-field-full"><span>External delivery company</span><input name="company" [(ngModel)]="shipForm.nomSociete" required /></label>} @else {<label class="form-field form-field-full"><span>Internal courier</span><select name="courier" [(ngModel)]="shipForm.livreurId" required><option [ngValue]="null">Select an active courier</option>@for (courier of couriers(); track courier.id) { <option [ngValue]="courier.id">{{ courier.firstname }} {{ courier.lastname }} · #{{ courier.id }}</option> }</select></label>}
+      </div><div class="form-actions"><button class="primary-button" [disabled]="busy">Create shipment</button></div></form>
     }
 
     @if (panel === 'detail' && selected(); as delivery) {
+      <div class="customer-identity-card"><div class="avatar">{{delivery.clientNomComplet[0]}}</div><div><span>Recipient</span><h3>{{delivery.clientNomComplet}}</h3><a [href]="'tel:' + delivery.clientTelephone">{{delivery.clientTelephone}}</a></div></div>
       <div class="detail-panel"><dl class="detail-list">
         <div><dt>Tracking</dt><dd>{{ delivery.codeSuiviTracking }}</dd></div><div><dt>Status</dt><dd>{{ label(delivery.statutLivraison) }}</dd></div>
         <div><dt>Order</dt><dd>#{{ delivery.referenceCommandeId }}</dd></div><div><dt>Carrier</dt><dd>{{ delivery.nomSociete || label(delivery.typeTransporteur) }}</dd></div>
-        <div><dt>Courier</dt><dd>{{ delivery.typeTransporteur === 'LIVREUR_INTERNE' ? courierName(delivery.livreurId) : '—' }}</dd></div><div><dt>Shipped</dt><dd>{{ delivery.shippingDate | date:'medium' }}</dd></div>
-        <div><dt>Delivered</dt><dd>{{ delivery.deliveryDate ? (delivery.deliveryDate | date:'medium') : '—' }}</dd></div><div><dt>COD</dt><dd>{{ delivery.montantACollecterCoD }} MAD</dd></div>
-        <div><dt>Recipient</dt><dd>{{ delivery.clientNomComplet }}</dd></div><div><dt>Phone</dt><dd>{{ delivery.clientTelephone }}</dd></div>
-        <div><dt>Delivery address</dt><dd>{{ delivery.adresseLivraison }}, {{ delivery.villeLivraison }}</dd></div>
-        <div><dt>Lead time</dt><dd>{{ delivery.delaiJours < 0 ? '—' : delivery.delaiJours + ' days' }}</dd></div>
+        <div><dt>Address</dt><dd>{{ delivery.adresseLivraison }}, {{ delivery.villeLivraison }}</dd></div><div><dt>Email</dt><dd>{{delivery.clientEmail || '—'}}</dd></div>
+        <div><dt>COD required</dt><dd>{{ delivery.montantACollecterCoD }} MAD</dd></div><div><dt>COD collected</dt><dd>{{delivery.codCollectedAmount ?? '—'}}{{delivery.codCollectedAmount !== null ? ' MAD' : ''}}</dd></div>
+        <div><dt>Assigned</dt><dd>{{ delivery.shippingDate | date:'medium' }}</dd></div><div><dt>Accepted</dt><dd>{{ delivery.acceptedAt ? (delivery.acceptedAt | date:'medium') : '—' }}</dd></div>
+        <div><dt>Started</dt><dd>{{ delivery.startedAt ? (delivery.startedAt | date:'medium') : '—' }}</dd></div><div><dt>Delivered</dt><dd>{{ delivery.deliveryDate ? (delivery.deliveryDate | date:'medium') : '—' }}</dd></div>
+        @if(delivery.attemptCount){<div><dt>Attempts</dt><dd>{{delivery.attemptCount}} · {{delivery.failureReason ? label(delivery.failureReason) : '—'}}</dd></div><div><dt>Attempt note</dt><dd>{{delivery.failureNote || '—'}}</dd></div>}
+        @if(delivery.deliveredTo){<div><dt>Delivered to</dt><dd>{{delivery.deliveredTo}}</dd></div><div><dt>Signature</dt><dd>{{delivery.proofSignature}}</dd></div>}
       </dl></div>
+      <div class="drawer-inline-actions"><a class="action-button" [href]="mapsUrl(delivery)" target="_blank" rel="noopener noreferrer">Open navigation</a>@if(delivery.proofPhotoAvailable){<button class="action-button" (click)="viewProof(delivery)">View proof photo</button>}</div>
+      @if(proofPreviewUrl(); as proofUrl){<img class="proof-preview" [src]="proofUrl" alt="Proof captured for this delivery" />}
+    }
+
+    @if (panel === 'failure' && selected(); as delivery) {
+      <form (ngSubmit)="reportFailure()"><div class="form-grid">
+        <label class="form-field form-field-full"><span>Reason</span><select name="failureReason" [(ngModel)]="failureForm.reason">@for(reason of failureReasons;track reason){<option [value]="reason">{{label(reason)}}</option>}</select></label>
+        <label class="form-field form-field-full"><span>Operational note</span><textarea name="failureNote" [(ngModel)]="failureForm.note" maxlength="1000" placeholder="What happened and what should logistics know?"></textarea></label>
+        <div class="form-field form-field-full"><span>Attempt location (optional)</span><button type="button" class="action-button" (click)="captureLocation('failure')">Use current location</button><small class="form-help">{{locationMessage}}</small></div>
+      </div><div class="form-actions"><button class="primary-button" [disabled]="busy">Record failed attempt</button></div></form>
+    }
+
+    @if (panel === 'complete' && selected(); as delivery) {
+      <form (ngSubmit)="complete()"><div class="form-grid">
+        <label class="form-field form-field-full"><span>Recipient name</span><input name="recipient" [(ngModel)]="completionForm.recipientName" required /></label>
+        <label class="form-field form-field-full"><span>Recipient signature / confirmation</span><input name="signature" [(ngModel)]="completionForm.signature" required placeholder="Name or signature confirmation" /></label>
+        <label class="form-field"><span>Required COD</span><input [value]="delivery.montantACollecterCoD" disabled /></label>
+        <label class="form-field"><span>Cash collected</span><input type="number" min="0" step="0.01" name="codCollected" [(ngModel)]="completionForm.collectedCodAmount" required /></label>
+        <label class="form-field form-field-full"><span>Proof photo (optional, JPEG/PNG, max 5 MB)</span><input type="file" accept="image/jpeg,image/png" (change)="selectProofPhoto($event)" /></label>
+        <label class="form-field form-field-full"><span>COD note</span><textarea name="codNote" [(ngModel)]="completionForm.codDiscrepancyNote" maxlength="1000"></textarea></label>
+        <div class="form-field form-field-full"><span>Delivery location (optional)</span><button type="button" class="action-button" (click)="captureLocation('complete')">Use current location</button><small class="form-help">{{locationMessage}}</small></div>
+      </div><p class="form-help">Completion is rejected if collected cash differs from the required COD. Report a payment problem as a failed attempt instead.</p><div class="form-actions"><button class="primary-button" [disabled]="busy || !completionForm.recipientName || !completionForm.signature">Complete delivery</button></div></form>
     }
 
     @if (panel === 'status' && selected(); as delivery) {
-      <form (ngSubmit)="update()"><label class="form-field"><span>Next valid status</span><select name="status" [(ngModel)]="newStatus">@for (status of allowedStatuses(delivery); track status) { <option [value]="status">{{ label(status) }}</option> }</select></label><p class="form-help">Internal delivery execution belongs to its assigned courier. External-carrier execution belongs to logistics.</p><div class="form-actions"><button class="primary-button" [disabled]="busy || allowedStatuses(delivery).length === 0">Update status</button></div></form>
+      <form (ngSubmit)="update()"><label class="form-field"><span>Next valid status</span><select name="status" [(ngModel)]="newStatus">@for (status of allowedStatuses(delivery); track status) { <option [value]="status">{{ label(status) }}</option> }</select></label><p class="form-help">Courier execution uses proof-backed actions. Logistics can approve a requested return here.</p><div class="form-actions"><button class="primary-button" [disabled]="busy || allowedStatuses(delivery).length === 0">Update status</button></div></form>
     }
     @if (panel === 'assign' && selected(); as delivery) {
-      <form (ngSubmit)="assign()"><label class="form-field"><span>Active internal courier</span><select name="assignedCourier" [(ngModel)]="assignedCourierId" required><option [ngValue]="null" disabled>Select a courier</option>@for(courier of couriers();track courier.id){<option [ngValue]="courier.id">{{courier.firstname}} {{courier.lastname}}</option>}</select><small class="form-help">Reassignment is allowed before dispatch or after a failed attempt.</small></label><div class="form-actions"><button class="primary-button" [disabled]="busy||!assignedCourierId">Save assignment</button></div></form>
+      <form (ngSubmit)="assign()"><label class="form-field"><span>Active internal courier</span><select name="assignedCourier" [(ngModel)]="assignedCourierId" required><option [ngValue]="null" disabled>Select a courier</option>@for(courier of couriers();track courier.id){<option [ngValue]="courier.id">{{courier.firstname}} {{courier.lastname}}</option>}</select><small class="form-help">Reassignment is allowed before acceptance or after a failed attempt.</small></label><div class="form-actions"><button class="primary-button" [disabled]="busy||!assignedCourierId">Save assignment</button></div></form>
     }
   </aside>
 }

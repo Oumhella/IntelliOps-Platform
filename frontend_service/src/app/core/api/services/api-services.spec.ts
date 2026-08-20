@@ -119,6 +119,40 @@ describe('API services transport details', () => {
     request.flush({});
   });
 
+  it('uses dedicated courier workflow endpoints instead of generic status mutation', () => {
+    const service = TestBed.inject(DeliveriesApiService);
+    service.accept(21).subscribe();
+
+    const accept = httpTesting.expectOne('http://gateway:8080/api/v1/livraisons/21/accept');
+    expect(accept.request.method).toBe('POST');
+    accept.flush({});
+
+    service.reportFailedAttempt(21, {
+      reason: 'CLIENT_ABSENT',
+      note: 'Called twice',
+      latitude: 33.57,
+      longitude: -7.59,
+    }).subscribe();
+    const failed = httpTesting.expectOne('http://gateway:8080/api/v1/livraisons/21/failed-attempt');
+    expect(failed.request.body.reason).toBe('CLIENT_ABSENT');
+    expect(failed.request.body.latitude).toBe(33.57);
+    failed.flush({});
+  });
+
+  it('sends delivery proof and COD confirmation as multipart data', () => {
+    TestBed.inject(DeliveriesApiService).complete(21, {
+      recipientName: 'Customer',
+      signature: 'Customer',
+      collectedCodAmount: 120,
+    }).subscribe();
+
+    const request = httpTesting.expectOne('http://gateway:8080/api/v1/livraisons/21/complete');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body instanceof FormData).toBeTrue();
+    expect((request.request.body as FormData).has('details')).toBeTrue();
+    request.flush({});
+  });
+
   it('starts Shopify authorization without sending provider credentials', () => {
     TestBed.inject(IntegrationsApiService).connectShopify({
       displayName: 'Main store',
