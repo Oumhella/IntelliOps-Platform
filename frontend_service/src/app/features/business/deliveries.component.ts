@@ -24,7 +24,7 @@ import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
   selector: 'app-deliveries',
   imports: [FormsModule, DatePipe],
   templateUrl: './deliveries.component.html',
-  styleUrl: './business-view.scss',
+  styleUrls: ['./business-view.scss', './deliveries.component.scss'],
 })
 export class DeliveriesComponent implements OnInit {
   private readonly api = inject(DeliveriesApiService);
