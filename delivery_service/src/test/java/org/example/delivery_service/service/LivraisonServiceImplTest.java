@@ -129,6 +129,25 @@ class LivraisonServiceImplTest {
     }
 
     @Test
+    void startingDeliveryHandsTheOrderToShippedAndPersistsTheStart() {
+        authenticateCourier();
+        Livraison shipment = assignedShipment(StatutLivraison.ACCEPTEE);
+        when(repository.findByIdLivraisonAndEnterpriseId(5L, 42L)).thenReturn(Optional.of(shipment));
+        when(repository.save(shipment)).thenReturn(shipment);
+
+        service.startDelivery(5L);
+
+        ArgumentCaptor<OrderClient.StatusUpdate> orderStatus =
+                ArgumentCaptor.forClass(OrderClient.StatusUpdate.class);
+        verify(orderClient).updateFulfillmentStatus(
+                org.mockito.ArgumentMatchers.eq(12L), orderStatus.capture());
+        assertThat(orderStatus.getValue().status()).isEqualTo("EXPEDIEE");
+        assertThat(shipment.getStatutLivraison()).isEqualTo(StatutLivraison.EN_COURS);
+        assertThat(shipment.getStartedAt()).isNotNull();
+        verify(repository).save(shipment);
+    }
+
+    @Test
     void failedAttemptRecordsReasonNoteAndAuditCount() {
         authenticateCourier();
         Livraison shipment = assignedShipment(StatutLivraison.EN_COURS);
@@ -192,6 +211,7 @@ class LivraisonServiceImplTest {
         return Livraison.builder()
                 .idLivraison(5L)
                 .enterpriseId(42L)
+                .referenceCommandeId(12L)
                 .livreurId(7L)
                 .typeTransporteur(TypeTransporteur.LIVREUR_INTERNE)
                 .statutLivraison(status)

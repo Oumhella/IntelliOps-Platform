@@ -159,13 +159,11 @@ public class LivraisonServiceImpl implements LivraisonService {
 
         if (request.getStatut() == StatutLivraison.CHEZ_TRANSPORTEUR
                 || request.getStatut() == StatutLivraison.EN_COURS) {
-            orderClient.updateFulfillmentStatus(livraison.getReferenceCommandeId(),
-                    new OrderClient.StatusUpdate("EXPEDIEE"));
+            updateOrderFulfillmentStatus(livraison, "EXPEDIEE");
         } else if (request.getStatut() == StatutLivraison.LIVREE) {
             completeOrderDelivery(livraison);
         } else if (request.getStatut() == StatutLivraison.RETOUR) {
-            orderClient.updateFulfillmentStatus(livraison.getReferenceCommandeId(),
-                    new OrderClient.StatusUpdate("RETOURNEE"));
+            updateOrderFulfillmentStatus(livraison, "RETOURNEE");
         }
 
         livraison.mettreAJourStatut(request.getStatut());
@@ -249,8 +247,7 @@ public class LivraisonServiceImpl implements LivraisonService {
         delivery.setFailureReason(null);
         delivery.setFailureNote(null);
         delivery.mettreAJourStatut(StatutLivraison.EN_COURS);
-        orderClient.updateFulfillmentStatus(delivery.getReferenceCommandeId(),
-                new OrderClient.StatusUpdate("EXPEDIEE"));
+        updateOrderFulfillmentStatus(delivery, "EXPEDIEE");
         return livraisonMapper.toResponse(livraisonRepository.save(delivery));
     }
 
@@ -451,8 +448,7 @@ public class LivraisonServiceImpl implements LivraisonService {
         if (delivery.getMontantACollecterCoD() > 0) {
             paymentClient.collectCashOnDelivery(delivery.getReferenceCommandeId());
         }
-        orderClient.updateFulfillmentStatus(delivery.getReferenceCommandeId(),
-                new OrderClient.StatusUpdate("LIVREE"));
+        updateOrderFulfillmentStatus(delivery, "LIVREE");
     }
 
     private void ensureCourierAccess(Livraison delivery) {
@@ -517,6 +513,18 @@ public class LivraisonServiceImpl implements LivraisonService {
                     delivery.getClientEmail(),
                     "Commande livree",
                     "Votre commande #" + delivery.getReferenceCommandeId() + " a bien ete livree. Merci !");
+        }
+    }
+
+    private void updateOrderFulfillmentStatus(Livraison delivery, String status) {
+        try {
+            orderClient.updateFulfillmentStatus(
+                    delivery.getReferenceCommandeId(), new OrderClient.StatusUpdate(status));
+        } catch (FeignException exception) {
+            throw new IllegalStateException(
+                    "The linked order could not be moved to " + status
+                            + ". The delivery change was rolled back; please retry.",
+                    exception);
         }
     }
 
