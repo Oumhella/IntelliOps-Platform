@@ -54,7 +54,7 @@ public class InventaireController {
     }
 
     @PostMapping("/boutiques/{idBoutique}/produits/{idProduit}/consommer")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CSM', 'LOGISTIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CSM', 'LOGISTIC', 'INTEGRATION_SERVICE')")
     public ResponseEntity<InventaireResponseDTO> consommerReservation(
             @PathVariable Long idBoutique,
             @PathVariable Long idProduit,

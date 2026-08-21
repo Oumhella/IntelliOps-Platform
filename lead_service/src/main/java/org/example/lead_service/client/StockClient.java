@@ -1,6 +1,6 @@
 package org.example.lead_service.client;
 
-import org.example.common.feign.FeignClientConfig;
+import org.example.lead_service.config.StockFeignClientConfig;
 import org.example.lead_service.dto.StockProductDTO;
 import org.example.lead_service.dto.StockInventoryDTO;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 
-@FeignClient(name = "stock-service", configuration = FeignClientConfig.class)
+@FeignClient(name = "stock-service", configuration = StockFeignClientConfig.class)
 public interface StockClient {
 
     @GetMapping("/api/v1/produits/{idProduit}/catalog")
