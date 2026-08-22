@@ -1,6 +1,6 @@
 <main class="public-page">
   <nav class="public-nav" aria-label="Public navigation">
-    <a class="public-brand" routerLink="/" aria-label="IntelliOps home"><span class="brand-mark"><svg viewBox="0 0 24 24"><path d="M6 5.5h12v4H6zM6 14.5h5v4H6zM14 14.5h4v4h-4z"/></svg></span><strong>IntelliOps</strong></a>
+    <a class="public-brand" routerLink="/" aria-label="IntelliOps home"><span class="brand-mark"><img src="/logo.jfif" alt="" /></span><strong>IntelliOps</strong></a>
     <div class="nav-links"><a href="#platform">Platform</a><a href="#plans">Plans</a><a href="#integrations">Integrations</a></div>
     <div class="nav-actions">@if(session.isAuthenticated()){<a class="nav-login" [routerLink]="dashboardUrl()">Open workspace</a>}@else{<a class="nav-login" routerLink="/login">Sign in</a><a class="nav-cta" href="#plans">Start now</a>}</div>
   </nav>
@@ -19,5 +19,5 @@
   </section>
 
   <section class="public-cta"><div><p class="section-kicker">Ready to operate clearly?</p><h2>Choose a plan, create the enterprise workspace, then complete secure activation.</h2></div><a href="#plans">View available plans</a></section>
-  <footer><a class="public-brand" routerLink="/"><span class="brand-mark"><svg viewBox="0 0 24 24"><path d="M6 5.5h12v4H6zM6 14.5h5v4H6zM14 14.5h4v4h-4z"/></svg></span><strong>IntelliOps</strong></a><p>Operational clarity for modern commerce teams.</p><a routerLink="/login">Customer sign in</a></footer>
+  <footer><a class="public-brand" routerLink="/"><span class="brand-mark"><img src="/logo.jfif" alt="" /></span><strong>IntelliOps</strong></a><p>Operational clarity for modern commerce teams.</p><a routerLink="/login">Customer sign in</a></footer>
 </main>
