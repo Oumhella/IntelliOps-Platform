@@ -6,9 +6,13 @@ import {
   DeliveryResponse,
   ShipDeliveryRequest,
   UpdateDeliveryStatusRequest,
+  AssignCourierRequest,
   DeliveryStatus,
   CarrierType,
   PageResponse,
+  CompleteDeliveryRequest,
+  CourierDashboardResponse,
+  FailedDeliveryAttemptRequest,
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -52,5 +56,51 @@ export class DeliveriesApiService {
 
   confirmReception(deliveryId: number): Observable<DeliveryResponse> {
     return this.http.post<DeliveryResponse>(`${this.url}/${deliveryId}/confirmer-reception`, null);
+  }
+
+  assignCourier(deliveryId: number, request: AssignCourierRequest): Observable<DeliveryResponse> {
+    return this.http.patch<DeliveryResponse>(`${this.url}/${deliveryId}/livreur`, request);
+  }
+
+  courierDashboard(): Observable<CourierDashboardResponse> {
+    return this.http.get<CourierDashboardResponse>(`${this.url}/me/dashboard`);
+  }
+
+  accept(deliveryId: number): Observable<DeliveryResponse> {
+    return this.http.post<DeliveryResponse>(`${this.url}/${deliveryId}/accept`, null);
+  }
+
+  start(deliveryId: number): Observable<DeliveryResponse> {
+    return this.http.post<DeliveryResponse>(`${this.url}/${deliveryId}/start`, null);
+  }
+
+  reportFailedAttempt(
+    deliveryId: number,
+    request: FailedDeliveryAttemptRequest,
+  ): Observable<DeliveryResponse> {
+    return this.http.post<DeliveryResponse>(`${this.url}/${deliveryId}/failed-attempt`, request);
+  }
+
+  requestReturn(deliveryId: number): Observable<DeliveryResponse> {
+    return this.http.post<DeliveryResponse>(`${this.url}/${deliveryId}/request-return`, null);
+  }
+
+  complete(
+    deliveryId: number,
+    request: CompleteDeliveryRequest,
+    proofPhoto?: File,
+  ): Observable<DeliveryResponse> {
+    const form = new FormData();
+    form.append('details', new Blob([JSON.stringify(request)], { type: 'application/json' }));
+    if (proofPhoto) form.append('proofPhoto', proofPhoto);
+    return this.http.post<DeliveryResponse>(`${this.url}/${deliveryId}/complete`, form);
+  }
+
+  reconcileCod(deliveryId: number): Observable<DeliveryResponse> {
+    return this.http.post<DeliveryResponse>(`${this.url}/${deliveryId}/reconcile-cod`, null);
+  }
+
+  getProofPhoto(deliveryId: number): Observable<Blob> {
+    return this.http.get(`${this.url}/${deliveryId}/proof-photo`, { responseType: 'blob' });
   }
 }

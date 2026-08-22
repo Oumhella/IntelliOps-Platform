@@ -3,6 +3,9 @@ package org.example.user_service.service;
 import lombok.RequiredArgsConstructor;
 import org.example.user_service.config.UserJwtGenerator;
 import org.example.user_service.dto.request.ChangePasswordRequest;
+import org.example.user_service.dto.request.ForgotPasswordRequest;
+import org.example.user_service.dto.request.ResetPasswordRequest;
+import org.example.user_service.dto.request.EnterpriseUpdateRequest;
 import org.example.user_service.dto.request.ProfileUpdateRequest;
 import org.example.user_service.dto.request.RegisterRequest;
 import org.example.user_service.dto.request.UserCreationRequest;
@@ -15,6 +18,9 @@ import org.example.user_service.mapper.UserMapper;
 import org.example.user_service.repository.RefreshTokenRedisRepository;
 import org.example.user_service.repository.UserRepository;
 import org.example.user_service.repository.EnterpriseRepository;
+import org.example.user_service.repository.PasswordResetTokenRepository;
+import org.example.user_service.dto.response.EnterpriseResponse;
+import org.example.user_service.event.PasswordResetEventProducer;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -43,11 +49,14 @@ public class UserServiceImpl implements UserService {
     private final UserJwtGenerator userJwtGenerator;
     private final RefreshTokenRedisRepository refreshTokenRepository;
     private final StringRedisTemplate redisTemplate; // Utile pour la blacklist des Access Tokens
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final PasswordResetEventProducer passwordResetEventProducer;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final String BLACKLIST_PREFIX = "jwt:blacklist:";
 
     @Value("${app.auth.refresh-token-ttl:7d}")
     private Duration refreshTokenTtl;
+    @Value("${app.auth.password-reset-url:http://localhost:4200/reset-password}") private String passwordResetUrl;
     // ── Authentication ──────────────────────────────────────────────
 
     @Override
@@ -312,6 +321,24 @@ public class UserServiceImpl implements UserService {
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
     }
+
+    @Override @Transactional public void requestPasswordReset(ForgotPasswordRequest request) {
+        userRepository.findByEmail(request.email().trim().toLowerCase()).filter(User::isActive).ifPresent(user -> {
+            passwordResetTokenRepository.deleteByUserIdAndUsedAtIsNull(user.getId()); byte[] bytes=new byte[32]; SECURE_RANDOM.nextBytes(bytes);
+            String raw=Base64.getUrlEncoder().withoutPadding().encodeToString(bytes); PasswordResetToken token=new PasswordResetToken();
+            token.setUserId(user.getId()); token.setTokenHash(hashResetToken(raw)); token.setExpiresAt(java.time.LocalDateTime.now().plusMinutes(30)); passwordResetTokenRepository.save(token);
+            passwordResetEventProducer.send(user.getEnterpriseId(),user.getEmail(),passwordResetUrl+"?token="+raw);
+        });
+    }
+    @Override @Transactional public void resetPassword(ResetPasswordRequest request) {
+        if(!request.newPassword().equals(request.confirmPassword())) throw new IllegalArgumentException("New password and confirmation do not match");
+        PasswordResetToken token=passwordResetTokenRepository.findByTokenHash(hashResetToken(request.token())).filter(t->t.getUsedAt()==null&&t.getExpiresAt().isAfter(java.time.LocalDateTime.now())).orElseThrow(()->new IllegalArgumentException("Reset link is invalid or expired"));
+        User user=userRepository.findById(token.getUserId()).orElseThrow(()->new IllegalArgumentException("Reset link is invalid or expired")); user.setPassword(passwordEncoder.encode(request.newPassword())); userRepository.save(user); token.setUsedAt(java.time.LocalDateTime.now()); passwordResetTokenRepository.save(token);
+    }
+    @Override public EnterpriseResponse getEnterprise(Long enterpriseId){return EnterpriseResponse.from(enterpriseRepository.findById(enterpriseId).orElseThrow(()->new ResourceNotFoundException("Enterprise not found")));}
+    @Override @Transactional public EnterpriseResponse updateEnterprise(Long id,EnterpriseUpdateRequest r){Enterprise e=enterpriseRepository.findById(id).orElseThrow(()->new ResourceNotFoundException("Enterprise not found"));e.setCompanyName(r.companyName().trim());e.setActivityType(r.activityType().trim());e.setLegalName(clean(r.legalName()));e.setLegalIdentifier(clean(r.legalIdentifier()));e.setTaxIdentifier(clean(r.taxIdentifier()));e.setContactEmail(clean(r.contactEmail()));e.setContactPhone(clean(r.contactPhone()));e.setWebsite(clean(r.website()));e.setAddressLine1(clean(r.addressLine1()));e.setAddressLine2(clean(r.addressLine2()));e.setCity(clean(r.city()));e.setPostalCode(clean(r.postalCode()));e.setCountryCode(r.countryCode());e.setCurrencyCode(r.currencyCode());e.setTimezone(clean(r.timezone()));return EnterpriseResponse.from(enterpriseRepository.save(e));}
+    private String clean(String v){return v==null||v.isBlank()?null:v.trim();}
+    private String hashResetToken(String token){if(token==null||token.isBlank())throw new IllegalArgumentException("Reset token is required");try{return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8)));}catch(NoSuchAlgorithmException e){throw new IllegalStateException(e);}}
 
     @Override
     public UserResponse getUserById(Long userId, Long enterpriseId) {

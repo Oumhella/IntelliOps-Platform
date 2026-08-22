@@ -81,9 +81,20 @@ jobs:
           docker logs erp-vault || true
           echo "--- vault-init logs ---"
           docker logs erp-vault-init || true
+          echo "--- database-init logs ---"
+          docker compose logs --no-color database-init || true
 
       - name: Verify one-shot init containers succeeded
         run: |
+          DATABASE_INIT_ID=$(docker compose ps -aq database-init)
+          DATABASE_INIT_EXIT=$(docker inspect "$DATABASE_INIT_ID" --format='{{.State.ExitCode}}')
+          if [ "$DATABASE_INIT_EXIT" != "0" ]; then
+            echo "::error::database-init exited with code $DATABASE_INIT_EXIT (expected 0)"
+            docker compose logs --no-color database-init
+            exit 1
+          fi
+          echo "database-init completed successfully (exit 0)."
+
           VAULT_INIT_EXIT=$(docker inspect erp-vault-init --format='{{.State.ExitCode}}')
           if [ "$VAULT_INIT_EXIT" != "0" ]; then
             echo "::error::vault-init exited with code $VAULT_INIT_EXIT (expected 0)"

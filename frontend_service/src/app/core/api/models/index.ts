@@ -9,3 +9,4 @@ export * from './platform.models';
 export * from './stock.models';
 export * from './subscription.models';
 export * from './user.models';
+export * from './analytics.models';

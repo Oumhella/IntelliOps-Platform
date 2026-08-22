@@ -7,7 +7,12 @@ import org.example.delivery_service.client.OrderClient;
 import org.example.delivery_service.client.PaymentClient;
 import org.example.delivery_service.dto.request.ExpedierLivraisonRequest;
 import org.example.delivery_service.dto.request.UpdateStatutRequest;
+import org.example.delivery_service.dto.request.AssignCourierRequest;
 import org.example.delivery_service.dto.response.LivraisonResponse;
+import org.example.delivery_service.dto.request.CompleteDeliveryRequest;
+import org.example.delivery_service.dto.request.FailedDeliveryAttemptRequest;
+import org.example.delivery_service.dto.response.CourierDashboardResponse;
+import org.example.delivery_service.dto.response.ProofPhotoResponse;
 import org.example.delivery_service.entity.Livraison;
 import org.example.delivery_service.entity.StatutLivraison;
 import org.example.delivery_service.entity.TypeTransporteur;
@@ -22,6 +27,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.List;
 import java.util.UUID;
 import org.example.common.dto.PageResponse;
 import org.example.common.security.TenantContext;
@@ -30,6 +39,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import feign.FeignException;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -42,6 +52,7 @@ public class LivraisonServiceImpl implements LivraisonService {
     private final UserClient userClient;
     private final OrderClient orderClient;
     private final PaymentClient paymentClient;
+    private final DeliveryProofStorage proofStorage;
 
     @Override
     @Transactional
@@ -61,7 +72,8 @@ public class LivraisonServiceImpl implements LivraisonService {
                 .enterpriseId(enterpriseId)
                 .referenceCommandeId(request.getReferenceCommandeId())
                 .codeSuiviTracking("TRK-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
-                .statutLivraison(StatutLivraison.EN_PREPARATION)
+                .statutLivraison(request.getTypeTransporteur() == TypeTransporteur.LIVREUR_INTERNE
+                        ? StatutLivraison.ASSIGNEE : StatutLivraison.EN_PREPARATION)
                 .typeTransporteur(request.getTypeTransporteur())
                 .nomSociete(request.getNomSociete())
                 .livreurId(request.getLivreurId())
@@ -138,6 +150,7 @@ public class LivraisonServiceImpl implements LivraisonService {
     @Transactional
     public LivraisonResponse mettreAJourStatut(Long id, UpdateStatutRequest request) {
         Livraison livraison = findDelivery(id);
+        ensureGenericStatusOwnership(livraison, request.getStatut());
 
         if (!isAllowedTransition(livraison, request.getStatut())) {
             throw new IllegalStateException(
@@ -146,13 +159,11 @@ public class LivraisonServiceImpl implements LivraisonService {
 
         if (request.getStatut() == StatutLivraison.CHEZ_TRANSPORTEUR
                 || request.getStatut() == StatutLivraison.EN_COURS) {
-            orderClient.updateFulfillmentStatus(livraison.getReferenceCommandeId(),
-                    new OrderClient.StatusUpdate("EXPEDIEE"));
+            updateOrderFulfillmentStatus(livraison, "EXPEDIEE");
         } else if (request.getStatut() == StatutLivraison.LIVREE) {
             completeOrderDelivery(livraison);
         } else if (request.getStatut() == StatutLivraison.RETOUR) {
-            orderClient.updateFulfillmentStatus(livraison.getReferenceCommandeId(),
-                    new OrderClient.StatusUpdate("RETOURNEE"));
+            updateOrderFulfillmentStatus(livraison, "RETOURNEE");
         }
 
         livraison.mettreAJourStatut(request.getStatut());
@@ -164,6 +175,9 @@ public class LivraisonServiceImpl implements LivraisonService {
     @Transactional
     public LivraisonResponse confirmerReception(Long id) {
         Livraison livraison = findDelivery(id);
+        if (livraison.getTypeTransporteur() != TypeTransporteur.SOCIETE_LIVRAISON) {
+            throw new AccessDeniedException("Internal deliveries require courier proof of delivery.");
+        }
 
         if (livraison.getStatutLivraison() != StatutLivraison.EN_COURS
                 && livraison.getStatutLivraison() != StatutLivraison.CHEZ_TRANSPORTEUR) {
@@ -185,6 +199,177 @@ public class LivraisonServiceImpl implements LivraisonService {
         return livraisonMapper.toResponse(saved);
     }
 
+    @Override
+    @Transactional
+    public LivraisonResponse assignerLivreur(Long id, AssignCourierRequest request) {
+        Livraison livraison = findDelivery(id);
+        if (livraison.getTypeTransporteur() != TypeTransporteur.LIVREUR_INTERNE) {
+            throw new IllegalStateException("Only an internal delivery can be assigned to a courier.");
+        }
+        if (livraison.getStatutLivraison() != StatutLivraison.ASSIGNEE
+                && livraison.getStatutLivraison() != StatutLivraison.EN_PREPARATION
+                && livraison.getStatutLivraison() != StatutLivraison.ECHEC) {
+            throw new IllegalStateException("A courier can be reassigned only before dispatch or after a failed attempt.");
+        }
+        UserSummary courier = userClient.getActiveCourier(request.livreurId());
+        if (!"ROLE_LIVREUR".equals(courier.role()) || !courier.active()) {
+            throw new IllegalArgumentException("The selected user is not an active internal courier");
+        }
+        livraison.setLivreurId(courier.id());
+        livraison.mettreAJourStatut(StatutLivraison.ASSIGNEE);
+        livraison.setAcceptedAt(null);
+        livraison.setStartedAt(null);
+        return livraisonMapper.toResponse(livraisonRepository.save(livraison));
+    }
+
+    @Override
+    @Transactional
+    public LivraisonResponse acceptAssignment(Long id) {
+        Livraison delivery = requireInternalCourierDelivery(id);
+        if (delivery.getStatutLivraison() != StatutLivraison.ASSIGNEE
+                && delivery.getStatutLivraison() != StatutLivraison.EN_PREPARATION) {
+            throw new IllegalStateException("Only a newly assigned delivery can be accepted.");
+        }
+        delivery.setAcceptedAt(LocalDateTime.now());
+        delivery.mettreAJourStatut(StatutLivraison.ACCEPTEE);
+        return livraisonMapper.toResponse(livraisonRepository.save(delivery));
+    }
+
+    @Override
+    @Transactional
+    public LivraisonResponse startDelivery(Long id) {
+        Livraison delivery = requireInternalCourierDelivery(id);
+        if (delivery.getStatutLivraison() != StatutLivraison.ACCEPTEE
+                && delivery.getStatutLivraison() != StatutLivraison.ECHEC) {
+            throw new IllegalStateException("Accept the assignment before starting delivery.");
+        }
+        delivery.setStartedAt(LocalDateTime.now());
+        delivery.setFailureReason(null);
+        delivery.setFailureNote(null);
+        delivery.mettreAJourStatut(StatutLivraison.EN_COURS);
+        updateOrderFulfillmentStatus(delivery, "EXPEDIEE");
+        return livraisonMapper.toResponse(livraisonRepository.save(delivery));
+    }
+
+    @Override
+    @Transactional
+    public LivraisonResponse reportFailedAttempt(Long id, FailedDeliveryAttemptRequest request) {
+        Livraison delivery = requireInternalCourierDelivery(id);
+        if (!List.of(StatutLivraison.ASSIGNEE, StatutLivraison.ACCEPTEE, StatutLivraison.EN_COURS)
+                .contains(delivery.getStatutLivraison())) {
+            throw new IllegalStateException("A failed attempt can be recorded only on an active assignment.");
+        }
+        validateCoordinates(request.latitude(), request.longitude());
+        delivery.setFailureReason(request.reason());
+        delivery.setFailureNote(trimToNull(request.note()));
+        delivery.setLastLatitude(request.latitude());
+        delivery.setLastLongitude(request.longitude());
+        delivery.setLastAttemptAt(LocalDateTime.now());
+        delivery.setAttemptCount(delivery.getAttemptCount() + 1);
+        delivery.mettreAJourStatut(StatutLivraison.ECHEC);
+        return livraisonMapper.toResponse(livraisonRepository.save(delivery));
+    }
+
+    @Override
+    @Transactional
+    public LivraisonResponse requestReturn(Long id) {
+        Livraison delivery = requireInternalCourierDelivery(id);
+        if (delivery.getStatutLivraison() != StatutLivraison.ECHEC) {
+            throw new IllegalStateException("A return can be requested only after a failed attempt.");
+        }
+        delivery.setReturnRequestedAt(LocalDateTime.now());
+        delivery.mettreAJourStatut(StatutLivraison.RETOUR_DEMANDE);
+        return livraisonMapper.toResponse(livraisonRepository.save(delivery));
+    }
+
+    @Override
+    @Transactional
+    public LivraisonResponse completeDelivery(
+            Long id, CompleteDeliveryRequest request, MultipartFile proofPhoto) {
+        Livraison delivery = requireInternalCourierDelivery(id);
+        if (delivery.getStatutLivraison() != StatutLivraison.EN_COURS) {
+            throw new IllegalStateException("Only an in-progress delivery can be completed.");
+        }
+        validateCoordinates(request.latitude(), request.longitude());
+        BigDecimal expectedCod = BigDecimal.valueOf(delivery.getMontantACollecterCoD())
+                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal collectedCod = request.collectedCodAmount() == null
+                ? BigDecimal.ZERO : request.collectedCodAmount().setScale(2, RoundingMode.HALF_UP);
+        if (expectedCod.compareTo(collectedCod) != 0) {
+            throw new IllegalArgumentException(
+                    "Collected COD amount must equal the required amount. Report a payment problem instead.");
+        }
+
+        String proofObjectKey = null;
+        if (proofPhoto != null && !proofPhoto.isEmpty()) {
+            proofObjectKey = proofStorage.store(delivery.getEnterpriseId(), delivery.getIdLivraison(), proofPhoto);
+        }
+        delivery.setDeliveredTo(request.recipientName().trim());
+        delivery.setProofSignature(request.signature().trim());
+        delivery.setProofPhotoObjectKey(proofObjectKey);
+        delivery.setProofCapturedAt(LocalDateTime.now());
+        delivery.setLastLatitude(request.latitude());
+        delivery.setLastLongitude(request.longitude());
+        delivery.setCodCollectedAmount(collectedCod);
+        delivery.setCodDiscrepancyNote(trimToNull(request.codDiscrepancyNote()));
+        completeOrderDelivery(delivery);
+        delivery.mettreAJourStatut(StatutLivraison.LIVREE);
+        Livraison saved = livraisonRepository.save(delivery);
+        notifyDelivered(saved);
+        return livraisonMapper.toResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public LivraisonResponse reconcileCod(Long id) {
+        Livraison delivery = findDelivery(id);
+        if (delivery.getStatutLivraison() != StatutLivraison.LIVREE
+                || delivery.getCodCollectedAmount() == null
+                || delivery.getCodCollectedAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalStateException("Only collected COD from a delivered shipment can be reconciled.");
+        }
+        if (delivery.getCodReconciledAt() != null) {
+            throw new IllegalStateException("COD has already been reconciled.");
+        }
+        delivery.setCodReconciledAt(LocalDateTime.now());
+        delivery.setCodReconciledBy(TenantContext.requireUserId());
+        return livraisonMapper.toResponse(livraisonRepository.save(delivery));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CourierDashboardResponse courierDashboard() {
+        Long enterpriseId = TenantContext.requireEnterpriseId();
+        Long courierId = TenantContext.requireUserId();
+        LocalDateTime today = LocalDate.now().atStartOfDay();
+        List<StatutLivraison> active = List.of(
+                StatutLivraison.ASSIGNEE, StatutLivraison.ACCEPTEE,
+                StatutLivraison.EN_PREPARATION, StatutLivraison.EN_COURS);
+        return new CourierDashboardResponse(
+                livraisonRepository.countByEnterpriseIdAndLivreurIdAndShippingDateGreaterThanEqual(
+                        enterpriseId, courierId, today),
+                livraisonRepository.countByEnterpriseIdAndLivreurIdAndStatutLivraisonIn(
+                        enterpriseId, courierId, active),
+                livraisonRepository.countByEnterpriseIdAndLivreurIdAndDeliveryDateGreaterThanEqual(
+                        enterpriseId, courierId, today),
+                livraisonRepository.countByEnterpriseIdAndLivreurIdAndStatutLivraison(
+                        enterpriseId, courierId, StatutLivraison.ECHEC),
+                livraisonRepository.sumUnreconciledCod(enterpriseId, courierId));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProofPhotoResponse getProofPhoto(Long id) {
+        Livraison delivery = findDelivery(id);
+        if (!hasText(delivery.getProofPhotoObjectKey())) {
+            throw new ResourceNotFoundException("No proof photo is available for this delivery.");
+        }
+        String contentType = delivery.getProofPhotoObjectKey().endsWith(".png")
+                ? "image/png" : "image/jpeg";
+        return new ProofPhotoResponse(
+                proofStorage.load(delivery.getProofPhotoObjectKey()), contentType);
+    }
+
     private Livraison findDelivery(Long id) {
         Livraison delivery = livraisonRepository.findByIdLivraisonAndEnterpriseId(
                         id, TenantContext.requireEnterpriseId())
@@ -197,6 +382,8 @@ public class LivraisonServiceImpl implements LivraisonService {
         StatutLivraison current = delivery.getStatutLivraison();
         if (current == next) return false;
         return switch (current) {
+            case ASSIGNEE -> next == StatutLivraison.ACCEPTEE || next == StatutLivraison.ECHEC;
+            case ACCEPTEE -> next == StatutLivraison.EN_COURS || next == StatutLivraison.ECHEC;
             case EN_PREPARATION -> next == StatutLivraison.ECHEC
                     || (delivery.getTypeTransporteur() == TypeTransporteur.LIVREUR_INTERNE
                     ? next == StatutLivraison.EN_COURS
@@ -206,6 +393,7 @@ public class LivraisonServiceImpl implements LivraisonService {
             case EN_COURS -> next == StatutLivraison.LIVREE
                     || next == StatutLivraison.ECHEC || next == StatutLivraison.RETOUR;
             case ECHEC -> next == StatutLivraison.EN_COURS || next == StatutLivraison.RETOUR;
+            case RETOUR_DEMANDE -> next == StatutLivraison.RETOUR;
             case LIVREE, RETOUR -> false;
         };
     }
@@ -260,8 +448,7 @@ public class LivraisonServiceImpl implements LivraisonService {
         if (delivery.getMontantACollecterCoD() > 0) {
             paymentClient.collectCashOnDelivery(delivery.getReferenceCommandeId());
         }
-        orderClient.updateFulfillmentStatus(delivery.getReferenceCommandeId(),
-                new OrderClient.StatusUpdate("LIVREE"));
+        updateOrderFulfillmentStatus(delivery, "LIVREE");
     }
 
     private void ensureCourierAccess(Livraison delivery) {
@@ -271,11 +458,74 @@ public class LivraisonServiceImpl implements LivraisonService {
         }
     }
 
-    private Long currentCourierId() {
-        boolean courier = SecurityContextHolder.getContext().getAuthentication() != null
+    private void ensureGenericStatusOwnership(Livraison delivery, StatutLivraison next) {
+        boolean courier = hasRole("ROLE_LIVREUR");
+        if (delivery.getTypeTransporteur() == TypeTransporteur.LIVREUR_INTERNE) {
+            if (courier) {
+                throw new AccessDeniedException("Use the courier workflow actions to update an internal delivery.");
+            }
+            if (delivery.getStatutLivraison() != StatutLivraison.RETOUR_DEMANDE
+                    || next != StatutLivraison.RETOUR) {
+                throw new AccessDeniedException("Logistics can only approve a courier's return request.");
+            }
+        }
+        if (delivery.getTypeTransporteur() == TypeTransporteur.SOCIETE_LIVRAISON && courier) {
+            throw new AccessDeniedException("External-carrier deliveries are managed by logistics.");
+        }
+    }
+
+    private boolean hasRole(String role) {
+        return SecurityContextHolder.getContext().getAuthentication() != null
                 && SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
-                .anyMatch(authority -> "ROLE_LIVREUR".equals(authority.getAuthority()));
+                .anyMatch(authority -> role.equals(authority.getAuthority()));
+    }
+
+    private Long currentCourierId() {
+        boolean courier = hasRole("ROLE_LIVREUR");
         return courier ? TenantContext.requireUserId() : null;
+    }
+
+    private Livraison requireInternalCourierDelivery(Long id) {
+        Livraison delivery = findDelivery(id);
+        if (!hasRole("ROLE_LIVREUR") || delivery.getTypeTransporteur() != TypeTransporteur.LIVREUR_INTERNE) {
+            throw new AccessDeniedException("This action belongs to the assigned internal courier.");
+        }
+        return delivery;
+    }
+
+    private void validateCoordinates(Double latitude, Double longitude) {
+        if ((latitude == null) != (longitude == null)) {
+            throw new IllegalArgumentException("Latitude and longitude must be provided together.");
+        }
+        if (latitude != null && (latitude < -90 || latitude > 90
+                || longitude < -180 || longitude > 180)) {
+            throw new IllegalArgumentException("Invalid GPS coordinates.");
+        }
+    }
+
+    private String trimToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private void notifyDelivered(Livraison delivery) {
+        if (hasText(delivery.getClientEmail())) {
+            eventProducer.sendNotificationEvent(
+                    delivery.getClientEmail(),
+                    "Commande livree",
+                    "Votre commande #" + delivery.getReferenceCommandeId() + " a bien ete livree. Merci !");
+        }
+    }
+
+    private void updateOrderFulfillmentStatus(Livraison delivery, String status) {
+        try {
+            orderClient.updateFulfillmentStatus(
+                    delivery.getReferenceCommandeId(), new OrderClient.StatusUpdate(status));
+        } catch (FeignException exception) {
+            throw new IllegalStateException(
+                    "The linked order could not be moved to " + status
+                            + ". The delivery change was rolled back; please retry.",
+                    exception);
+        }
     }
 
     private boolean hasText(String value) {

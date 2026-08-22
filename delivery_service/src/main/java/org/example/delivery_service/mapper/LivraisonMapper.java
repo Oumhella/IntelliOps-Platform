@@ -27,6 +27,22 @@ public class LivraisonMapper {
                 .clientTelephone(entity.getClientTelephone())
                 .adresseLivraison(entity.getAdresseLivraison())
                 .villeLivraison(entity.getVilleLivraison())
+                .acceptedAt(entity.getAcceptedAt())
+                .startedAt(entity.getStartedAt())
+                .lastAttemptAt(entity.getLastAttemptAt())
+                .returnRequestedAt(entity.getReturnRequestedAt())
+                .attemptCount(entity.getAttemptCount())
+                .failureReason(entity.getFailureReason())
+                .failureNote(entity.getFailureNote())
+                .lastLatitude(entity.getLastLatitude())
+                .lastLongitude(entity.getLastLongitude())
+                .deliveredTo(entity.getDeliveredTo())
+                .proofSignature(entity.getProofSignature())
+                .proofPhotoAvailable(entity.getProofPhotoObjectKey() != null)
+                .proofCapturedAt(entity.getProofCapturedAt())
+                .codCollectedAmount(entity.getCodCollectedAmount())
+                .codDiscrepancyNote(entity.getCodDiscrepancyNote())
+                .codReconciledAt(entity.getCodReconciledAt())
                 .build();
     }
 }

@@ -39,7 +39,7 @@ class WooCommerceConnectorTest {
                 respond(exchange, """
                         [
                           {"id":42,"name":"Sneaker","sku":"SNK","variations":[901,902]},
-                          {"id":77,"name":"Sticker","sku":"STICK","variations":[]}
+                          {"id":77,"name":"Sticker","sku":"STICK","price":"3.50","stock_quantity":12,"variations":[]}
                         ]
                         """);
                 return;
@@ -48,8 +48,8 @@ class WooCommerceConnectorTest {
                 variationsRequested.set(true);
                 respond(exchange, """
                         [
-                          {"id":901,"sku":"SNK-RED-42","attributes":[{"name":"Color","option":"Red"},{"name":"Size","option":"42"}]},
-                          {"id":902,"sku":"","attributes":[]}
+                          {"id":901,"sku":"SNK-RED-42","price":"89.99","stock_quantity":7,"attributes":[{"name":"Color","option":"Red"},{"name":"Size","option":"42"}]},
+                          {"id":902,"sku":"","price":"95.00","stock_quantity":0,"attributes":[]}
                         ]
                         """);
                 return;
@@ -68,11 +68,15 @@ class WooCommerceConnectorTest {
         assertThat(variationsRequested).isTrue();
         assertThat(products)
                 .extracting(ExternalProduct::productId, ExternalProduct::variantId,
-                        ExternalProduct::sku, ExternalProduct::name)
+                        ExternalProduct::sku, ExternalProduct::name,
+                        ExternalProduct::salePrice, ExternalProduct::availableQuantity)
                 .containsExactly(
-                        org.assertj.core.groups.Tuple.tuple("42", "901", "SNK-RED-42", "Sneaker - Red / 42"),
-                        org.assertj.core.groups.Tuple.tuple("42", "902", "", "Sneaker - variation 902"),
-                        org.assertj.core.groups.Tuple.tuple("77", "77", "STICK", "Sticker"));
+                        org.assertj.core.groups.Tuple.tuple("42", "901", "SNK-RED-42", "Sneaker - Red / 42",
+                                new java.math.BigDecimal("89.99"), 7),
+                        org.assertj.core.groups.Tuple.tuple("42", "902", "", "Sneaker - variation 902",
+                                new java.math.BigDecimal("95.00"), 0),
+                        org.assertj.core.groups.Tuple.tuple("77", "77", "STICK", "Sticker",
+                                new java.math.BigDecimal("3.50"), 12));
     }
 
     private void assertBasicAuth(HttpExchange exchange) {

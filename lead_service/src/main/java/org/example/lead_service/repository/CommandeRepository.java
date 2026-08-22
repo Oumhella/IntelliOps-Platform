@@ -26,9 +26,11 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             select commande from Commande commande
             where commande.lead.enterpriseId = :enterpriseId
               and (:statut is null or commande.statutCommande = :statut)
+              and (:agentId is null or commande.lead.agentId = :agentId)
             """)
     Page<Commande> search(
             @Param("enterpriseId") Long enterpriseId,
             @Param("statut") StatutCommande statut,
+            @Param("agentId") Long agentId,
             Pageable pageable);
 }

@@ -24,12 +24,12 @@ public class LeadController {
     private final LeadService leadService;
 
     @PostMapping
-    @PreAuthorize("hasRole('CSM')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<LeadDTO> creerLead(
             @Valid @RequestBody LeadDTO leadDTO,
-            @RequestAttribute("userId") Long agentId
+            @RequestAttribute("userId") Long currentUserId
     ) {
-        leadDTO.setAgentId(agentId);
+        leadDTO.setAgentId(null);
         return ResponseEntity.ok(leadService.creerLead(leadDTO));
     }
 

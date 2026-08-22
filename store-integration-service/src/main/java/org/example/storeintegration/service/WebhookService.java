@@ -44,7 +44,7 @@ public class WebhookService {
     private final ProductMappingRepository mappingRepository;
     private final WebhookEventRepository eventRepository;
 
-    @Transactional
+    @Transactional(noRollbackFor = RuntimeException.class)
     public WebhookEvent receiveShopify(Long connectionId, byte[] payload, String hmac, String eventId, String topic,
             String shopDomain) {
         StoreConnection connection = publicConnection(connectionId, StorePlatform.SHOPIFY);
@@ -56,7 +56,7 @@ public class WebhookService {
                 required(eventId, "Shopify webhook ID is required."), true);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = RuntimeException.class)
     public WebhookEvent receiveWooCommerce(Long connectionId, byte[] payload, String signature, String eventId,
             String topic) {
         StoreConnection connection = publicConnection(connectionId, StorePlatform.WOOCOMMERCE);
@@ -116,8 +116,9 @@ public class WebhookService {
                         coreClient.verifyProductAndLocation(connection.getEnterpriseId(),
                                 mapping.getInternalProductId(), connection.getStockLocationId());
                     } catch (Exception missingProduct) {
-                        Long newInternalId = coreClient.createProduct(connection.getEnterpriseId(), line.label(),
-                                "SKU-" + line.externalVariantId(), line.unitPrice().doubleValue());
+                        Long newInternalId = coreClient.importProduct(connection.getEnterpriseId(), line.label(),
+                                connection.getPlatform().name() + "-" + line.externalVariantId(), line.unitPrice(),
+                                connection.getStockLocationId(), null, null);
                         if (newInternalId != null) {
                             mapping.setInternalProductId(newInternalId);
                             mapping = mappingRepository.save(mapping);
@@ -127,8 +128,9 @@ public class WebhookService {
                     }
                 }
                 if (mapping == null) {
-                    Long newInternalId = coreClient.createProduct(connection.getEnterpriseId(), line.label(),
-                            "SKU-" + line.externalVariantId(), line.unitPrice().doubleValue());
+                    Long newInternalId = coreClient.importProduct(connection.getEnterpriseId(), line.label(),
+                            connection.getPlatform().name() + "-" + line.externalVariantId(), line.unitPrice(),
+                            connection.getStockLocationId(), null, null);
                     if (newInternalId != null) {
                         mapping = ProductMapping.builder()
                                 .connection(connection)
@@ -167,15 +169,17 @@ public class WebhookService {
                 }
             }
             if (shopify && !hasImportableCustomer(order.customer())) {
-                return actionRequired(event,
-                        "Shopify order customer details are incomplete (missing email/phone or street address). "
-                                + "Approve Protected Customer Data (name, email, phone, address) in the Shopify Partner Dashboard, "
-                                + "reinstall/reconnect the app, then retry this webhook.");
+                return actionRequired(event, incompleteShopifyCustomerMessage(order.customer()));
             }
-            coreClient.importOrder(connection.getEnterpriseId(),
-                    new ExternalOrderRequest(connection.getPlatform().name(), order.id(), order.reference(),
-                            connection.getStockLocationId(), order.customer(), order.initialPaymentStatus(),
-                            order.currency(), order.totalAmount(), items));
+            try {
+                coreClient.importOrder(connection.getEnterpriseId(),
+                        new ExternalOrderRequest(connection.getPlatform().name(), order.id(), order.reference(),
+                                connection.getStockLocationId(), order.customer(), order.initialPaymentStatus(),
+                                order.currency(), order.totalAmount(), items));
+            } catch (HttpClientErrorException.Conflict businessConflict) {
+                return actionRequired(event,
+                        "Order could not reserve its mapped inventory. Synchronize store products and retry it.");
+            }
             if (!order.initialPaymentStatus().equals(order.currentPaymentStatus()) || order.cancelled()
                     || !createTopic) {
                 coreClient.syncOrderState(connection.getEnterpriseId(), new ExternalOrderStateRequest(
@@ -343,8 +347,13 @@ public class WebhookService {
     }
 
     private boolean hasImportableCustomer(Customer customer) {
+        return missingCustomerFields(customer).isEmpty();
+    }
+
+    static List<String> missingCustomerFields(Customer customer) {
+        List<String> missing = new ArrayList<>();
         if (customer == null) {
-            return false;
+            return List.of("customer name", "email or phone", "street address", "city");
         }
         boolean hasName = customer.fullName() != null && !customer.fullName().isBlank();
         boolean hasContact = (customer.email() != null && !customer.email().isBlank())
@@ -354,7 +363,22 @@ public class WebhookService {
         boolean hasAddress = customer.address() != null && !customer.address().isBlank()
                 && !customer.address().equalsIgnoreCase(customer.city())
                 && !customer.address().startsWith("Shopify Store Order");
-        return hasName && hasContact && hasCity && hasAddress;
+        if (!hasName)
+            missing.add("customer name");
+        if (!hasContact)
+            missing.add("email or phone");
+        if (!hasAddress)
+            missing.add("street address");
+        if (!hasCity)
+            missing.add("city");
+        return missing;
+    }
+
+    private String incompleteShopifyCustomerMessage(Customer customer) {
+        String missing = String.join(", ", missingCustomerFields(customer));
+        return "Shopify order cannot be imported because required customer data is missing: " + missing + ". "
+                + "If these fields are present on the order in Shopify, verify Protected Customer Data access "
+                + "and reconnect the store before retrying this webhook.";
     }
 
     private boolean isShopifyCod(JsonNode order) {
@@ -408,7 +432,7 @@ public class WebhookService {
     }
 
     private StoreConnection publicConnection(Long id, StorePlatform platform) {
-        StoreConnection c = connectionRepository.findById(id)
+        StoreConnection c = connectionRepository.findByIdForWebhook(id)
                 .orElseThrow(() -> new EntityNotFoundException("Store connection not found."));
         if (c.getPlatform() != platform)
             throw new SecurityException("Webhook platform mismatch.");

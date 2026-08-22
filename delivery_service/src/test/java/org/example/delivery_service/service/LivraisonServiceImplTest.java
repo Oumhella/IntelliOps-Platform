@@ -6,9 +6,12 @@ import org.example.delivery_service.client.UserSummary;
 import org.example.delivery_service.client.OrderClient;
 import org.example.delivery_service.client.PaymentClient;
 import org.example.delivery_service.dto.request.ExpedierLivraisonRequest;
+import org.example.delivery_service.dto.request.CompleteDeliveryRequest;
+import org.example.delivery_service.dto.request.FailedDeliveryAttemptRequest;
 import org.example.delivery_service.entity.Livraison;
 import org.example.delivery_service.entity.StatutLivraison;
 import org.example.delivery_service.entity.TypeTransporteur;
+import org.example.delivery_service.entity.MotifEchecLivraison;
 import org.example.delivery_service.event.LivraisonEventProducer;
 import org.example.delivery_service.mapper.LivraisonMapper;
 import org.example.delivery_service.repository.LivraisonRepository;
@@ -38,6 +41,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class LivraisonServiceImplTest {
@@ -49,6 +53,7 @@ class LivraisonServiceImplTest {
     @Mock private UserClient userClient;
     @Mock private OrderClient orderClient;
     @Mock private PaymentClient paymentClient;
+    @Mock private DeliveryProofStorage proofStorage;
     @Mock private TransporteurStrategy strategy;
     @InjectMocks private LivraisonServiceImpl service;
 
@@ -78,7 +83,7 @@ class LivraisonServiceImplTest {
         verify(repository).save(shipment.capture());
         assertThat(shipment.getValue().getEnterpriseId()).isEqualTo(42L);
         assertThat(shipment.getValue().getLivreurId()).isEqualTo(19L);
-        assertThat(shipment.getValue().getStatutLivraison()).isEqualTo(StatutLivraison.EN_PREPARATION);
+        assertThat(shipment.getValue().getStatutLivraison()).isEqualTo(StatutLivraison.ASSIGNEE);
     }
 
     @Test
@@ -110,6 +115,71 @@ class LivraisonServiceImplTest {
         assertThatThrownBy(() -> service.getById(5L)).isInstanceOf(AccessDeniedException.class);
     }
 
+    @Test
+    void courierAcceptsOnlyTheirAssignedInternalDelivery() {
+        authenticateCourier();
+        Livraison shipment = assignedShipment(StatutLivraison.ASSIGNEE);
+        when(repository.findByIdLivraisonAndEnterpriseId(5L, 42L)).thenReturn(Optional.of(shipment));
+        when(repository.save(shipment)).thenReturn(shipment);
+
+        service.acceptAssignment(5L);
+
+        assertThat(shipment.getStatutLivraison()).isEqualTo(StatutLivraison.ACCEPTEE);
+        assertThat(shipment.getAcceptedAt()).isNotNull();
+    }
+
+    @Test
+    void startingDeliveryHandsTheOrderToShippedAndPersistsTheStart() {
+        authenticateCourier();
+        Livraison shipment = assignedShipment(StatutLivraison.ACCEPTEE);
+        when(repository.findByIdLivraisonAndEnterpriseId(5L, 42L)).thenReturn(Optional.of(shipment));
+        when(repository.save(shipment)).thenReturn(shipment);
+
+        service.startDelivery(5L);
+
+        ArgumentCaptor<OrderClient.StatusUpdate> orderStatus =
+                ArgumentCaptor.forClass(OrderClient.StatusUpdate.class);
+        verify(orderClient).updateFulfillmentStatus(
+                org.mockito.ArgumentMatchers.eq(12L), orderStatus.capture());
+        assertThat(orderStatus.getValue().status()).isEqualTo("EXPEDIEE");
+        assertThat(shipment.getStatutLivraison()).isEqualTo(StatutLivraison.EN_COURS);
+        assertThat(shipment.getStartedAt()).isNotNull();
+        verify(repository).save(shipment);
+    }
+
+    @Test
+    void failedAttemptRecordsReasonNoteAndAuditCount() {
+        authenticateCourier();
+        Livraison shipment = assignedShipment(StatutLivraison.EN_COURS);
+        when(repository.findByIdLivraisonAndEnterpriseId(5L, 42L)).thenReturn(Optional.of(shipment));
+        when(repository.save(shipment)).thenReturn(shipment);
+
+        service.reportFailedAttempt(5L, new FailedDeliveryAttemptRequest(
+                MotifEchecLivraison.CLIENT_ABSENT, "Called twice", 33.57, -7.59));
+
+        assertThat(shipment.getStatutLivraison()).isEqualTo(StatutLivraison.ECHEC);
+        assertThat(shipment.getFailureReason()).isEqualTo(MotifEchecLivraison.CLIENT_ABSENT);
+        assertThat(shipment.getAttemptCount()).isEqualTo(1);
+        assertThat(shipment.getLastAttemptAt()).isNotNull();
+    }
+
+    @Test
+    void codDeliveryCannotCompleteWithACollectedAmountMismatch() {
+        authenticateCourier();
+        Livraison shipment = assignedShipment(StatutLivraison.EN_COURS);
+        shipment.setMontantACollecterCoD(120.00);
+        when(repository.findByIdLivraisonAndEnterpriseId(5L, 42L)).thenReturn(Optional.of(shipment));
+
+        assertThatThrownBy(() -> service.completeDelivery(5L,
+                new CompleteDeliveryRequest("Customer", "Customer", new BigDecimal("100.00"), null, null, null),
+                null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Collected COD amount");
+
+        verify(paymentClient, never()).collectCashOnDelivery(any());
+        verify(repository, never()).save(any());
+    }
+
     private ExpedierLivraisonRequest internalRequest(Long courierId) {
         ExpedierLivraisonRequest request = new ExpedierLivraisonRequest();
         request.setReferenceCommandeId(12L);
@@ -135,5 +205,17 @@ class LivraisonServiceImplTest {
                         "courier@example.test",
                         null,
                         List.of(new SimpleGrantedAuthority("ROLE_LIVREUR"))));
+    }
+
+    private Livraison assignedShipment(StatutLivraison status) {
+        return Livraison.builder()
+                .idLivraison(5L)
+                .enterpriseId(42L)
+                .referenceCommandeId(12L)
+                .livreurId(7L)
+                .typeTransporteur(TypeTransporteur.LIVREUR_INTERNE)
+                .statutLivraison(status)
+                .montantACollecterCoD(0)
+                .build();
     }
 }

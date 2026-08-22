@@ -9,6 +9,7 @@ import {
   StaffStatusRequest,
   UserCreationRequest,
   UserResponse,
+  EnterpriseProfile, EnterpriseUpdateRequest,
 } from '../models';
 
 @Injectable({ providedIn: 'root' })
@@ -27,6 +28,8 @@ export class UsersApiService {
   changeMyPassword(request: ChangePasswordRequest): Observable<MessageResponse> {
     return this.http.put<MessageResponse>(`${this.url}/me/password`, request);
   }
+  getEnterprise():Observable<EnterpriseProfile>{return this.http.get<EnterpriseProfile>(`${this.url}/enterprise`);}
+  updateEnterprise(request:EnterpriseUpdateRequest):Observable<EnterpriseProfile>{return this.http.put<EnterpriseProfile>(`${this.url}/enterprise`,request);}
 
   createStaffMember(request: UserCreationRequest): Observable<UserResponse> {
     return this.http.post<UserResponse>(`${this.url}/staff`, request);

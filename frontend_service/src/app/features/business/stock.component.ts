@@ -1,13 +1,13 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { InventoryResponse, PLATFORM_TYPES, PlatformType, ProductResponse, STOCK_MOVEMENT_TYPES, StockApiService, StockMovementType, StoreResponse } from '../../core/api';
+import { InventoryResponse, PlatformType, ProductResponse, STOCK_MOVEMENT_TYPES, StockApiService, StockMovementType, StoreResponse } from '../../core/api';
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
 import { AuthSessionService } from '../../core/auth/auth-session.service';
 
 type StockTab='stores'|'products'|'inventory'; type StockPanel='store'|'product'|'inventory'|null;
 @Component({selector:'app-stock',imports:[FormsModule],templateUrl:'./stock.component.html',styleUrl:'./business-view.scss'})
 export class StockComponent implements OnInit{
- private readonly api=inject(StockApiService);readonly feedback=inject(UiFeedbackService);readonly platforms=PLATFORM_TYPES;readonly movements=STOCK_MOVEMENT_TYPES;
+ private readonly api=inject(StockApiService);readonly feedback=inject(UiFeedbackService);readonly movements=STOCK_MOVEMENT_TYPES;
  readonly canManageIntegrations=inject(AuthSessionService).currentUser()?.role==='ROLE_ADMIN';
  readonly stores=signal<readonly StoreResponse[]>([]);readonly products=signal<readonly ProductResponse[]>([]);readonly inventory=signal<readonly InventoryResponse[]>([]);readonly selectedInventory=signal<InventoryResponse|null>(null);readonly loading=signal(true);
  tab:StockTab='stores';panel:StockPanel=null;busy=false;editingStore:StoreResponse|null=null;editingProduct:ProductResponse|null=null;inventoryStoreId:number|null=null;inventoryProductId:number|null=null;
@@ -22,8 +22,11 @@ export class StockComponent implements OnInit{
  deleteProduct(product:ProductResponse):void{if(!confirm(`Delete ${product.nomProduit}?`))return;this.api.deleteProduct(product.idProduit).subscribe({next:()=>{this.feedback.success('Product deleted.');this.loadBase()},error:e=>this.feedback.error(e)})}
  loadInventory():void{if(!this.inventoryStoreId)return;this.loading.set(true);this.api.getStoreInventory(this.inventoryStoreId).subscribe({next:v=>{this.inventory.set(v);this.loading.set(false)},error:e=>{this.loading.set(false);this.feedback.error(e)}})}
  lookupInventory():void{if(!this.inventoryStoreId||!this.inventoryProductId)return;this.api.getInventory(this.inventoryStoreId,this.inventoryProductId).subscribe({next:v=>{this.selectedInventory.set(v);this.panel='inventory';this.ruleForm=v.regleApprovisionnement?{seuilAlerte:v.regleApprovisionnement.seuilAlerte,quantiteRecommandeAuto:v.regleApprovisionnement.quantiteRecommandeAuto,estActif:v.regleApprovisionnement.estActif}:{seuilAlerte:0,quantiteRecommandeAuto:0,estActif:true}},error:e=>this.feedback.error(e)})}
- openInventory(item:InventoryResponse):void{this.inventoryStoreId=item.boutique.idBoutique;this.inventoryProductId=item.produit.idProduit;this.lookupInventory()}
- adjust():void{const i=this.selectedInventory();if(!i)return;this.busy=true;this.api.adjustStock(i.boutique.idBoutique,i.produit.idProduit,this.stockForm).subscribe({next:v=>{this.busy=false;this.selectedInventory.set(v);this.feedback.success('Stock adjusted.');this.loadInventory()},error:e=>{this.busy=false;this.feedback.error(e)}})}
- configureRule():void{const i=this.selectedInventory();if(!i)return;this.busy=true;this.api.configureReplenishmentRule(i.id,this.ruleForm).subscribe({next:v=>{this.busy=false;this.selectedInventory.set(v);this.feedback.success('Replenishment rule saved.')},error:e=>{this.busy=false;this.feedback.error(e)}})}
+ openInventory(item:InventoryResponse):void{this.inventoryStoreId=item.boutique.idBoutique;this.inventoryProductId=item.produit.idProduit;this.stockForm={quantite:0,typeMouvement:'AJUSTEMENT'};this.lookupInventory()}
+ adjust():void{const i=this.selectedInventory();if(!i||!this.isStockAdjustmentValid())return;const quantite=this.stockForm.typeMouvement==='PERTE'?-Math.abs(this.stockForm.quantite):this.stockForm.quantite;this.busy=true;this.api.adjustStock(i.boutique.idBoutique,i.produit.idProduit,{...this.stockForm,quantite}).subscribe({next:v=>{this.busy=false;this.selectedInventory.set(v);this.stockForm={quantite:0,typeMouvement:this.stockForm.typeMouvement};this.feedback.success('Stock adjusted.');this.loadInventory()},error:e=>{this.busy=false;this.feedback.error(e)}})}
+ configureRule():void{const i=this.selectedInventory();if(!i||this.ruleForm.seuilAlerte<0||this.ruleForm.quantiteRecommandeAuto<0)return;this.busy=true;this.api.configureReplenishmentRule(i.id,this.ruleForm).subscribe({next:v=>{this.busy=false;this.selectedInventory.set(v);this.feedback.success('Replenishment rule saved.')},error:e=>{this.busy=false;this.feedback.error(e)}})}
+ isStockAdjustmentValid():boolean{const item=this.selectedInventory();const quantity=this.stockForm.quantite;if(!item||!Number.isInteger(quantity)||quantity===0)return false;if(this.stockForm.typeMouvement==='REASSORT'||this.stockForm.typeMouvement==='RETOUR')return quantity>0;if(this.stockForm.typeMouvement==='PERTE')return quantity>0&&quantity<=item.quantiteDisponible;return item.quantiteDisponible+quantity>=0}
+ quantityLabel():string{return this.stockForm.typeMouvement==='AJUSTEMENT'?'Signed quantity':'Units'}
+ quantityHelp():string{const item=this.selectedInventory();if(this.stockForm.typeMouvement==='PERTE')return `Enter units lost (maximum ${item?.quantiteDisponible??0}).`;if(this.stockForm.typeMouvement==='AJUSTEMENT')return 'Use a positive number to add stock or a negative number to remove it.';return 'Enter a positive whole number.'}
  close():void{this.panel=null;this.editingStore=null;this.editingProduct=null;this.selectedInventory.set(null)}label(v:string):string{return v.replaceAll('_',' ').toLowerCase().replace(/^./,c=>c.toUpperCase())}
 }

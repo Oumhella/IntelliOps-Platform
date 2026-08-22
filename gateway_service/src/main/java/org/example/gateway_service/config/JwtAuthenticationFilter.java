@@ -61,6 +61,8 @@ public class JwtAuthenticationFilter extends AbstractGatewayFilterFactory<JwtAut
             if (path.contains("/api/v1/users/register") ||
                     path.contains("/api/v1/users/login") ||
                     path.contains("/api/v1/users/refresh") ||
+                    path.equals("/api/v1/users/password/forgot") ||
+                    path.equals("/api/v1/users/password/reset") ||
                     (request.getMethod() == HttpMethod.GET && path.startsWith("/api/v1/plans")) ||
                     path.equals("/api/v1/integrations/oauth/shopify/callback") ||
                     path.equals("/api/v1/integrations/oauth/woocommerce/callback") ||

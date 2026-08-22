@@ -60,6 +60,8 @@
         />
       </label>
 
+      <p class="login-help login-recovery"><a routerLink="/forgot-password">Forgot your password?</a></p>
+
       <button class="login-submit" type="submit" [disabled]="submitting">
         @if (submitting) { <span class="button-spinner"></span> Signing in... } @else { Sign in <span>→</span> }
       </button>

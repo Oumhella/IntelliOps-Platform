@@ -19,6 +19,7 @@ import org.example.lead_service.repository.CommandeRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,18 +35,20 @@ public class CommandeServiceImpl implements CommandeService {
     @Override
     @Transactional(readOnly = true)
     public CommandeDTO obtenirCommandeParId(Long idCommande) {
-        return commandeMapper.toDto(findOrder(idCommande));
+        Commande order = findOrder(idCommande);
+        assertCsmOwnsOrder(order);
+        return commandeMapper.toDto(order);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<CommandeDTO> rechercherCommandes(StatutCommande statut, int page, int size) {
+    public PageResponse<CommandeDTO> rechercherCommandes(StatutCommande statut, Long agentId, int page, int size) {
         PageRequest pageable = PageRequest.of(
                 Math.max(0, page),
                 Math.min(Math.max(1, size), 100),
                 Sort.by(Sort.Direction.DESC, "idCommande"));
         return PageResponse.from(
-                commandeRepository.search(TenantContext.requireEnterpriseId(), statut, pageable),
+                commandeRepository.search(TenantContext.requireEnterpriseId(), statut, agentId, pageable),
                 commandeMapper::toDto);
     }
 
@@ -95,6 +98,13 @@ public class CommandeServiceImpl implements CommandeService {
     @Override
     public CommandeDTO changerStatutCommande(Long idCommande, StatutCommande nouveauStatut) {
         Commande order = findOrder(idCommande);
+        assertCsmOwnsOrder(order);
+        boolean csm = hasCurrentRole("ROLE_CSM");
+        if (csm && (order.getStatutCommande() != StatutCommande.EN_ATTENTE
+                || (nouveauStatut != StatutCommande.CONFIRMEE && nouveauStatut != StatutCommande.ANNULEE))) {
+            throw new AccessDeniedException(
+                    "CSM ownership ends when a pending order is confirmed and handed to logistics.");
+        }
         if (order.getStatutCommande() == nouveauStatut) {
             return commandeMapper.toDto(order);
         }
@@ -172,6 +182,19 @@ public class CommandeServiceImpl implements CommandeService {
         return commandeRepository.findByIdCommandeAndLeadEnterpriseId(
                         idCommande, TenantContext.requireEnterpriseId())
                 .orElseThrow(() -> new EntityNotFoundException("Order not found: " + idCommande));
+    }
+
+    private void assertCsmOwnsOrder(Commande order) {
+        boolean csm = hasCurrentRole("ROLE_CSM");
+        if (csm && !TenantContext.requireUserId().equals(order.getLead().getAgentId())) {
+            throw new AccessDeniedException("CSM users can access only orders from their assigned leads.");
+        }
+    }
+
+    private boolean hasCurrentRole(String role) {
+        return SecurityContextHolder.getContext().getAuthentication() != null
+                && SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(authority -> role.equals(authority.getAuthority()));
     }
 
     private boolean isAllowedTransition(StatutCommande current, StatutCommande next) {

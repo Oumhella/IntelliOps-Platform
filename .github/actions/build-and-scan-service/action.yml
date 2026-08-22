@@ -3,7 +3,7 @@ description: 'Builds target microservice (Java or Node), scans code and Docker i
 
 inputs:
   project_type:
-    description: 'Type de projet : java ou node'
+    description: 'Type de projet : java, node ou python'
     required: false
     default: 'java'
   service_name:
@@ -120,6 +120,23 @@ runs:
         fi
         npm run test:ci
 
+    - name: Configure Python
+      if: inputs.project_type == 'python'
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+        cache-dependency-path: '${{ inputs.service_name }}/pyproject.toml'
+
+    - name: Install and verify Python service
+      if: inputs.project_type == 'python'
+      shell: bash
+      run: |
+        cd ${{ inputs.service_name }}
+        python -m pip install -e ".[dev]"
+        python -m ruff check app tests
+        python -m pytest -q
+
     # -------------------------------------------------------------
     # SHARED DEVSECOPS STEPS
     # -------------------------------------------------------------
@@ -137,7 +154,7 @@ runs:
       shell: bash
       run: |
         # If project is Node/Angular, build using local Dockerfile
-        if [ "${{ inputs.project_type }}" = "node" ]; then
+        if [ "${{ inputs.project_type }}" = "node" ] || [ "${{ inputs.project_type }}" = "python" ]; then
           cd ${{ inputs.service_name }}
           docker build -t ${{ inputs.image_name }}:latest .
         elif [ "${{ inputs.dockerfile }}" = "Dockerfile.microservice" ]; then

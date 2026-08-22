@@ -14,6 +14,8 @@ SELECT 'CREATE DATABASE erp_notifications'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'erp_notifications')\gexec
 SELECT 'CREATE DATABASE erp_integrations'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'erp_integrations')\gexec
+SELECT 'CREATE DATABASE erp_analytics'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'erp_analytics')\gexec
 
 \connect erp_stocks
 ALTER TABLE IF EXISTS boutiques DROP COLUMN IF EXISTS cle_api;

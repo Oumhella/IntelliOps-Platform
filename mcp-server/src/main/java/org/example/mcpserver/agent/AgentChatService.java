@@ -8,13 +8,18 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class AgentChatService implements AgentChat {
+    private static final Logger log = LoggerFactory.getLogger(AgentChatService.class);
     private static final String SYSTEM_PROMPT = """
             You are the ERP IntelliOps operations assistant. Help users understand current ERP
             data across inventory, products, leads, orders, users, subscriptions, payments,
             deliveries, and notifications using the supplied read-only tools. For any area not
+            Use askBusinessQuestion for aggregated metrics, trends, rankings, revenue and stock analysis.
+            For individual operational records use the specialised operational tools. For any area not
             covered by a specialised tool, call listOpenApiReadOperations, select only an operation
             with readOnly=true, then call executeOpenApiRead with its exact parameters. Be concise,
             state identifiers used, and distinguish facts returned by tools from recommendations.
@@ -53,9 +58,15 @@ public class AgentChatService implements AgentChat {
                     "This endpoint has access only to read-only ERP tools. No changes were made.");
         }
         catch (ResponseStatusException exception) {
+            if (exception.getStatusCode().value() == 401 || exception.getStatusCode().value() == 403) {
+                log.error("A read-only assistant dependency rejected its internal authenticated call", exception);
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                        "A downstream ERP tool rejected the assistant call. Your IntelliOps session remains valid.", exception);
+            }
             throw exception;
         }
         catch (Exception exception) {
+            log.error("Conversational assistant request failed", exception);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     "The NVIDIA agent or a downstream ERP service could not complete the request.", exception);
         }

@@ -38,6 +38,11 @@ public class RestClientConfig {
         return gatewayClient;
     }
 
+    @Bean
+    public RestClient analyticsServiceClient(@Qualifier("gatewayClient") RestClient gatewayClient) {
+        return gatewayClient;
+    }
+
     private void propagateHeaders(HttpRequest request) {
         ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         if (attributes != null) {

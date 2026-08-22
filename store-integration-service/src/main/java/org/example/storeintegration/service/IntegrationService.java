@@ -234,40 +234,63 @@ public class IntegrationService {
                             : Instant.now().plusSeconds(refreshed.expiresIn()).getEpochSecond());
             connection.setEncryptedCredentials(credentialCipher.encrypt(updated));
             connectionRepository.save(connection);
+            credentials = updated;
             externalProducts = connectorFactory.require(connection.getPlatform()).listProducts(storeUrl, updated);
         }
 
         registerWebhook(connection, credentials);
 
         int importedCount = 0;
+        int synchronizedCount = 0;
         int skippedCount = 0;
-        List<ProductMappingResponse> createdMappings = new ArrayList<>();
+        List<ProductMappingResponse> synchronizedMappings = new ArrayList<>();
 
         for (ExternalProduct ep : externalProducts) {
-            boolean exists = mappingRepository.findByConnectionIdAndExternalVariantId(connection.getId(), ep.variantId()).isPresent();
-            if (exists) {
+            ProductMapping existingMapping = mappingRepository
+                    .findByConnectionIdAndExternalVariantId(connection.getId(), ep.variantId()).orElse(null);
+
+            if (ep.salePrice() == null || ep.salePrice().signum() <= 0) {
+                log.warn("autoImportProducts: skipping variant {} because its sale price is absent or invalid",
+                        ep.variantId());
                 skippedCount++;
                 continue;
             }
-
-            Long internalId = coreClient.createProduct(connection.getEnterpriseId(), ep.name(), ep.sku(), 10.0);
+            String sku = ep.sku() == null || ep.sku().isBlank()
+                    ? connection.getPlatform().name() + "-" + ep.variantId()
+                    : ep.sku();
+            Long internalId = coreClient.importProduct(connection.getEnterpriseId(), ep.name(), sku, ep.salePrice(),
+                    connection.getStockLocationId(), ep.availableQuantity(),
+                    existingMapping == null ? null : existingMapping.getInternalProductId());
             if (internalId != null) {
-                ProductMapping mapping = ProductMapping.builder()
-                        .connection(connection)
-                        .enterpriseId(connection.getEnterpriseId())
-                        .externalProductId(ep.productId())
-                        .externalVariantId(ep.variantId())
-                        .externalSku(blankToNull(ep.sku()))
-                        .externalName(ep.name())
-                        .internalProductId(internalId)
-                        .build();
-                createdMappings.add(mappingResponse(mappingRepository.save(mapping)));
-                importedCount++;
+                ProductMapping mapping;
+                if (existingMapping == null) {
+                    mapping = ProductMapping.builder()
+                            .connection(connection)
+                            .enterpriseId(connection.getEnterpriseId())
+                            .externalProductId(ep.productId())
+                            .externalVariantId(ep.variantId())
+                            .externalSku(blankToNull(ep.sku()))
+                            .externalName(ep.name())
+                            .internalProductId(internalId)
+                            .build();
+                    importedCount++;
+                } else {
+                    mapping = existingMapping;
+                    mapping.setExternalProductId(ep.productId());
+                    mapping.setExternalSku(blankToNull(ep.sku()));
+                    mapping.setExternalName(ep.name());
+                    mapping.setInternalProductId(internalId);
+                    synchronizedCount++;
+                }
+                synchronizedMappings.add(mappingResponse(mappingRepository.save(mapping)));
             }
         }
 
-        log.info("autoImportProducts: completed for store={}, imported={}, skipped={}", connection.getStoreUrl(), importedCount, skippedCount);
-        return new AutoImportResponse(importedCount, skippedCount, createdMappings);
+        connection.setLastSyncAt(Instant.now());
+        connectionRepository.save(connection);
+        log.info("autoImportProducts: completed for store={}, imported={}, synchronized={}, skipped={}",
+                connection.getStoreUrl(), importedCount, synchronizedCount, skippedCount);
+        return new AutoImportResponse(importedCount, synchronizedCount, skippedCount, synchronizedMappings);
     }
 
     @Transactional

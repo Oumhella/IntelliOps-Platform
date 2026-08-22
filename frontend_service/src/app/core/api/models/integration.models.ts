@@ -7,8 +7,8 @@ export interface IntegrationCapabilities { readonly shopify:boolean;readonly woo
 export interface IntegrationConnectRequest { readonly displayName:string;readonly store:string;readonly stockLocationId:number; }
 export interface IntegrationAuthorization { readonly authorizationUrl:string;readonly expiresAt:IsoDateTime; }
 export interface StoreConnectionResponse { readonly id:number;readonly platform:IntegrationPlatform;readonly displayName:string;readonly storeUrl:string;readonly stockLocationId:number;readonly status:IntegrationConnectionStatus;readonly webhooksActive:boolean;readonly lastError:string|null;readonly lastSyncAt:IsoDateTime|null;readonly createdAt:IsoDateTime; }
-export interface ExternalProductResponse { readonly productId:string;readonly variantId:string;readonly sku:string;readonly name:string; }
+export interface ExternalProductResponse { readonly productId:string;readonly variantId:string;readonly sku:string;readonly name:string;readonly salePrice:number|null;readonly availableQuantity:number|null; }
 export interface ProductMappingRequest { readonly externalProductId:string;readonly externalVariantId:string;readonly externalSku?:string;readonly externalName:string;readonly internalProductId:number; }
 export interface ProductMappingResponse extends ProductMappingRequest { readonly id:number;readonly connectionId:number;readonly createdAt:IsoDateTime; }
 export interface IntegrationEventResponse { readonly id:number;readonly connectionId:number;readonly externalEventId:string;readonly topic:string;readonly status:IntegrationEventStatus;readonly errorMessage:string|null;readonly receivedAt:IsoDateTime;readonly processedAt:IsoDateTime|null; }
-export interface AutoImportResponse { readonly importedCount:number;readonly skippedCount:number;readonly mappings:readonly ProductMappingResponse[]; }
+export interface AutoImportResponse { readonly importedCount:number;readonly synchronizedCount:number;readonly skippedCount:number;readonly mappings:readonly ProductMappingResponse[]; }

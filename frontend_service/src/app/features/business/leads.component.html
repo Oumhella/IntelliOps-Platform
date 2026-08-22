@@ -7,7 +7,7 @@
     </div>
     <div class="view-actions">
       <button class="secondary-button" type="button" (click)="load()">Refresh</button>
-      @if (canCreateAndContact) {
+      @if (canCreate) {
         <button class="primary-button" type="button" (click)="open('create')">+ New lead</button>
       }
     </div>
@@ -58,10 +58,10 @@
               <td>
                 <div class="row-actions">
                   <button class="action-button" (click)="open('detail', lead)">View</button>
-                  @if (canCreateAndContact && allowedLeadStatuses(lead).length) {
+                  @if (canContact && allowedLeadStatuses(lead).length) {
                     <button class="action-button" (click)="open('interaction', lead)">Contact</button>
                   }
-                  @if (canCreateAndContact && lead.statutLead === 'IN_PROGRESS') {
+                  @if (canContact && lead.statutLead === 'IN_PROGRESS') {
                     <button class="action-button action-button-success" (click)="open('convert', lead)">Convert</button>
                   }
                   @if (canAssign && lead.statutLead !== 'CONVERTED' && lead.statutLead !== 'REFUSED') {
@@ -96,7 +96,7 @@
     <header class="drawer-header">
       <div>
         <h2>{{ panel === 'create' ? 'Create lead' : panel === 'detail' ? 'Lead details' : panel === 'assign' ? 'Assign CSM' : panel === 'interaction' ? 'Record interaction' : 'Convert to order' }}</h2>
-        <p>@if (selected(); as lead) { Lead #{{ lead.idLead }} · {{ lead.infosClient.nomComplet }} } @else { Add a customer opportunity to your queue. }</p>
+        <p>@if (selected(); as lead) { Lead #{{ lead.idLead }} · {{ lead.infosClient.nomComplet }} } @else { Capture an opportunity for assignment to a CSM. }</p>
       </div>
       <button class="drawer-close" type="button" (click)="close()">×</button>
     </header>
@@ -111,7 +111,7 @@
           <label class="form-field"><span>City</span><input name="city" [(ngModel)]="createForm.ville" required /></label>
           <label class="form-field"><span>Priority</span><select name="priority" [(ngModel)]="createForm.ordrePriorite">@for (priority of priorities; track priority) {<option [value]="priority">{{ label(priority) }}</option>}</select></label>
         </div>
-        <p class="row-secondary">New leads always start in New lead and are assigned to you. Sales-channel links are created by integrations, not entered manually.</p>
+        <p class="row-secondary">The lead starts unassigned in New lead. Assign it to an active CSM after creation. Sales-channel leads are created only by integrations.</p>
         <div class="form-actions"><button class="secondary-button" type="button" (click)="close()">Cancel</button><button class="primary-button" [disabled]="busy">Create lead</button></div>
       </form>
     }

@@ -27,8 +27,11 @@ public class CommandeController {
     public ResponseEntity<PageResponse<CommandeDTO>> rechercherCommandes(
             @RequestParam(required = false) StatutCommande statut,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(commandeService.rechercherCommandes(statut, page, size));
+            @RequestParam(defaultValue = "20") int size,
+            @RequestAttribute("userId") Long currentUserId,
+            Authentication authentication) {
+        Long agentId = hasRole(authentication, "ROLE_CSM") ? currentUserId : null;
+        return ResponseEntity.ok(commandeService.rechercherCommandes(statut, agentId, page, size));
     }
 
     @GetMapping("/{idCommande}")
@@ -57,9 +60,6 @@ public class CommandeController {
                 && (nouveauStatut == StatutCommande.CONFIRMEE || nouveauStatut == StatutCommande.ANNULEE);
         boolean logisticAction = hasRole(authentication, "ROLE_LOGISTIC")
                 && (nouveauStatut == StatutCommande.PREPARATION
-                || nouveauStatut == StatutCommande.EXPEDIEE
-                || nouveauStatut == StatutCommande.LIVREE
-                || nouveauStatut == StatutCommande.RETOURNEE
                 || nouveauStatut == StatutCommande.ANNULEE);
         if (!csmAction && !logisticAction) {
             throw new AccessDeniedException("This order status is not owned by the current role.");

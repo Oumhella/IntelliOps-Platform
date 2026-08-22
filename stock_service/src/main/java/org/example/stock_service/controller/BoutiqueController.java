@@ -26,11 +26,13 @@ public class BoutiqueController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'CSM', 'LOGISTIC', 'INTEGRATION_SERVICE')")
     public ResponseEntity<List<BoutiqueResponseDTO>> obtenirBoutiques() {
         return ResponseEntity.ok(boutiqueService.obtenirBoutiques());
     }
 
     @GetMapping("/{idBoutique}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CSM', 'LOGISTIC', 'INTEGRATION_SERVICE')")
     public ResponseEntity<BoutiqueResponseDTO> obtenirBoutique(@PathVariable Long idBoutique) {
         return ResponseEntity.ok(boutiqueService.obtenirBoutique(idBoutique));
     }

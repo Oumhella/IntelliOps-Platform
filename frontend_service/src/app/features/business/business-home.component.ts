@@ -6,6 +6,7 @@ import { CrmApiService, DeliveriesApiService, NotificationsApiService, PaymentsA
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
 
 interface OverviewMetric { label: string; value: number; note: string; tone: string; route: string; }
+interface WorkflowStep { label: string; detail: string; route: string; }
 
 @Component({ selector: 'app-business-home', imports: [RouterLink], templateUrl: './business-home.component.html', styleUrl: './business-home.component.scss' })
 export class BusinessHomeComponent implements OnInit {
@@ -19,6 +20,8 @@ export class BusinessHomeComponent implements OnInit {
   private readonly notificationsApi = inject(NotificationsApiService);
   private readonly feedback = inject(UiFeedbackService);
   readonly user = this.session.currentUser;
+  readonly canUseBi = ['ROLE_ADMIN', 'ROLE_CSM', 'ROLE_LOGISTIC'].includes(this.user()?.role ?? '');
+  readonly workflow = this.workflowForRole(this.user()?.role);
   readonly metrics = signal<OverviewMetric[]>([]);
   readonly loading = signal(true);
 
@@ -43,13 +46,15 @@ export class BusinessHomeComponent implements OnInit {
       ]); subscriber.complete(); }, error: (e) => subscriber.error(e) }));
     }
     if (role === 'ROLE_CSM') {
-      return new Observable((subscriber) => forkJoin({ leads: this.crmApi.searchLeads(), orders: this.crmApi.searchOrders() }).subscribe({ next: (v) => { subscriber.next([
+      return new Observable((subscriber) => forkJoin({ leads: this.crmApi.searchLeads(), pendingOrders: this.crmApi.searchOrders(0, 100, 'EN_ATTENTE'), handedOrders: this.crmApi.searchOrders(0, 100, 'CONFIRMEE') }).subscribe({ next: (v) => { subscriber.next([
         { label: 'Leads', value: v.leads.totalElements, note: 'CRM pipeline', tone: 'indigo', route: '/app/leads' },
-        { label: 'Orders', value: v.orders.totalElements, note: 'Converted customer orders', tone: 'sky', route: '/app/orders' },
+        { label: 'Needs confirmation', value: v.pendingOrders.totalElements, note: 'My pending customer orders', tone: 'amber', route: '/app/orders' },
+        { label: 'Handed to logistics', value: v.handedOrders.totalElements, note: 'My confirmed orders', tone: 'emerald', route: '/app/orders' },
       ]); subscriber.complete(); }, error: (e) => subscriber.error(e) }));
     }
     if (role === 'ROLE_LOGISTIC') {
-      return new Observable((subscriber) => forkJoin({ stores: this.stockApi.getStores(), products: this.stockApi.getProducts(), deliveries: this.deliveriesApi.search() }).subscribe({ next: (v) => { subscriber.next([
+      return new Observable((subscriber) => forkJoin({ readyOrders: this.crmApi.searchOrders(0, 100, 'CONFIRMEE'), stores: this.stockApi.getStores(), products: this.stockApi.getProducts(), deliveries: this.deliveriesApi.search() }).subscribe({ next: (v) => { subscriber.next([
+        { label: 'Ready for logistics', value: v.readyOrders.totalElements, note: 'Confirmed order handoffs', tone: 'amber', route: '/app/orders' },
         { label: 'Stores', value: v.stores.length, note: 'Connected commerce stores', tone: 'indigo', route: '/app/stock' },
         { label: 'Products', value: v.products.length, note: 'Product catalogue', tone: 'sky', route: '/app/stock' },
         { label: 'Deliveries', value: v.deliveries.totalElements, note: 'Shipment records', tone: 'emerald', route: '/app/deliveries' },
@@ -61,5 +66,28 @@ export class BusinessHomeComponent implements OnInit {
       ]); subscriber.complete(); }, error: (e) => subscriber.error(e) }));
     }
     return of([]);
+  }
+
+  private workflowForRole(role?: string): readonly WorkflowStep[] {
+    if (role === 'ROLE_CSM') return [
+      { label: 'Qualify assigned lead', detail: 'Record interactions until the lead is ready.', route: '/app/leads' },
+      { label: 'Convert and reserve', detail: 'Create the pending order with real catalogue prices and stock.', route: '/app/leads' },
+      { label: 'Confirm customer intent', detail: 'CONFIRMEE hands the order to the logistics queue.', route: '/app/orders' },
+    ];
+    if (role === 'ROLE_LOGISTIC') return [
+      { label: 'Accept confirmed order', detail: 'The logistics queue starts at CONFIRMEE.', route: '/app/orders' },
+      { label: 'Prepare fulfillment', detail: 'Move the order to PREPARATION after payment/COD checks.', route: '/app/orders' },
+      { label: 'Create and assign shipment', detail: 'Choose an internal courier or external carrier.', route: '/app/deliveries' },
+    ];
+    if (role === 'ROLE_LIVREUR') return [
+      { label: 'Open assigned delivery', detail: 'Only shipments assigned to your account are visible.', route: '/app/deliveries' },
+      { label: 'Execute delivery', detail: 'Update the shipment through its allowed operational states.', route: '/app/deliveries' },
+      { label: 'Close the attempt', detail: 'Mark it delivered, failed, or returned with an auditable status.', route: '/app/deliveries' },
+    ];
+    return [
+      { label: 'Customer operations', detail: 'CSM owns qualification and order confirmation.', route: '/app/leads' },
+      { label: 'Fulfillment operations', detail: 'Logistics owns preparation and carrier assignment.', route: '/app/orders' },
+      { label: 'Delivery execution', detail: 'The assigned courier or carrier owns final execution.', route: '/app/deliveries' },
+    ];
   }
 }
