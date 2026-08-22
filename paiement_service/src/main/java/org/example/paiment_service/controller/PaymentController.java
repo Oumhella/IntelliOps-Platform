@@ -16,6 +16,9 @@ import org.example.paiment_service.entity.StatutPaiement;
 import org.example.paiment_service.service.InvoicePdfService;
 import org.example.paiment_service.service.PaymentService;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -110,10 +113,14 @@ public class PaymentController {
         return ResponseEntity.ok(paymentService.getInvoice(idFacture));
     }
 
-    @GetMapping("/factures/{idFacture}/download-url")
-    public ResponseEntity<String> telechargerFactureUrl(@PathVariable Long idFacture) {
+    @GetMapping(value = "/factures/{idFacture}/download", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> telechargerFacture(@PathVariable Long idFacture) {
         FactureResponseDTO facture = paymentService.getInvoice(idFacture);
-        return ResponseEntity.ok(
-                invoicePdfService.obtenirUrlTelechargementTemporaire(facture.getCheminFichierPdf()));
+        byte[] pdf = invoicePdfService.lireFacturePdf(facture.getCheminFichierPdf());
+        String filename = facture.getNumeroFactureUnique() + ".pdf";
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename).build().toString())
+                .body(pdf);
     }
 }

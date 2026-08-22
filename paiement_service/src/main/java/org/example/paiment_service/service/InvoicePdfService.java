@@ -5,10 +5,9 @@ import com.lowagie.text.Font;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
-import io.minio.GetPresignedObjectUrlArgs;
+import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
-import io.minio.http.Method;
 import lombok.RequiredArgsConstructor;
 import org.example.paiment_service.entity.Facture;
 import org.example.paiment_service.entity.TransactionPaiement;
@@ -18,8 +17,8 @@ import org.springframework.stereotype.Service;
 import java.awt.*;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.time.format.DateTimeFormatter;
-import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -103,18 +102,17 @@ public class InvoicePdfService {
             throw new RuntimeException("Erreur lors de l'upload de la facture sur MinIO", e);
         }
     }
-    public String obtenirUrlTelechargementTemporaire(String objectName) {
+    public byte[] lireFacturePdf(String objectName) {
         try {
-            return minioClient.getPresignedObjectUrl(
-                    GetPresignedObjectUrlArgs.builder()
-                            .method(Method.GET)
+            try (InputStream input = minioClient.getObject(
+                    GetObjectArgs.builder()
                             .bucket(bucketName)
                             .object(objectName)
-                            .expiry(15, TimeUnit.MINUTES) // URL valide 15 minutes
-                            .build()
-            );
+                            .build())) {
+                return input.readAllBytes();
+            }
         } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de la génération de l'URL MinIO", e);
+            throw new RuntimeException("Erreur lors de la lecture de la facture depuis MinIO", e);
         }
     }
 }

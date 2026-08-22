@@ -61,14 +61,14 @@ describe('API services transport details', () => {
     request.flush({});
   });
 
-  it('requests invoice download URLs as plain text', () => {
-    let downloadUrl = '';
-    TestBed.inject(PaymentsApiService).getInvoiceDownloadUrl(12).subscribe((value) => downloadUrl = value);
+  it('requests invoice PDFs as binary data', () => {
+    let invoiceFile: Blob | undefined;
+    TestBed.inject(PaymentsApiService).downloadInvoice(12).subscribe((value) => invoiceFile = value);
 
-    const request = httpTesting.expectOne('http://gateway:8080/api/v1/payments/factures/12/download-url');
-    expect(request.request.responseType).toBe('text');
-    request.flush('https://object-store.example/invoice.pdf');
-    expect(downloadUrl).toContain('invoice.pdf');
+    const request = httpTesting.expectOne('http://gateway:8080/api/v1/payments/factures/12/download');
+    expect(request.request.responseType).toBe('blob');
+    request.flush(new Blob(['pdf']), { headers: { 'Content-Type': 'application/pdf' } });
+    expect(invoiceFile?.size).toBe(3);
   });
 
   it('sends pagination and optional CRM filters using backend parameter names', () => {

@@ -64,9 +64,8 @@ export class PaymentsApiService {
     return this.http.post<PaymentTransactionResponse>(`${this.url}/${transactionId}/annuler`, null);
   }
 
-  getInvoiceDownloadUrl(invoiceId: number): Observable<string> {
-    // The backend returns text/plain, so Angular must not try to parse this as JSON.
-    return this.http.get(`${this.url}/factures/${invoiceId}/download-url`, { responseType: 'text' });
+  downloadInvoice(invoiceId: number): Observable<Blob> {
+    return this.http.get(`${this.url}/factures/${invoiceId}/download`, { responseType: 'blob' });
   }
 
   getInvoices(page = 0, size = 20): Observable<PageResponse<InvoiceResponse>> {
