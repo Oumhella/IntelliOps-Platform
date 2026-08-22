@@ -47,7 +47,8 @@ public class PaymentController {
     }
 
     @PostMapping("/initier")
-    public ResponseEntity<TransactionPaiementResponseDTO> initierPaiement(@Valid @RequestBody InitierPaiementRequestDTO request) {
+    public ResponseEntity<TransactionPaiementResponseDTO> initierPaiement(
+            @Valid @RequestBody InitierPaiementRequestDTO request) {
         return new ResponseEntity<>(paymentService.initierPaiement(request), HttpStatus.CREATED);
     }
 
@@ -120,7 +121,8 @@ public class PaymentController {
         String filename = facture.getNumeroFactureUnique() + ".pdf";
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_PDF)
-                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename).build().toString())
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(filename).build().toString())
                 .body(pdf);
     }
 }
