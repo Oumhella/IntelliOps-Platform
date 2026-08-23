@@ -5,7 +5,7 @@ import { AuthSessionService } from '../../core/auth/auth-session.service';
 import { CrmApiService, DeliveriesApiService, NotificationsApiService, PaymentsApiService, StockApiService, SubscriptionsApiService, UsersApiService } from '../../core/api';
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
 
-interface OverviewMetric { label: string; value: number; note: string; tone: string; route: string; }
+interface OverviewMetric { label: string; value: number | string; note: string; tone: string; route: string; }
 interface WorkflowStep { label: string; detail: string; route: string; }
 
 @Component({ selector: 'app-business-home', imports: [RouterLink], templateUrl: './business-home.component.html', styleUrl: './business-home.component.scss' })
@@ -40,7 +40,7 @@ export class BusinessHomeComponent implements OnInit {
     if (role === 'ROLE_ADMIN') {
       return new Observable((subscriber) => forkJoin({ staff: this.usersApi.getEnterpriseStaff(), subscriptions: this.subscriptionsApi.searchSubscriptions(), payments: this.paymentsApi.searchTransactions(), notifications: this.notificationsApi.search() }).subscribe({ next: (v) => { subscriber.next([
         { label: 'Team members', value: v.staff.length, note: 'Enterprise accounts', tone: 'indigo', route: '/app/team' },
-        { label: 'Current workspace plan', value: v.subscriptions.content.some((item) => item.statut === 'ACTIF' || item.statut === 'SUSPENDU') ? 1 : 0, note: 'Enterprise entitlement', tone: 'sky', route: '/app/subscriptions' },
+        { label: 'Plan entitlement', value: v.subscriptions.content.some((item) => item.statut === 'ACTIF' || item.statut === 'SUSPENDU') ? 'Active' : 'None', note: 'Workspace access', tone: 'sky', route: '/app/subscriptions' },
         { label: 'Transactions', value: v.payments.totalElements, note: 'Recorded payments', tone: 'emerald', route: '/app/billing' },
         { label: 'Notifications', value: v.notifications.totalElements, note: 'Delivery history', tone: 'amber', route: '/app/notifications' },
       ]); subscriber.complete(); }, error: (e) => subscriber.error(e) }));
