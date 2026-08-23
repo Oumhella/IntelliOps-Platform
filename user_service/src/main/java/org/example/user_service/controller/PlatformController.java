@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/platform")
 @RequiredArgsConstructor
@@ -19,5 +21,15 @@ public class PlatformController {
     @GetMapping("/overview")
     public PlatformOverviewResponse getOverview() {
         return platformOverviewService.getOverview();
+    }
+
+    @GetMapping("/audit")
+    public List<PlatformOverviewResponse.PlatformEvent> getAudit() {
+        return platformOverviewService.getAudit();
+    }
+
+    @GetMapping("/settings")
+    public PlatformOverviewResponse.PlatformSettings getSettings() {
+        return platformOverviewService.getSettings();
     }
 }

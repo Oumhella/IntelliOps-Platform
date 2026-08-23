@@ -19,7 +19,7 @@
       </a>
       <a class="nav-item" href="#services">
         <svg viewBox="0 0 24 24"><path d="M4 5h16v5H4V5Zm0 9h16v5H4v-5Zm3-6h.01M7 17h.01" /></svg><span>Services</span>
-        <span class="status-dot" [class.status-dot-success]="overview()?.totals?.onlineServices === overview()?.totals?.totalServices"></span>
+        <span class="status-dot" [class.status-dot-success]="overview() && overview()!.totals.onlineServices === overview()!.totals.totalServices"></span>
       </a>
       <a class="nav-item" href="#plans">
         <svg viewBox="0 0 24 24"><path d="M4 6h16v12H4V6Zm4 4h8m-8 4h5" /></svg><span>Plan catalogue</span>
@@ -27,12 +27,13 @@
       </a>
 
       <p class="nav-label nav-label-spaced">Administration</p>
-      <span class="nav-item nav-item-disabled">
-        <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5V4Zm4 5h6m-6 4h6m-6 4h4" /></svg><span>Audit log</span><small>Soon</small>
-      </span>
-      <span class="nav-item nav-item-disabled">
-        <svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.4-3.5a7.8 7.8 0 0 0-.1-1l2-1.5-2-3.4-2.4 1a8 8 0 0 0-1.7-1L15 3.5h-4l-.3 2.6a8 8 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.5a7.8 7.8 0 0 0 0 2l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 1.7 1l.3 2.6h4l.3-2.6a8 8 0 0 0 1.7-1l2.4 1 2-3.4-2-1.5a7.8 7.8 0 0 0 .1-1Z" /></svg><span>Platform settings</span><small>Soon</small>
-      </span>
+      <a class="nav-item" href="#audit">
+        <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5V4Zm4 5h6m-6 4h6m-6 4h4" /></svg><span>Audit log</span>
+        @if (!auditLoading()) { <span class="nav-count">{{ audit().length }}</span> }
+      </a>
+      <a class="nav-item" href="#settings">
+        <svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.4-3.5a7.8 7.8 0 0 0-.1-1l2-1.5-2-3.4-2.4 1a8 8 0 0 0-1.7-1L15 3.5h-4l-.3 2.6a8 8 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.5a7.8 7.8 0 0 0 0 2l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 1.7-1l.3 2.6h4l.3-2.6a8 8 0 0 0 1.7-1l2.4 1 2-3.4-2-1.5a7.8 7.8 0 0 0 .1-1Z" /></svg><span>Platform settings</span>
+      </a>
     </nav>
 
     <div class="sidebar-footer">
@@ -126,6 +127,28 @@
                   <td>{{ tenant.createdAt | date:'mediumDate' }}</td></tr>
               } @empty { <tr><td colspan="5" class="empty-row">{{ searchTerm() ? 'No enterprises match your search.' : 'No business enterprises are registered yet.' }}</td></tr> }
             </tbody></table></div>
+          </article>
+        </section>
+
+        <section class="platform-sections admin-sections">
+          <article class="surface-card service-panel" id="audit">
+            <header class="card-header"><div><div class="card-title-row"><h2>Platform audit log</h2><span class="record-count">{{ audit().length }} events</span></div><p>Observed service health and enterprise registry activity from the platform API.</p></div><button class="secondary-button" type="button" (click)="loadAudit()" [disabled]="auditLoading()">{{ auditLoading() ? 'Refreshing...' : 'Refresh' }}</button></header>
+            @if (auditError()) { <p class="plan-notice" role="alert">{{ auditError() }}</p> }
+            <div class="table-wrap"><table><thead><tr><th>Type</th><th>Subject</th><th>Detail</th><th>Observed</th><th>Severity</th></tr></thead><tbody>
+              @if (auditLoading()) { <tr><td colspan="5" class="empty-row">Loading platform activity...</td></tr> }
+              @for (event of audit(); track event.type + event.subject) {
+                <tr><td><span class="micro-tag">{{ event.type }}</span></td><td><strong>{{ event.subject }}</strong></td><td>{{ event.detail }}</td><td>{{ event.observedAt | date:'medium' }}</td><td><span class="status-badge" [class.status-badge-success]="event.severity === 'INFO'" [class.status-badge-warning]="event.severity === 'WARNING'"><span></span>{{ event.severity }}</span></td></tr>
+              } @empty { @if (!auditLoading()) { <tr><td colspan="5" class="empty-row">No platform events are available.</td></tr> } }
+            </tbody></table></div>
+          </article>
+
+          <article class="surface-card service-panel" id="settings">
+            <header class="card-header"><div><div class="card-title-row"><h2>Platform settings</h2><span class="status-badge status-badge-info"><span></span>Read only</span></div><p>Runtime values reported by the platform service. Deployment changes remain managed through configuration.</p></div><button class="secondary-button" type="button" (click)="loadSettings()" [disabled]="settingsLoading()">{{ settingsLoading() ? 'Refreshing...' : 'Refresh' }}</button></header>
+            @if (settingsError()) { <p class="plan-notice" role="alert">{{ settingsError() }}</p> }
+            @if (settings(); as platformSettings) {
+              <div class="settings-grid"><div><span>Environment</span><strong>{{ platformSettings.environment }}</strong></div><div><span>Authentication</span><strong>{{ platformSettings.authentication }}</strong></div><div><span>Service discovery</span><strong>{{ platformSettings.serviceDiscovery }}</strong></div><div><span>Expected services</span><strong>{{ platformSettings.expectedServices.length }}</strong></div></div>
+              <div class="settings-services"><span class="section-kicker">Expected registry members</span><div>@for (service of platformSettings.expectedServices; track service) { <span class="micro-tag">{{ service }}</span> }</div></div>
+            } @else if (settingsLoading()) { <p class="empty-row">Loading platform settings...</p> } @else { <p class="empty-row">Platform settings are unavailable.</p> }
           </article>
         </section>
 
