@@ -60,7 +60,7 @@ public class CommandeController {
                 && (nouveauStatut == StatutCommande.CONFIRMEE || nouveauStatut == StatutCommande.ANNULEE);
         boolean logisticAction = hasRole(authentication, "ROLE_LOGISTIC")
                 && (nouveauStatut == StatutCommande.PREPARATION
-                || nouveauStatut == StatutCommande.ANNULEE);
+                        || nouveauStatut == StatutCommande.ANNULEE);
         if (!csmAction && !logisticAction) {
             throw new AccessDeniedException("This order status is not owned by the current role.");
         }
@@ -69,7 +69,7 @@ public class CommandeController {
     }
 
     @PatchMapping("/{idCommande}/payment-status")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC', 'LIVREUR')")
     public ResponseEntity<CommandeDTO> changerStatutPaiement(
             @PathVariable Long idCommande,
             @Valid @RequestBody UpdateOrderPaymentStatusRequest request) {
