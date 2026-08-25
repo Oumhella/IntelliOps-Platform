@@ -35,7 +35,7 @@ public class CommandeController {
     }
 
     @GetMapping("/{idCommande}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CSM', 'LOGISTIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CSM', 'LOGISTIC', 'LIVREUR')")
     public ResponseEntity<CommandeDTO> obtenirCommandeParId(@PathVariable Long idCommande) {
         return ResponseEntity.ok(commandeService.obtenirCommandeParId(idCommande));
     }
