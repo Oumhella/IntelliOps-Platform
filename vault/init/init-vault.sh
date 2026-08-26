@@ -181,7 +181,7 @@ vault kv put secret/analytics-service \
   JWT_SECRET="${JWT_SECRET:-MaCleSecreteUltraSecuriseeEtTresLonguePourLeCRM2026!}" \
   LLM_API_KEY="${NVIDIA_API_KEY:-}" \
   LLM_BASE_URL="${NVIDIA_BASE_URL:-https://integrate.api.nvidia.com}/v1" \
-  LLM_MODEL="${NVIDIA_MODEL:-meta/llama-3.1-70b-instruct}" \
+  LLM_MODEL="${NVIDIA_MODEL:-meta/llama-3.2-11b-vision-instruct}" \
   ANALYTICS_QUERY_PASSWORD="${ANALYTICS_QUERY_PASSWORD:-change-query-password}" \
   ANALYTICS_SYNC_PASSWORD="${ANALYTICS_SYNC_PASSWORD:-change-sync-password}" \
   ANALYTICS_DATABASE_URL="postgresql://analytics_query:${ANALYTICS_QUERY_PASSWORD:-change-query-password}@erp-db:5432/erp_analytics" \
