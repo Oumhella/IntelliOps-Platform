@@ -126,11 +126,11 @@ echo "PKI root + intermediate CA configured."
 
 vault kv put secret/application \
   JWT_SECRET="${JWT_SECRET:-MaCleSecreteUltraSecuriseeEtTresLonguePourLeCRM2026!}" \
-  JWT_EXPIRATION="${JWT_EXPIRATION:-86400000}" \
+  JWT_EXPIRATION="${JWT_EXPIRATION:-900000}" \
   app.jwt.secret="${JWT_SECRET:-MaCleSecreteUltraSecuriseeEtTresLonguePourLeCRM2026!}" \
-  app.jwt.expiration="${JWT_EXPIRATION:-86400000}" \
+  app.jwt.expiration="${JWT_EXPIRATION:-900000}" \
   jwt.secret="${JWT_SECRET:-MaCleSecreteUltraSecuriseeEtTresLonguePourLeCRM2026!}" \
-  jwt.expiration="${JWT_EXPIRATION:-86400000}"
+  jwt.expiration="${JWT_EXPIRATION:-900000}"
 # Stored under three name variants because different services expect different
 # property names for the same secret: common_lib's JwtUtils (used by paiement-service
 # and others) reads "app.jwt.secret", gateway-service's own JwtAuthenticationFilter

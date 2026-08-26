@@ -26,7 +26,7 @@ jobs:
           echo "VAULT_LOCAL_UNKEY=unused-ci-placeholder" >> .env
           echo "VAULT_LOCAL_ROOT_TOKEN=unused-ci-placeholder" >> .env
           echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
-          echo "JWT_EXPIRATION=86400" >> .env
+          echo "JWT_EXPIRATION=900000" >> .env
           echo "DB_USER=root" >> .env
           # NOTE: these || fallbacks exist only so this workflow still runs for anyone who
           # forks the repo without configuring their own secrets. They are NOT a real security
