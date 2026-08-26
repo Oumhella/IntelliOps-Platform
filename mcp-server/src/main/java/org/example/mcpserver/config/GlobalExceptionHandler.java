@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 
@@ -18,6 +19,16 @@ public class GlobalExceptionHandler {
                         "status", ex.getStatusCode().value(),
                         "error", ex.getStatusText(),
                         "message", ex.getResponseBodyAsString()
+                ));
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> handleResponseStatusError(ResponseStatusException ex) {
+        return ResponseEntity.status(ex.getStatusCode())
+                .body(Map.of(
+                        "status", ex.getStatusCode().value(),
+                        "error", ex.getReason() != null ? ex.getReason() : ex.getStatusCode().toString(),
+                        "message", ex.getMessage()
                 ));
     }
 
