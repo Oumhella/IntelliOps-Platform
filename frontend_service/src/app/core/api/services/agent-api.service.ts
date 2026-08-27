@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { API_BASE_URL, buildApiUrl } from '../api.config';
-import { AgentChatRequest, AgentReplyResponse, AgentStatusResponse } from '../models';
+import { AgentActionExecutionResponse, AgentChatRequest, AgentReplyResponse, AgentStatusResponse } from '../models';
 
 @Injectable({ providedIn: 'root' })
 export class AgentApiService {
@@ -16,5 +16,13 @@ export class AgentApiService {
   chat(message: string): Observable<AgentReplyResponse> {
     const request: AgentChatRequest = { message };
     return this.http.post<AgentReplyResponse>(`${this.url}/chat`, request);
+  }
+
+  confirmAction(token: string): Observable<AgentActionExecutionResponse> {
+    return this.http.post<AgentActionExecutionResponse>(`${this.url}/actions/${encodeURIComponent(token)}/confirm`, null);
+  }
+
+  rejectAction(token: string): Observable<AgentActionExecutionResponse> {
+    return this.http.post<AgentActionExecutionResponse>(`${this.url}/actions/${encodeURIComponent(token)}/reject`, null);
   }
 }

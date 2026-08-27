@@ -8,6 +8,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ApprovalServiceTest {
     @Test
@@ -36,6 +37,21 @@ class ApprovalServiceTest {
 
         authenticateAs("owner-token");
         assertEquals("payload", service.confirm(preview.approvalToken(), "TEST", "CONFIRM", String.class));
+        RequestContextHolder.resetRequestAttributes();
+    }
+
+    @Test
+    void exposesOnlyTheCurrentCallersLatestPreviewAndAllowsExplicitRejection() {
+        authenticateAs("owner-token");
+        ApprovalService service = new ApprovalService(300);
+        var since = java.time.Instant.now().minusSeconds(1);
+        ApprovalService.ActionPreview preview = service.prepare("TEST", "payload", "Review this exact action");
+
+        assertEquals(preview.approvalToken(), service.latestForCurrentCallerSince(since).orElseThrow().approvalToken());
+        assertEquals("Review this exact action", service.reject(preview.approvalToken()).summary());
+        assertTrue(service.latestForCurrentCallerSince(since).isEmpty());
+        assertThrows(ResponseStatusException.class,
+                () -> service.confirm(preview.approvalToken(), "TEST", "CONFIRM", String.class));
         RequestContextHolder.resetRequestAttributes();
     }
 

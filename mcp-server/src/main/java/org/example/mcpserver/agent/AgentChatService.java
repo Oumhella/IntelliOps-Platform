@@ -2,6 +2,7 @@ package org.example.mcpserver.agent;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.mcpserver.approval.ApprovalService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -10,10 +11,13 @@ import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashMap;
+import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -21,8 +25,8 @@ public class AgentChatService implements AgentChat {
     private static final Logger log = LoggerFactory.getLogger(AgentChatService.class);
     private static final String SYSTEM_PROMPT = """
             You are the ERP IntelliOps operations assistant. Help users understand current ERP
-            data across inventory, products, leads, orders, users, subscriptions, payments,
-            deliveries, and notifications using the supplied read-only tools.
+            data and safely operate inventory, CRM, orders, payments, deliveries, and other
+            documented workflows using the supplied tools.
 
             TOOL ROUTING:
             - Products / product list / available products / catalog -> ALWAYS call listProducts.
@@ -30,28 +34,44 @@ public class AgentChatService implements AgentChat {
             - CRM leads -> call getLead or listAgentLeads.
             - Business trends, metrics, rankings, revenue -> call askBusinessQuestion.
             - Other read operations -> call listOpenApiReadOperations then executeOpenApiRead.
+            - Stock adjustment -> inspect inventory, then call previewStockAdjustment.
+            - Qualified lead conversion -> inspect the lead and products, then call previewLeadConversion.
+            - Other business changes -> call listAvailableOperations, select the exact non-GET operation,
+              then call previewOpenApiMutation.
 
             RESPONSE RULES:
             1. ALWAYS call the tool to get the real ERP data.
             2. Present all information in clean, professional natural language markdown (bullet points, bold headings, or markdown tables).
             3. NEVER output raw JSON, function call parameter JSON like {"name": "..."}, or tool signatures to the user.
-            4. You cannot perform write/mutation operations. If asked to modify data, explain that mutations require the separate MCP preview and confirmation workflow.
+            4. You may PREVIEW a write operation, but you can never confirm or execute it. After a preview,
+               explain the impact and tell the user to use the approval card. Never claim that a preview changed data.
+            5. Respect the authenticated role: CSM handles assigned leads and customer/order handoff;
+               LOGISTIC handles stock, preparation and assignment; LIVREUR handles only assigned delivery
+               execution; ADMIN handles workspace administration. Domain APIs enforce the final permission.
             """;
 
     private final ChatClient chatClient;
-    private final ToolCallbackProvider readOnlyToolProvider;
+    private final ToolCallbackProvider agentToolProvider;
     private final ReadOnlyAgentTools readOnlyAgentTools;
+    private final ActionPreviewAgentTools actionPreviewAgentTools;
+    private final ApprovalService approvalService;
     private final ObjectMapper objectMapper;
 
-    public AgentChatService(ObjectProvider<ChatModel> chatModelProvider, ReadOnlyAgentTools readOnlyAgentTools, ObjectProvider<ObjectMapper> objectMapperProvider) {
+    public AgentChatService(ObjectProvider<ChatModel> chatModelProvider,
+                            ReadOnlyAgentTools readOnlyAgentTools,
+                            ActionPreviewAgentTools actionPreviewAgentTools,
+                            ApprovalService approvalService,
+                            ObjectProvider<ObjectMapper> objectMapperProvider) {
         ChatModel chatModel = chatModelProvider.getIfAvailable();
         this.chatClient = chatModel == null ? null : ChatClient.builder(chatModel)
                 .defaultSystem(SYSTEM_PROMPT)
                 .build();
-        this.readOnlyToolProvider = MethodToolCallbackProvider.builder()
-                .toolObjects(readOnlyAgentTools)
+        this.agentToolProvider = MethodToolCallbackProvider.builder()
+                .toolObjects(readOnlyAgentTools, actionPreviewAgentTools)
                 .build();
         this.readOnlyAgentTools = readOnlyAgentTools;
+        this.actionPreviewAgentTools = actionPreviewAgentTools;
+        this.approvalService = approvalService;
         ObjectMapper om = objectMapperProvider.getIfAvailable();
         this.objectMapper = om != null ? om : new ObjectMapper();
     }
@@ -63,17 +83,32 @@ public class AgentChatService implements AgentChat {
                     "Conversational agent is unavailable. Configure NVIDIA_API_KEY and AGENT_LLM_PROVIDER=openai.");
         }
         try {
+            Instant requestStartedAt = Instant.now();
+            String role = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                    .findFirst().map(Object::toString).orElse("UNKNOWN");
             String answer = chatClient.prompt()
-                    .user(message)
-                    // This explicit provider is the only tool allow-list for this endpoint.
-                    .tools(readOnlyToolProvider)
+                    .user("Authenticated role (trusted context): " + role + "\nUser request: " + message)
+                    // Confirmation tools are intentionally absent from this allow-list.
+                    .tools(agentToolProvider)
                     .call()
                     .content();
 
             answer = processPotentialToolCall(answer, message);
+            ApprovalService.ActionPreview action = approvalService
+                    .latestForCurrentCallerSince(requestStartedAt).orElse(null);
+            if (action != null) {
+                answer = "I prepared an operational action for your review. No business data has changed yet. "
+                        + "Review the impact below, then confirm or reject it.";
+            } else if (looksLikeRawToolCall(answer)) {
+                answer = "I could not safely translate the tool response into a business answer. "
+                        + "No action was executed; please refine the request and try again.";
+            }
 
             return new AgentReply(answer,
-                    "This endpoint has access only to read-only ERP tools. No changes were made.");
+                    action == null
+                            ? "Live ERP data was consulted. No changes were made."
+                            : "A change was prepared, but nothing has been executed. Review the approval card.",
+                    action);
         }
         catch (ResponseStatusException exception) {
             if (exception.getStatusCode().value() == 401 || exception.getStatusCode().value() == 403) {
@@ -145,6 +180,29 @@ public class AgentChatService implements AgentChat {
                     String q = params.has("question") ? params.get("question").asText() : userMessage;
                     toolResult = readOnlyAgentTools.askBusinessQuestion(q);
                 }
+                case "previewStockAdjustment" -> {
+                    ApprovalService.ActionPreview preview = actionPreviewAgentTools.previewStockAdjustment(
+                            longValue(params, "storeId", "idBoutique"),
+                            longValue(params, "productId", "idProduit"),
+                            intValue(params, "quantity", "quantite"),
+                            textValue(params, "movementType", "typeMouvement"));
+                    toolResult = objectMapper.writeValueAsString(preview);
+                }
+                case "previewLeadConversion" -> {
+                    Long leadId = longValue(params, "leadId", "idLead");
+                    Long locationId = longValue(params, "stockLocationId", "locationId");
+                    List<org.example.mcpserver.tools.LeadMcpTools.ItemRequest> items = objectMapper.convertValue(
+                            params.path("items"), objectMapper.getTypeFactory().constructCollectionType(
+                                    List.class, org.example.mcpserver.tools.LeadMcpTools.ItemRequest.class));
+                    toolResult = objectMapper.writeValueAsString(
+                            actionPreviewAgentTools.previewLeadConversion(leadId, locationId, items));
+                }
+                case "listAvailableOperations" -> toolResult = actionPreviewAgentTools.listAvailableOperations();
+                case "previewOpenApiMutation" -> toolResult = objectMapper.writeValueAsString(
+                        actionPreviewAgentTools.previewOpenApiMutation(
+                                textValue(params, "service"), textValue(params, "operationId"),
+                                parseMap(params, "pathParameters"), parseMap(params, "queryParameters"),
+                                textValue(params, "requestBodyJson")));
             }
 
             if (toolResult != null) {
@@ -179,5 +237,37 @@ public class AgentChatService implements AgentChat {
         return result;
     }
 
-    public record AgentReply(String answer, String safety) { }
+    private String textValue(JsonNode node, String... names) {
+        for (String name : names) {
+            if (node.has(name)) return node.get(name).asText();
+        }
+        return "";
+    }
+
+    private Long longValue(JsonNode node, String... names) {
+        for (String name : names) {
+            if (node.has(name)) return node.get(name).asLong();
+        }
+        return null;
+    }
+
+    private int intValue(JsonNode node, String... names) {
+        for (String name : names) {
+            if (node.has(name)) return node.get(name).asInt();
+        }
+        return 0;
+    }
+
+    private boolean looksLikeRawToolCall(String answer) {
+        if (answer == null) return false;
+        String value = answer.trim();
+        return value.startsWith("{") && (value.contains("\"name\"")
+                || value.contains("\"parameters\"") || value.contains("\"operationId\""));
+    }
+
+    public record AgentReply(String answer, String safety, ApprovalService.ActionPreview action) {
+        public AgentReply(String answer, String safety) {
+            this(answer, safety, null);
+        }
+    }
 }

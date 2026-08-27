@@ -30,7 +30,7 @@ export const routes: Routes = [
       { path: 'subscriptions', loadComponent: () => import('./features/business/subscriptions.component').then((m) => m.SubscriptionsComponent), canActivate: [roleGuard], data: { roles: ADMIN }, title: 'Subscriptions — IntelliOps' },
       { path: 'team', loadComponent: () => import('./features/business/team.component').then((m) => m.TeamComponent), canActivate: [roleGuard], data: { roles: ADMIN }, title: 'Team — IntelliOps' },
       { path: 'notifications', loadComponent: () => import('./features/business/notifications.component').then((m) => m.NotificationsComponent), canActivate: [roleGuard], data: { roles: ADMIN }, title: 'Notification log — IntelliOps' },
-      { path: 'assistant', loadComponent: () => import('./features/business/assistant.component').then((m) => m.AssistantComponent), canActivate: [roleGuard], data: { roles: ADMIN }, title: 'AI assistant — IntelliOps' },
+      { path: 'assistant', loadComponent: () => import('./features/business/assistant.component').then((m) => m.AssistantComponent), canActivate: [roleGuard], data: { roles: WORKSPACE }, title: 'AI operations — IntelliOps' },
       { path: 'analytics', loadComponent: () => import('./features/business/analytics.component').then((m) => m.AnalyticsComponent), canActivate: [roleGuard], data: { roles: BUSINESS }, title: 'Conversational BI — IntelliOps' },
       { path: 'profile', loadComponent: () => import('./features/business/profile.component').then((m) => m.ProfileComponent), canActivate: [roleGuard], data: { roles: WORKSPACE }, title: 'Profile — IntelliOps' },
     ],
