@@ -28,3 +28,12 @@ The password must contain at least 12 characters. On startup, `user-service` cre
 - online/offline service state and instance counts from Eureka.
 
 The endpoint reports missing Eureka registrations as `OFFLINE`; the frontend does not substitute demo metrics when the endpoint is unavailable.
+
+## Platform activity and settings
+
+The super-admin workspace also exposes two authenticated, read-only platform views:
+
+- `GET /api/v1/platform/audit` reports the current service-health and enterprise-registry observations;
+- `GET /api/v1/platform/settings` reports the configured authentication mode, service-discovery provider, and expected registry members.
+
+These values are derived from the live user-service configuration and Eureka state. Deployment configuration remains managed through the deployment environment rather than edited from the browser.

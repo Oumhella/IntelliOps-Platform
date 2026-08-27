@@ -30,3 +30,19 @@ export interface PlatformOverview {
   readonly tenants: readonly PlatformTenantSummary[];
   readonly services: readonly PlatformServiceSummary[];
 }
+
+export interface PlatformEvent {
+  readonly type: string;
+  readonly subject: string;
+  readonly detail: string;
+  readonly observedAt: string;
+  readonly severity: 'INFO' | 'WARNING';
+}
+
+export interface PlatformSettings {
+  readonly environment: string;
+  readonly authentication: string;
+  readonly serviceDiscovery: string;
+  readonly expectedServices: readonly string[];
+  readonly generatedAt: string;
+}

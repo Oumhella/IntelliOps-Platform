@@ -10,8 +10,10 @@ import {
   OfferDuration,
   OfferStatus,
   PlanResponse,
+  PlatformEvent,
   PlatformApiService,
   PlatformOverview,
+  PlatformSettings,
   PlatformServiceSummary,
   SubscriptionsApiService,
 } from '../../core/api';
@@ -34,6 +36,12 @@ export class PlatformDashboardComponent implements OnInit {
   readonly overview = signal<PlatformOverview | null>(null);
   readonly loading = signal(true);
   readonly errorMessage = signal('');
+  readonly audit = signal<readonly PlatformEvent[]>([]);
+  readonly auditLoading = signal(true);
+  readonly auditError = signal('');
+  readonly settings = signal<PlatformSettings | null>(null);
+  readonly settingsLoading = signal(true);
+  readonly settingsError = signal('');
   readonly searchTerm = signal('');
   readonly plans = signal<readonly PlanResponse[]>([]);
   readonly planLoading = signal(true);
@@ -68,6 +76,30 @@ export class PlatformDashboardComponent implements OnInit {
   ngOnInit(): void {
     this.loadOverview();
     this.loadPlans();
+    this.loadAudit();
+    this.loadSettings();
+  }
+
+  loadAudit(): void {
+    this.auditLoading.set(true);
+    this.auditError.set('');
+    this.platformApi.getAudit()
+      .pipe(finalize(() => this.auditLoading.set(false)))
+      .subscribe({
+        next: (events) => this.audit.set(events),
+        error: (error: unknown) => this.auditError.set(error instanceof ApiError ? error.message : 'The platform activity could not be loaded.'),
+      });
+  }
+
+  loadSettings(): void {
+    this.settingsLoading.set(true);
+    this.settingsError.set('');
+    this.platformApi.getSettings()
+      .pipe(finalize(() => this.settingsLoading.set(false)))
+      .subscribe({
+        next: (settings) => this.settings.set(settings),
+        error: (error: unknown) => this.settingsError.set(error instanceof ApiError ? error.message : 'Platform settings could not be loaded.'),
+      });
   }
 
   loadPlans(): void {

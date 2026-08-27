@@ -19,6 +19,7 @@ export class LoginComponent implements OnInit {
 
   email = '';
   password = '';
+  showPassword = false;
   submitting = false;
   errorMessage = '';
   registrationMessage = '';

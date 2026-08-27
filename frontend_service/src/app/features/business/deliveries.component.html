@@ -55,7 +55,8 @@
               <div><span>Address</span><strong>{{ delivery.adresseLivraison }}, {{ delivery.villeLivraison }}</strong></div>
               <div><span>Phone</span><strong>{{ delivery.clientTelephone }}</strong></div>
               <div><span>Order</span><strong>#{{ delivery.referenceCommandeId }}</strong></div>
-              <div><span>Cash to collect</span><strong [class.cod-due]="delivery.montantACollecterCoD > 0">{{ delivery.montantACollecterCoD }} MAD</strong></div>
+              <div><span>COD required</span><strong [class.cod-due]="delivery.montantACollecterCoD > 0">{{ delivery.montantACollecterCoD }} MAD</strong></div>
+              <div><span>COD collected</span><strong>{{ delivery.codCollectedAmount ?? '—' }}{{ delivery.codCollectedAmount !== null ? ' MAD' : '' }}</strong></div>
             </div>
             @if (delivery.statutLivraison === 'ECHEC') {
               <div class="attempt-alert"><strong>{{ delivery.failureReason ? label(delivery.failureReason) : 'Failed attempt' }}</strong><span>{{ delivery.failureNote || 'No note supplied' }} · attempt {{ delivery.attemptCount }}</span></div>
@@ -136,6 +137,9 @@
     @if (panel === 'ship' && canShip) {
       <form (ngSubmit)="ship()"><div class="form-grid">
         <label class="form-field form-field-full"><span>Order ready to ship</span><select name="order" [(ngModel)]="shipForm.referenceCommandeId" required><option [ngValue]="null" disabled>Select an order in preparation</option>@for (order of shippableOrders(); track order.idCommande) {<option [ngValue]="order.idCommande">{{ order.reference }} · {{ order.infosClient.nomComplet }} · {{ label(order.statutPaiement) }}</option>}</select></label>
+        @if (selectedOrder(); as order) {
+          <div class="form-field form-field-full form-help"><strong>COD required: {{ order.statutPaiement === 'AWAITING_COLLECTION' ? order.totalPrix : 0 }} MAD</strong><span>{{ order.statutPaiement === 'AWAITING_COLLECTION' ? 'COD is configured. The courier must collect exactly this amount at delivery.' : 'No COD: this order is already paid by card.' }}</span></div>
+        }
         <label class="form-field"><span>Carrier type</span><select name="carrier" [(ngModel)]="shipForm.typeTransporteur">@for (carrier of carriers; track carrier) { <option [value]="carrier">{{ label(carrier) }}</option> }</select></label>
         @if (shipForm.typeTransporteur === 'SOCIETE_LIVRAISON') {<label class="form-field form-field-full"><span>External delivery company</span><input name="company" [(ngModel)]="shipForm.nomSociete" required /></label>} @else {<label class="form-field form-field-full"><span>Internal courier</span><select name="courier" [(ngModel)]="shipForm.livreurId" required><option [ngValue]="null">Select an active courier</option>@for (courier of couriers(); track courier.id) { <option [ngValue]="courier.id">{{ courier.firstname }} {{ courier.lastname }} · #{{ courier.id }}</option> }</select></label>}
       </div><div class="form-actions"><button class="primary-button" [disabled]="busy">Create shipment</button></div></form>

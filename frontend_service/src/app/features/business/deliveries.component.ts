@@ -273,6 +273,10 @@ export class DeliveriesComponent implements OnInit {
     )}`;
   }
 
+  selectedOrder(): OrderResponse | undefined {
+    return this.shippableOrders().find((order) => order.idCommande === this.shipForm.referenceCommandeId);
+  }
+
   assign(): void {
     const delivery = this.selected();
     if (!delivery || !this.assignedCourierId || !this.canReassign(delivery)) return;
