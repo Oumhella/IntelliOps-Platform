@@ -43,7 +43,7 @@ public class ReadOnlyAgentTools {
         return stockTools.consulterInventaire(storeId, productId);
     }
 
-    @Tool(description = "Read-only: list the ERP product catalog for product discovery and inventory analysis.")
+    @Tool(description = "Read-only: list all products in the ERP catalog. Use this tool whenever the user asks for products, available products, product list, or catalog.")
     public String listProducts() {
         return stockTools.listerProduits();
     }
@@ -58,7 +58,7 @@ public class ReadOnlyAgentTools {
         return leadTools.listerLeadsAgent(agentId);
     }
 
-    @Tool(description = "Read-only: list the currently documented Swagger operations across user, stock, lead, abonnement, paiement, delivery, and notification services. Select only an operation whose readOnly field is true, then call executeOpenApiRead.")
+    @Tool(description = "Read-only: list currently documented Swagger read operations across services.")
     public String listOpenApiReadOperations() {
         return openApiTools.listerOperationsOpenApi();
     }
