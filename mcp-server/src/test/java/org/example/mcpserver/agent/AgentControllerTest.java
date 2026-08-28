@@ -44,10 +44,12 @@ class AgentControllerTest {
 
     @Test
     void authenticatedUiCanConfirmAStructuredApprovalToken() throws Exception {
-        when(agentActionService.confirm("approval-123")).thenReturn(
+        when(agentActionService.confirm("approval-123", "CONFIRM", null)).thenReturn(
                 new AgentActionService.ActionExecution("STOCK_ADJUSTMENT", "Stock updated.", "{}"));
 
-        mockMvc.perform(post("/api/v1/agent/actions/approval-123/confirm"))
+        mockMvc.perform(post("/api/v1/agent/actions/approval-123/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"confirmation\":\"CONFIRM\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.operation").value("STOCK_ADJUSTMENT"))
                 .andExpect(jsonPath("$.message").value("Stock updated."));

@@ -14,6 +14,8 @@ export interface AgentActionPreview {
   readonly summary: string;
   readonly expiresAt: string;
   readonly requiresExplicitConfirmation: boolean;
+  readonly riskLevel: 'LOW' | 'MEDIUM' | 'HIGH';
+  readonly requiresReason: boolean;
   readonly nextStep: string;
 }
 

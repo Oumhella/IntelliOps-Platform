@@ -60,8 +60,11 @@ public class AgentController {
     }
 
     @PostMapping("/actions/{token}/confirm")
-    public AgentActionService.ActionExecution confirm(@PathVariable String token) {
-        return agentActionService.confirm(token);
+    public AgentActionService.ActionExecution confirm(@PathVariable String token,
+                                                       @RequestBody(required = false) ActionConfirmation request) {
+        String confirmation = request == null ? "" : request.confirmation();
+        String reason = request == null ? null : request.reason();
+        return agentActionService.confirm(token, confirmation, reason);
     }
 
     @PostMapping("/actions/{token}/reject")
@@ -73,4 +76,5 @@ public class AgentController {
                               List<String> readOnlyCapabilities, List<String> actionCapabilities,
                               String mutationSafety) { }
     public record ChatRequest(String message) { }
+    public record ActionConfirmation(String confirmation, String reason) { }
 }

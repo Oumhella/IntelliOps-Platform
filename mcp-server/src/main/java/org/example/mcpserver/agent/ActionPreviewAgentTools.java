@@ -21,12 +21,14 @@ public class ActionPreviewAgentTools {
     private final StockMcpTools stockTools;
     private final LeadMcpTools leadTools;
     private final OpenApiMcpTools openApiTools;
+    private final AgentActionIntentGuard intentGuard;
 
     public ActionPreviewAgentTools(StockMcpTools stockTools, LeadMcpTools leadTools,
-                                   OpenApiMcpTools openApiTools) {
+                                   OpenApiMcpTools openApiTools, AgentActionIntentGuard intentGuard) {
         this.stockTools = stockTools;
         this.leadTools = leadTools;
         this.openApiTools = openApiTools;
+        this.intentGuard = intentGuard;
     }
 
     @Tool(description = "Preview a manual stock adjustment. This never changes stock. The user must review and confirm the returned approval card.")
@@ -35,6 +37,7 @@ public class ActionPreviewAgentTools {
             @ToolParam(description = "Product ID") Long productId,
             @ToolParam(description = "Signed quantity: positive adds stock, negative removes it") int quantity,
             @ToolParam(description = "REASSORT, RETOUR, PERTE, or AJUSTEMENT") String movementType) {
+        intentGuard.requireIdsPresent(storeId, productId);
         return stockTools.preparerAjustementStock(storeId, productId, quantity, movementType);
     }
 
@@ -44,6 +47,8 @@ public class ActionPreviewAgentTools {
             @ToolParam(description = "Fulfillment stock location ID") Long stockLocationId,
             @ToolParam(description = "Order lines containing productId and positive quantity")
             List<LeadMcpTools.ItemRequest> items) {
+        intentGuard.requireIdsPresent(leadId, stockLocationId);
+        if (items != null) items.forEach(item -> intentGuard.requireIdsPresent(item.productId()));
         return leadTools.preparerConversionLeadEnCommande(leadId, stockLocationId, items);
     }
 
@@ -59,6 +64,7 @@ public class ActionPreviewAgentTools {
             @ToolParam(description = "Swagger path parameters or an empty object") Map<String, String> pathParameters,
             @ToolParam(description = "Swagger query parameters or an empty object") Map<String, String> queryParameters,
             @ToolParam(description = "Valid JSON request body, or an empty string") String requestBodyJson) {
+        intentGuard.requireGenericMutation(operationId, pathParameters, queryParameters, requestBodyJson);
         return openApiTools.preparerMutationOpenApi(service, operationId, pathParameters, queryParameters, requestBodyJson);
     }
 }

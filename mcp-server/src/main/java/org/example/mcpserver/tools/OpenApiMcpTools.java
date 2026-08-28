@@ -108,16 +108,20 @@ public class OpenApiMcpTools {
         }
         String uri = resolveUri(operation, pathParameters, queryParameters);
         OpenApiMutation mutation = new OpenApiMutation(operation.method(), uri, body);
+        boolean highRisk = isHighRisk(operation.method(), uri, operation.operationId());
         return approvalService.prepare("OPENAPI_MUTATION", mutation,
-                "%s %s (%s/%s)".formatted(operation.method(), uri, service, operation.operationId()));
+                "%s %s (%s/%s)".formatted(operation.method(), uri, service, operation.operationId()),
+                highRisk ? ApprovalService.RiskLevel.HIGH : ApprovalService.RiskLevel.MEDIUM,
+                highRisk);
     }
 
-    @Tool(description = "EXECUTION STEP for a previously previewed OpenAPI mutation. Call only after a human explicitly approves the displayed request. The confirmation text must be exactly CONFIRM.")
+    @Tool(description = "EXECUTION STEP for a previously previewed OpenAPI mutation. Normal changes require CONFIRM. High-risk refunds, cancellations, archives, and deletes require CONFIRM HIGH RISK plus a business reason. Never call without explicit human approval.")
     public String confirmerMutationOpenApi(
             @ToolParam(description = "Approval token returned by preparerMutationOpenApi") String approvalToken,
-            @ToolParam(description = "Must be exactly CONFIRM after human review") String confirmation) {
+            @ToolParam(description = "CONFIRM for normal changes; CONFIRM HIGH RISK for refunds, cancellations, archives, or deletes") String confirmation,
+            @ToolParam(description = "Business reason required for high-risk actions; otherwise optional") String reason) {
         OpenApiMutation mutation = approvalService.confirm(approvalToken, "OPENAPI_MUTATION", confirmation,
-                OpenApiMutation.class);
+                reason, OpenApiMutation.class);
         RestClient.RequestBodySpec request = gatewayClient.method(mutation.method()).uri(mutation.uri());
         if (!mutation.requestBodyJson().isEmpty()) {
             return request.contentType(MediaType.APPLICATION_JSON).body(mutation.requestBodyJson())
@@ -211,6 +215,11 @@ public class OpenApiMcpTools {
                     "Unknown service. Allowed values: " + SERVICE_DOCUMENTS.keySet());
         }
         return normalized;
+    }
+
+    private boolean isHighRisk(HttpMethod method, String uri, String operationId) {
+        String value = (uri + " " + operationId).toLowerCase(Locale.ROOT);
+        return method == HttpMethod.DELETE || value.matches(".*(refund|rembours|cancel|annul|delete|supprim|archive).*" );
     }
 
     private ResponseStatusException unavailable(String message, Exception cause) {

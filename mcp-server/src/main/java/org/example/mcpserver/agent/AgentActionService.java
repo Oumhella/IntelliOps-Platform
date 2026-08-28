@@ -23,16 +23,20 @@ public class AgentActionService {
         this.openApiTools = openApiTools;
     }
 
-    public ActionExecution confirm(String token) {
+    public ActionExecution confirm(String token, String confirmation, String reason) {
         String operation = approvalService.operationFor(token);
         String result = switch (operation) {
-            case "STOCK_ADJUSTMENT" -> stockTools.confirmerAjustementStock(token, "CONFIRM");
-            case "LEAD_CONVERSION" -> leadTools.confirmerConversionLeadEnCommande(token, "CONFIRM");
-            case "OPENAPI_MUTATION" -> openApiTools.confirmerMutationOpenApi(token, "CONFIRM");
+            case "STOCK_ADJUSTMENT" -> stockTools.confirmerAjustementStock(token, confirmation);
+            case "LEAD_CONVERSION" -> leadTools.confirmerConversionLeadEnCommande(token, confirmation);
+            case "OPENAPI_MUTATION" -> openApiTools.confirmerMutationOpenApi(token, confirmation, reason);
             default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "This pending operation is not executable from the assistant.");
         };
         return new ActionExecution(operation, successMessage(operation), result);
+    }
+
+    public ActionExecution confirm(String token) {
+        return confirm(token, "CONFIRM", null);
     }
 
     public ActionExecution reject(String token) {

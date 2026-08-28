@@ -6,10 +6,10 @@ import { AuthSessionService } from '../../core/auth/auth-session.service';
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
 
 type ActionState = 'pending' | 'executed' | 'rejected' | 'failed' | 'historical';
-interface ActionView extends AgentActionPreview { state: ActionState; feedback?: string }
+interface ActionView extends AgentActionPreview { state: ActionState; feedback?: string; confirmationText?: string; reason?: string }
 interface ChatMessage { role: 'user' | 'assistant'; text: string; safety?: string; action?: ActionView }
 
-@Component({ selector: 'app-assistant', imports: [FormsModule, DatePipe], templateUrl: './assistant.component.html', styleUrl: './assistant.component.scss' })
+@Component({ selector: 'app-assistant', imports: [FormsModule, DatePipe], templateUrl: './assistant.component.html', styleUrls: ['./assistant.component.scss', './assistant-risk.component.scss'] })
 export class AssistantComponent implements OnInit {
   private readonly api = inject(AgentApiService);
   private readonly historyApi = inject(AnalyticsApiService);
@@ -69,11 +69,12 @@ export class AssistantComponent implements OnInit {
     this.api.chat(text).subscribe({
       next: (reply: AgentReplyResponse) => {
         this.sending = false;
-        const action: ActionView | undefined = reply.action ? { ...reply.action, state: 'pending' } : undefined;
+        const action: ActionView | undefined = reply.action ? { ...reply.action, state: 'pending', confirmationText: '', reason: '' } : undefined;
         this.messages.update((items) => [...items, { role: 'assistant', text: reply.answer, safety: reply.safety, action }]);
         const historicalAction = reply.action ? {
           operation: reply.action.operation, summary: reply.action.summary, expiresAt: reply.action.expiresAt,
-          requiresExplicitConfirmation: true, nextStep: 'This approval was available only in the live session.',
+          requiresExplicitConfirmation: true, riskLevel: reply.action.riskLevel,
+          requiresReason: reply.action.requiresReason, nextStep: 'This approval was available only in the live session.',
         } : undefined;
         this.historyApi.store('ASSISTANT', 'assistant', reply.answer, { safety: reply.safety, ...(historicalAction ? { action: historicalAction } : {}) }).subscribe({ error: () => undefined });
       }, error: (error) => { this.sending = false; this.feedback.error(error); },
@@ -81,9 +82,10 @@ export class AssistantComponent implements OnInit {
   }
 
   confirm(action: ActionView): void {
-    if (action.state !== 'pending' || this.isExpired(action)) return;
+    if (!this.canConfirm(action)) return;
     this.actionBusyToken = action.approvalToken;
-    this.api.confirmAction(action.approvalToken).subscribe({
+    const confirmation = action.riskLevel === 'HIGH' ? action.confirmationText!.trim() : 'CONFIRM';
+    this.api.confirmAction(action.approvalToken, confirmation, action.reason?.trim()).subscribe({
       next: (result) => { this.actionBusyToken = ''; this.updateAction(action.approvalToken, 'executed', result.message); this.appendExecutionMessage(result.message); this.feedback.success(result.message); },
       error: (error) => { this.actionBusyToken = ''; this.updateAction(action.approvalToken, 'failed', 'Execution failed. No retry was performed automatically.'); this.feedback.error(error, 'The action could not be completed.'); },
     });
@@ -100,6 +102,11 @@ export class AssistantComponent implements OnInit {
 
   clear(): void { this.historyApi.clearHistory('ASSISTANT').subscribe({ next: () => this.messages.set([]), error: (error) => this.feedback.error(error) }); }
   isExpired(action: ActionView): boolean { return new Date(action.expiresAt).getTime() <= Date.now(); }
+  canConfirm(action: ActionView): boolean {
+    if (action.state !== 'pending' || this.isExpired(action) || this.actionBusyToken === action.approvalToken) return false;
+    if (action.riskLevel !== 'HIGH') return true;
+    return action.confirmationText?.trim() === 'CONFIRM HIGH RISK' && (action.reason?.trim().length ?? 0) >= 10;
+  }
   operationLabel(operation: string): string { return operation.replaceAll('_', ' ').toLowerCase().replace(/^./, (value) => value.toUpperCase()); }
   format(text: string): string {
     return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')

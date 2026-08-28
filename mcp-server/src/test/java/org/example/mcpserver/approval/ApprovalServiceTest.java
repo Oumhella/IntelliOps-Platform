@@ -55,6 +55,22 @@ class ApprovalServiceTest {
         RequestContextHolder.resetRequestAttributes();
     }
 
+    @Test
+    void highRiskActionRequiresStrongConfirmationAndABusinessReason() {
+        authenticateAs("owner-token");
+        ApprovalService service = new ApprovalService(300);
+        ApprovalService.ActionPreview preview = service.prepare("REFUND", "payload", "Refund payment 42",
+                ApprovalService.RiskLevel.HIGH, true);
+
+        assertThrows(ResponseStatusException.class,
+                () -> service.confirm(preview.approvalToken(), "REFUND", "CONFIRM", "Duplicate", String.class));
+        assertThrows(ResponseStatusException.class,
+                () -> service.confirm(preview.approvalToken(), "REFUND", "CONFIRM HIGH RISK", "short", String.class));
+        assertEquals("payload", service.confirm(preview.approvalToken(), "REFUND", "CONFIRM HIGH RISK",
+                "Duplicate payment recorded", String.class));
+        RequestContextHolder.resetRequestAttributes();
+    }
+
     private void authenticateAs(String token) {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer " + token);

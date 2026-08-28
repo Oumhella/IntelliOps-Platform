@@ -28,11 +28,17 @@ public class ApprovalService {
     }
 
     public ActionPreview prepare(String operation, Object payload, String summary) {
+        return prepare(operation, payload, summary, RiskLevel.MEDIUM, false);
+    }
+
+    public ActionPreview prepare(String operation, Object payload, String summary,
+                                 RiskLevel riskLevel, boolean requiresReason) {
         String token = UUID.randomUUID().toString();
         Instant createdAt = Instant.now();
         Instant expiresAt = createdAt.plusSeconds(ttlSeconds);
-        pendingActions.put(token, new PendingAction(operation, payload, summary, createdAt, expiresAt, currentCallerKey()));
-        return new ActionPreview(token, operation, summary, expiresAt, true,
+        pendingActions.put(token, new PendingAction(operation, payload, summary, riskLevel, requiresReason,
+                createdAt, expiresAt, currentCallerKey()));
+        return new ActionPreview(token, operation, summary, expiresAt, true, riskLevel, requiresReason,
                 "No change has been made. A human must explicitly confirm this token in a separate call.");
     }
 
@@ -60,10 +66,12 @@ public class ApprovalService {
     }
 
     public <T> T confirm(String token, String expectedOperation, String confirmation, Class<T> type) {
-        if (!"CONFIRM".equals(confirmation)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Confirmation must be exactly CONFIRM; no change was made.");
-        }
+        return confirm(token, expectedOperation, confirmation, null, type);
+    }
+
+    public <T> T confirm(String token, String expectedOperation, String confirmation, String reason, Class<T> type) {
         PendingAction action = requireOwnedPendingAction(token);
+        validateConfirmation(action, confirmation, reason);
         if (!expectedOperation.equals(action.operation()) || !type.isInstance(action.payload())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Approval token does not match this operation; no change was made.");
         }
@@ -75,8 +83,11 @@ public class ApprovalService {
     }
 
     public record ActionPreview(String approvalToken, String operation, String summary, Instant expiresAt,
-                                boolean requiresExplicitConfirmation, String nextStep) { }
-    private record PendingAction(String operation, Object payload, String summary, Instant createdAt, Instant expiresAt,
+                                boolean requiresExplicitConfirmation, RiskLevel riskLevel,
+                                boolean requiresReason, String nextStep) { }
+    public enum RiskLevel { LOW, MEDIUM, HIGH }
+    private record PendingAction(String operation, Object payload, String summary, RiskLevel riskLevel,
+                                 boolean requiresReason, Instant createdAt, Instant expiresAt,
                                  byte[] callerKey) { }
 
     private PendingAction requireOwnedPendingAction(String token) {
@@ -97,7 +108,20 @@ public class ApprovalService {
 
     private ActionPreview toPreview(String token, PendingAction action) {
         return new ActionPreview(token, action.operation(), action.summary(), action.expiresAt(), true,
+                action.riskLevel(), action.requiresReason(),
                 "Review this action, then explicitly confirm or reject it.");
+    }
+
+    private void validateConfirmation(PendingAction action, String confirmation, String reason) {
+        String requiredText = action.riskLevel() == RiskLevel.HIGH ? "CONFIRM HIGH RISK" : "CONFIRM";
+        if (!requiredText.equals(confirmation)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Confirmation must be exactly " + requiredText + "; no change was made.");
+        }
+        if (action.requiresReason() && (reason == null || reason.trim().length() < 10)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "A business reason of at least 10 characters is required; no change was made.");
+        }
     }
 
     private ResponseStatusException expired() {

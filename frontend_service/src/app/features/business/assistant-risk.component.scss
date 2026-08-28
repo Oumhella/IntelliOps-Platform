@@ -1,0 +1,55 @@
+.approval-high-risk {
+  border-color: #f87171;
+}
+
+.approval-high-risk header {
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+
+.approval-high-risk header small {
+  color: #b91c1c;
+}
+
+.approval-high-risk header > span {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.risk-confirmation {
+  display: grid;
+  gap: 7px;
+  margin: 0 13px 12px;
+  padding: 11px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+}
+
+.risk-confirmation strong {
+  color: #9a3412;
+  font-size: 9px;
+}
+
+.risk-confirmation p {
+  margin: 0;
+  color: #7c2d12;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.risk-confirmation textarea,
+.risk-confirmation input {
+  width: 100%;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #fdba74;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 8px;
+}
+
+.risk-confirmation textarea {
+  min-height: 54px;
+  resize: vertical;
+}

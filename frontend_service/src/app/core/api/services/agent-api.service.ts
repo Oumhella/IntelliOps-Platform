@@ -18,8 +18,8 @@ export class AgentApiService {
     return this.http.post<AgentReplyResponse>(`${this.url}/chat`, request);
   }
 
-  confirmAction(token: string): Observable<AgentActionExecutionResponse> {
-    return this.http.post<AgentActionExecutionResponse>(`${this.url}/actions/${encodeURIComponent(token)}/confirm`, null);
+  confirmAction(token: string, confirmation: string, reason?: string): Observable<AgentActionExecutionResponse> {
+    return this.http.post<AgentActionExecutionResponse>(`${this.url}/actions/${encodeURIComponent(token)}/confirm`, { confirmation, reason });
   }
 
   rejectAction(token: string): Observable<AgentActionExecutionResponse> {
