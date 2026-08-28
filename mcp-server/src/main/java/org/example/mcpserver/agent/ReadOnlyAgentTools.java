@@ -58,6 +58,11 @@ public class ReadOnlyAgentTools {
         return leadTools.listerLeadsAgent(agentId);
     }
 
+    @Tool(description = "Read-only: list leads visible to the authenticated user. CSM users only receive their own assigned leads; administrators receive the workspace lead queue.")
+    public String listVisibleLeads() {
+        return leadTools.listerLeadsVisibles();
+    }
+
     @Tool(description = "Read-only: list currently documented Swagger read operations across services.")
     public String listOpenApiReadOperations() {
         return openApiTools.listerOperationsOpenApi();

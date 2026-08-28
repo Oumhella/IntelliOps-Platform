@@ -34,6 +34,11 @@ public class LeadMcpTools {
         return leadServiceClient.get().uri("/api/v1/leads/agent/{agentId}", agentId).retrieve().body(String.class);
     }
 
+    @Tool(description = "Read-only: lists leads visible to the authenticated user. The lead service automatically limits a CSM to their own assigned queue.")
+    public String listerLeadsVisibles() {
+        return leadServiceClient.get().uri("/api/v1/leads?page=0&size=100").retrieve().body(String.class);
+    }
+
     @Tool(description = "PREVIEW ONLY. It never creates an order. Returns a short-lived approval token for the selected fulfillment location and product quantities. The backend will apply authoritative catalog prices and reserve stock. Present it to a human and wait for explicit confirmation.")
     public ApprovalService.ActionPreview preparerConversionLeadEnCommande(
             @ToolParam(description = "Qualified lead ID") Long idLead,

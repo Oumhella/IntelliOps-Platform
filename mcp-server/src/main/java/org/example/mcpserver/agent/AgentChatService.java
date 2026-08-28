@@ -54,9 +54,10 @@ public class AgentChatService implements AgentChat {
             """;
 
     private final ChatClient chatClient;
-    private final ToolCallbackProvider readOnlyToolProvider;
     private final ToolCallbackProvider operationalToolProvider;
     private final ReadOnlyAgentTools readOnlyAgentTools;
+    private final AgentReadRouter readRouter;
+    private final AgentIntentClassifier intentClassifier;
     private final ActionPreviewAgentTools actionPreviewAgentTools;
     private final ApprovalService approvalService;
     private final AgentActionIntentGuard intentGuard;
@@ -64,6 +65,8 @@ public class AgentChatService implements AgentChat {
 
     public AgentChatService(ObjectProvider<ChatModel> chatModelProvider,
                             ReadOnlyAgentTools readOnlyAgentTools,
+                            AgentReadRouter readRouter,
+                            AgentIntentClassifier intentClassifier,
                             ActionPreviewAgentTools actionPreviewAgentTools,
                             ApprovalService approvalService,
                             AgentActionIntentGuard intentGuard,
@@ -72,13 +75,12 @@ public class AgentChatService implements AgentChat {
         this.chatClient = chatModel == null ? null : ChatClient.builder(chatModel)
                 .defaultSystem(SYSTEM_PROMPT)
                 .build();
-        this.readOnlyToolProvider = MethodToolCallbackProvider.builder()
-                .toolObjects(readOnlyAgentTools)
-                .build();
         this.operationalToolProvider = MethodToolCallbackProvider.builder()
                 .toolObjects(readOnlyAgentTools, actionPreviewAgentTools)
                 .build();
         this.readOnlyAgentTools = readOnlyAgentTools;
+        this.readRouter = readRouter;
+        this.intentClassifier = intentClassifier;
         this.actionPreviewAgentTools = actionPreviewAgentTools;
         this.approvalService = approvalService;
         this.intentGuard = intentGuard;
@@ -88,31 +90,41 @@ public class AgentChatService implements AgentChat {
 
     @Override
     public AgentReply chat(String message) {
-        if (chatClient == null) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "Conversational agent is unavailable. Configure NVIDIA_API_KEY and AGENT_LLM_PROVIDER=openai.");
-        }
-        if (isCapabilityQuestion(message)) {
-            return new AgentReply(capabilityAnswer(),
-                    "Capability information only. No ERP tool was called and no change was prepared.", null);
-        }
         intentGuard.begin(message);
         try {
+            if (!intentGuard.actionsAllowed()) {
+                var routed = readRouter.route(message);
+                if (routed.isEmpty()) {
+                    routed = intentClassifier.classify(message)
+                            .flatMap(intent -> readRouter.route(message, intent));
+                }
+                if (routed.isPresent()) {
+                    AgentReadRouter.RoutedRead read = routed.get();
+                    if (read.isDirect()) {
+                        return new AgentReply(read.directAnswer(),
+                                "No ERP data was changed and no operation was prepared.", null);
+                    }
+                    requireChatModel();
+                    return new AgentReply(formatToolResult(message, read.backendResult()),
+                            "Live, permission-scoped ERP data was consulted. No changes were made.", null);
+                }
+                return new AgentReply("I could not map that request to a safe, authoritative ERP query. "
+                        + "Please name the resource and scope—for example, ‘show available products’, "
+                        + "‘show my leads’, ‘inventory for product 12 at location 3’, or ‘orders by status’.",
+                        "No tool was called and no business data was changed.", null);
+            }
+
+            requireChatModel();
             Instant requestStartedAt = Instant.now();
             String role = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
                     .findFirst().map(Object::toString).orElse("UNKNOWN");
-            String answer;
-            if (!intentGuard.actionsAllowed() && isAnalyticsQuestion(message)) {
-                answer = formatToolResult(message, readOnlyAgentTools.askBusinessQuestion(message));
-            } else {
-                answer = chatClient.prompt()
-                        .user("Authenticated role (trusted context): " + role + "\nUser request: " + message)
-                        // Confirmation tools are intentionally absent from both allow-lists.
-                        .tools(intentGuard.actionsAllowed() ? operationalToolProvider : readOnlyToolProvider)
-                        .call()
-                        .content();
-                answer = processPotentialToolCall(answer, message);
-            }
+            String answer = chatClient.prompt()
+                    .user("Authenticated role (trusted context): " + role + "\nUser request: " + message)
+                    // Confirmation tools are intentionally absent from the allow-list.
+                    .tools(operationalToolProvider)
+                    .call()
+                    .content();
+            answer = processPotentialToolCall(answer, message);
 
             ApprovalService.ActionPreview action = approvalService
                     .latestForCurrentCallerSince(requestStartedAt).orElse(null);
@@ -135,7 +147,11 @@ public class AgentChatService implements AgentChat {
                 return new AgentReply(exception.getReason(),
                         "The request was blocked before execution. No business data was changed.", null);
             }
-            if (exception.getStatusCode().value() == 401 || exception.getStatusCode().value() == 403) {
+            if (exception.getStatusCode().value() == 403) {
+                return new AgentReply("Your authenticated role is not permitted to view that resource.",
+                        "The request was denied by the domain service. No business data was changed.", null);
+            }
+            if (exception.getStatusCode().value() == 401) {
                 log.error("A read-only assistant dependency rejected its internal authenticated call", exception);
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                         "A downstream ERP tool rejected the assistant call. Your IntelliOps session remains valid.", exception);
@@ -149,6 +165,13 @@ public class AgentChatService implements AgentChat {
         }
         finally {
             intentGuard.clear();
+        }
+    }
+
+    private void requireChatModel() {
+        if (chatClient == null) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "Conversational agent is unavailable. Configure NVIDIA_API_KEY and AGENT_LLM_PROVIDER=openai.");
         }
     }
 
@@ -331,29 +354,6 @@ public class AgentChatService implements AgentChat {
             // Never fall back to displaying untrusted raw JSON or a function-call transcript.
         }
         return "The ERP returned data, but the model could not safely format it. No values were invented and no change was made.";
-    }
-
-    private boolean isAnalyticsQuestion(String message) {
-        String value = message.toLowerCase();
-        return value.matches(".*\\b(revenue|sales|turnover|metric|trend|ranking|orders by status|stock value|chiffre d.?affaires)\\b.*");
-    }
-
-    private boolean isCapabilityQuestion(String message) {
-        String value = message.trim().toLowerCase();
-        return value.matches("(what|which|show|tell me)?\\s*(can you do|you can do|are your capabilities|actions can you|can the assistant do).*" )
-                || value.matches(".*\\b(capabilities|available actions|help menu)\\b.*");
-    }
-
-    private String capabilityAnswer() {
-        return """
-                **I can help in three controlled modes:**
-
-                - **Investigate:** query live leads, orders, products, inventory, deliveries, payments, notifications, and subscriptions.
-                - **Analyze:** answer BI questions about revenue, order status, stock, rankings, and trends.
-                - **Prepare actions:** propose role-authorized changes such as stock adjustments, lead conversion, order workflow, delivery actions, or payment operations.
-
-                I never invent a target and never execute a write from chat alone. For a change, provide the exact resource ID and values; I will produce an approval card for you to review.
-                """;
     }
 
     public record AgentReply(String answer, String safety, ApprovalService.ActionPreview action) {
