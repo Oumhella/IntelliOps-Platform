@@ -1,20 +1,20 @@
 <main class="view-page analytics-page">
   <header class="view-heading">
     <div>
-      <p class="eyebrow"><span>Intelligence</span><b>/</b> Conversational BI</p>
-      <h1>Ask your business data</h1>
-      <p>Tenant-isolated, role-aware answers with persistent history, charts and reports.</p>
+      <p class="eyebrow"><span>{{'analytics.section'|t}}</span><b>/</b> {{'analytics.label'|t}}</p>
+      <h1>{{'analytics.title'|t}}</h1>
+      <p>{{'analytics.subtitle'|t}}</p>
     </div>
     <div class="heading-actions">
       @if(role()){<span class="role-scope">{{roleLabel()}} scope</span>}
-      <button class="secondary-button" type="button" (click)="clear()" [disabled]="!messages().length">Clear history</button>
+      <button class="secondary-button" type="button" (click)="clear()" [disabled]="!messages().length">{{'analytics.clear'|t}}</button>
     </div>
   </header>
   <section class="surface-card analytics-card">
     @if(!messages().length){
       <div class="welcome">
-        <h2>What would you like to understand?</h2>
-        <p>Your available questions reflect your operational responsibilities.</p>
+        <h2>{{'analytics.welcome'|t}}</h2>
+        <p>{{'analytics.welcomeText'|t}}</p>
         <div class="suggestions">
           @for(item of suggestions();track item){<button type="button" (click)="ask(item)">{{item}}</button>}
         </div>
@@ -23,7 +23,7 @@
     <div class="messages">
       @for(message of messages();track $index){
         <article [class.user]="message.role==='user'" [class.failed]="message.failed">
-          <strong>{{message.role==='user'?'You':'BI'}}</strong>
+          <strong>{{message.role==='user'?('common.you'|t):'BI'}}</strong>
           <p>{{message.text}}</p>
           @if(message.response;as response){
             @if(response.visualization.type==='single_value'&&response.result.rows.length){

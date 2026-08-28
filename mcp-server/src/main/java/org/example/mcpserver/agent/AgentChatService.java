@@ -90,6 +90,12 @@ public class AgentChatService implements AgentChat {
 
     @Override
     public AgentReply chat(String message) {
+        return chat(message, "en");
+    }
+
+    @Override
+    public AgentReply chat(String message, String locale) {
+        String responseLocale = normalizeLocale(locale);
         intentGuard.begin(message);
         try {
             if (!intentGuard.actionsAllowed()) {
@@ -101,11 +107,11 @@ public class AgentChatService implements AgentChat {
                 if (routed.isPresent()) {
                     AgentReadRouter.RoutedRead read = routed.get();
                     if (read.isDirect()) {
-                        return new AgentReply(read.directAnswer(),
+                        return new AgentReply(localizeDirect(read.directAnswer(), responseLocale),
                                 "No ERP data was changed and no operation was prepared.", null);
                     }
                     requireChatModel();
-                    return new AgentReply(formatToolResult(message, read.backendResult()),
+                    return new AgentReply(formatToolResult(message, read.backendResult(), responseLocale),
                             "Live, permission-scoped ERP data was consulted. No changes were made.", null);
                 }
                 return new AgentReply("I could not map that request to a safe, authoritative ERP query. "
@@ -119,12 +125,13 @@ public class AgentChatService implements AgentChat {
             String role = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
                     .findFirst().map(Object::toString).orElse("UNKNOWN");
             String answer = chatClient.prompt()
-                    .user("Authenticated role (trusted context): " + role + "\nUser request: " + message)
+                    .user("Authenticated role (trusted context): " + role
+                            + "\nRespond in locale: " + responseLocale + "\nUser request: " + message)
                     // Confirmation tools are intentionally absent from the allow-list.
                     .tools(operationalToolProvider)
                     .call()
                     .content();
-            answer = processPotentialToolCall(answer, message);
+            answer = processPotentialToolCall(answer, message, responseLocale);
 
             ApprovalService.ActionPreview action = approvalService
                     .latestForCurrentCallerSince(requestStartedAt).orElse(null);
@@ -175,7 +182,7 @@ public class AgentChatService implements AgentChat {
         }
     }
 
-    private String processPotentialToolCall(String answer, String userMessage) {
+    private String processPotentialToolCall(String answer, String userMessage, String locale) {
         if (answer == null) {
             return answer;
         }
@@ -186,7 +193,7 @@ public class AgentChatService implements AgentChat {
                 case "listProducts" -> readOnlyAgentTools.listProducts();
                 default -> null;
             };
-            if (toolResult != null) return formatToolResult(userMessage, toolResult);
+            if (toolResult != null) return formatToolResult(userMessage, toolResult, locale);
         }
         if (!answer.contains("{")) return answer;
         try {
@@ -270,7 +277,7 @@ public class AgentChatService implements AgentChat {
 
             if (toolResult != null) {
                 log.info("Successfully executed tool {} via fallback interceptor, result length={}", toolName, toolResult.length());
-                return formatToolResult(userMessage, toolResult);
+                return formatToolResult(userMessage, toolResult, locale);
             }
         } catch (ResponseStatusException exception) {
             throw exception;
@@ -325,7 +332,7 @@ public class AgentChatService implements AgentChat {
         return null;
     }
 
-    private String formatToolResult(String userMessage, String toolResult) {
+    private String formatToolResult(String userMessage, String toolResult, String locale) {
         String formatPrompt = String.format("""
                 The user asked: "%s"
                 The trusted ERP backend returned:
@@ -333,8 +340,9 @@ public class AgentChatService implements AgentChat {
                 %s
 
                 Answer the question using only this result. Use concise natural-language markdown.
+                Respond in the language represented by locale "%s" (en=English, fr=French, ar=Arabic).
                 Never output JSON, tool names, function-call narration, or invented values.
-                """, userMessage, toolResult);
+                """, userMessage, toolResult, locale);
         String formatted = chatClient.prompt().user(formatPrompt).call().content();
         if (looksLikeRawToolCall(formatted) || narratedToolName(formatted) != null) {
             return safeBackendFallback(toolResult);
@@ -354,6 +362,25 @@ public class AgentChatService implements AgentChat {
             // Never fall back to displaying untrusted raw JSON or a function-call transcript.
         }
         return "The ERP returned data, but the model could not safely format it. No values were invented and no change was made.";
+    }
+
+    private String normalizeLocale(String locale) {
+        return locale != null && List.of("en", "fr", "ar").contains(locale) ? locale : "en";
+    }
+
+    private String localizeDirect(String answer, String locale) {
+        if ("en".equals(locale)) return answer;
+        if (answer.startsWith("Hi!")) {
+            return "fr".equals(locale)
+                    ? "Bonjour ! Je peux consulter les données ERP, analyser les performances ou préparer une opération contrôlée. Que souhaitez-vous faire ?"
+                    : "مرحباً! يمكنني الاطلاع على بيانات النظام وتحليل الأداء أو تحضير عملية خاضعة للموافقة. ماذا تريد أن تفعل؟";
+        }
+        if (answer.contains("three controlled modes")) {
+            return "fr".equals(locale)
+                    ? "**Je fonctionne selon trois modes contrôlés :** analyser les données réelles, produire des analyses BI et préparer des opérations soumises à votre approbation. Les droits du rôle et l’isolation de l’entreprise restent toujours appliqués."
+                    : "**أعمل بثلاثة أنماط خاضعة للتحكم:** الاطلاع على البيانات الفعلية، إجراء تحليلات ذكاء الأعمال، وتحضير عمليات تتطلب موافقتك. تبقى صلاحيات الدور وعزل بيانات المؤسسة مطبقة دائماً.";
+        }
+        return answer;
     }
 
     public record AgentReply(String answer, String safety, ApprovalService.ActionPreview action) {

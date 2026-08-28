@@ -74,6 +74,7 @@ async def ask(
             principal.role,
             principal.user_id,
             settings,
+            request.locale,
         )
     except HTTPException:
         raise
@@ -103,6 +104,7 @@ async def export_csv_report(
             principal.role,
             principal.user_id,
             settings,
+            request.locale,
         )
     except PermissionError as exc:
         raise HTTPException(403, str(exc)) from exc

@@ -4,24 +4,24 @@
       <span class="brand-mark" aria-hidden="true">
         <img src="/logo.jfif" alt="" />
       </span>
-      <span><strong>IntelliOps</strong><small>Enterprise workspace</small></span>
+      <span><strong>IntelliOps</strong><small>{{'shell.enterpriseWorkspace'|t}}</small></span>
     </div>
     <div class="login-message">
-      <span class="platform-label">Unified operations platform</span>
-      <h1>One workspace.<br />Every operation.</h1>
-      <p>Run customer, inventory, delivery, billing, and platform operations through a secure role-based workspace.</p>
+      <span class="platform-label">{{'auth.platform'|t}}</span>
+      <h1>{{'auth.heroTitle'|t}}</h1>
+      <p>{{'auth.heroText'|t}}</p>
     </div>
   </section>
 
   <section class="login-form-panel">
-    <form class="login-form" (ngSubmit)="submit()">
+    <form class="login-form" (ngSubmit)="submit()"><div style="display:flex;justify-content:flex-end"><app-language-switcher /></div>
       <div class="mobile-login-brand">
         <span class="brand-mark" aria-hidden="true"><img src="/logo.jfif" alt="" /></span>
         <strong>IntelliOps</strong>
       </div>
-      <p class="eyebrow">Welcome back</p>
-      <h2>Sign in to your workspace</h2>
-      <p class="form-intro">Use the account assigned to your enterprise or platform role.</p>
+      <p class="eyebrow">{{'auth.welcome'|t}}</p>
+      <h2>{{'auth.signInTitle'|t}}</h2>
+      <p class="form-intro">{{'auth.signInIntro'|t}}</p>
 
       @if (registrationMessage) {
         <div class="login-success" role="status"><span></span>{{ registrationMessage }}</div>
@@ -35,7 +35,7 @@
       }
 
       <label>
-        <span>Email address</span>
+        <span>{{'auth.email'|t}}</span>
         <input
           type="email"
           name="email"
@@ -47,13 +47,13 @@
         />
       </label>
       <label>
-        <span>Password</span>
+        <span>{{'auth.password'|t}}</span>
         <div class="password-field">
           <input
             [type]="showPassword ? 'text' : 'password'"
             name="password"
             autocomplete="current-password"
-            placeholder="Enter your password"
+            [placeholder]="'auth.passwordPlaceholder'|t"
             [(ngModel)]="password"
             [disabled]="submitting"
             required
@@ -68,12 +68,12 @@
         </div>
       </label>
 
-      <p class="login-help login-recovery"><a routerLink="/forgot-password">Forgot your password?</a></p>
+      <p class="login-help login-recovery"><a routerLink="/forgot-password">{{'auth.forgot'|t}}</a></p>
 
       <button class="login-submit" type="submit" [disabled]="submitting">
         @if (submitting) { <span class="button-spinner"></span> Signing in... } @else { Sign in <span>→</span> }
       </button>
-      <p class="login-help">New enterprise? <a routerLink="/">View plans and create a workspace</a></p>
+      <p class="login-help">{{'auth.newEnterprise'|t}} <a routerLink="/">{{'auth.viewPlans'|t}}</a></p>
     </form>
   </section>
 </main>

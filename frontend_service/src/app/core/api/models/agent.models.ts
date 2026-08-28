@@ -21,6 +21,7 @@ export interface AgentActionPreview {
 
 export interface AgentChatRequest {
   readonly message: string;
+  readonly locale?: 'en' | 'fr' | 'ar';
 }
 
 export interface AgentReplyResponse {

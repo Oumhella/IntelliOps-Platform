@@ -6,19 +6,23 @@ import { API_BASE_URL, buildApiUrl } from '../api/api.config';
 import { AuthSessionService } from '../auth/auth-session.service';
 import { AuthRefreshService } from '../auth/auth-refresh.service';
 import { ApiError } from './api-error';
+import { I18nService } from '../i18n/i18n.service';
 
 export const apiInterceptor: HttpInterceptorFn = (request, next) => {
   const authSession = inject(AuthSessionService);
   const authRefresh = inject(AuthRefreshService);
   const router = inject(Router);
+  const i18n = inject(I18nService);
   const apiPrefix = buildApiUrl(inject(API_BASE_URL), '/api/');
   const isApiRequest = request.url.startsWith(apiPrefix);
   const isAuthLifecycleRequest = ['/login', '/register', '/refresh', '/logout']
     .some((suffix) => request.url.endsWith(`/api/v1/users${suffix}`));
   const token = isApiRequest ? authSession.getToken() : null;
+  const localizedRequest = isApiRequest
+    ? request.clone({ setHeaders: { 'Accept-Language': i18n.language() } }) : request;
   const authenticatedRequest = token === null
-    ? request
-    : request.clone({ setHeaders: { Authorization: `Bearer ${token}` } });
+    ? localizedRequest
+    : localizedRequest.clone({ setHeaders: { Authorization: `Bearer ${token}` } });
 
   return next(authenticatedRequest).pipe(
     catchError((error: unknown) => {
@@ -39,8 +43,8 @@ export const apiInterceptor: HttpInterceptorFn = (request, next) => {
                 ? ApiError.fromHttpError(refreshError)
                 : refreshError);
             }),
-            switchMap((session) => next(request.clone({
-              setHeaders: { Authorization: `Bearer ${session.token}` },
+            switchMap((session) => next(localizedRequest.clone({
+              setHeaders: { Authorization: `Bearer ${session.token}`, 'Accept-Language': i18n.language() },
             })).pipe(catchError((retryError: unknown) => throwError(() =>
               retryError instanceof HttpErrorResponse ? ApiError.fromHttpError(retryError) : retryError)))),
           );

@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 class AskRequest(BaseModel):
     question: str = Field(min_length=3, max_length=1_000)
+    locale: Literal["en", "fr", "ar"] = "en"
 
 
 class Column(BaseModel):

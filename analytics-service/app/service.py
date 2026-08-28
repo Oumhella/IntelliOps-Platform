@@ -14,6 +14,7 @@ async def answer_question(
     role: str,
     user_id: str,
     settings: Settings,
+    locale: str = "en",
 ) -> AskResponse:
     plan = deterministic_plan(question, datetime.now(UTC), role, user_id)
     if plan is None:
@@ -36,7 +37,7 @@ async def answer_question(
     visualization = choose_visualization(plan.visualization, columns, len(rows))
     return AskResponse(
         question=question,
-        answer=summarize(plan.metric, rows),
+        answer=summarize(plan.metric, rows, locale),
         result=QueryResult(columns=columns, rows=rows),
         visualization=visualization,
         metadata=Metadata(
@@ -85,12 +86,19 @@ def choose_visualization(requested: str, columns: list[Column], row_count: int) 
     return Visualization(type="table")
 
 
-def summarize(metric: str, rows: list[dict]) -> str:
+def summarize(metric: str, rows: list[dict], locale: str = "en") -> str:
     if not rows:
-        return "No matching data was found for this question."
+        return {
+            "fr": "Aucune donnée correspondante n’a été trouvée pour cette question.",
+            "ar": "لم يتم العثور على بيانات مطابقة لهذا السؤال.",
+        }.get(locale, "No matching data was found for this question.")
     if len(rows) == 1 and len(rows[0]) == 1:
         label, value = next(iter(rows[0].items()))
         return f"{label.replace('_', ' ').capitalize()}: {value}."
     leader = rows[0]
     details = ", ".join(f"{key.replace('_', ' ')}: {value}" for key, value in leader.items())
+    if locale == "fr":
+        return f"L’analyse contient {len(rows)} résultat(s). Le premier est : {details}."
+    if locale == "ar":
+        return f"أرجع التحليل {len(rows)} نتيجة. النتيجة الأولى: {details}."
     return f"The query returned {len(rows)} result(s). The first is {details}."

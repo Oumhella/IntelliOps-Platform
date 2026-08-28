@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { AnalyticsApiService, AnalyticsResponse } from '../../core/api';
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 
 interface AnalyticsMessage {
   role: 'user' | 'assistant';
@@ -14,7 +15,7 @@ interface AnalyticsMessage {
 
 @Component({
   selector: 'app-analytics',
-  imports: [FormsModule],
+  imports: [FormsModule, TranslatePipe],
   templateUrl: './analytics.component.html',
   styleUrl: './analytics.component.scss',
 })

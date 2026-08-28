@@ -4,12 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { AgentActionPreview, AgentApiService, AgentReplyResponse, AgentStatusResponse, AnalyticsApiService, UserRole } from '../../core/api';
 import { AuthSessionService } from '../../core/auth/auth-session.service';
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 
 type ActionState = 'pending' | 'executed' | 'rejected' | 'failed' | 'historical';
 interface ActionView extends AgentActionPreview { state: ActionState; feedback?: string; confirmationText?: string; reason?: string }
 interface ChatMessage { role: 'user' | 'assistant'; text: string; safety?: string; action?: ActionView }
 
-@Component({ selector: 'app-assistant', imports: [FormsModule, DatePipe], templateUrl: './assistant.component.html', styleUrls: ['./assistant.component.scss', './assistant-risk.component.scss'] })
+@Component({ selector: 'app-assistant', imports: [FormsModule, DatePipe, TranslatePipe], templateUrl: './assistant.component.html', styleUrls: ['./assistant.component.scss', './assistant-risk.component.scss'] })
 export class AssistantComponent implements OnInit {
   private readonly api = inject(AgentApiService);
   private readonly historyApi = inject(AnalyticsApiService);

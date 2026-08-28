@@ -56,7 +56,9 @@ public class AgentController {
             throw new org.springframework.web.server.ResponseStatusException(
                     org.springframework.http.HttpStatus.BAD_REQUEST, "message must not exceed 4000 characters");
         }
-        return agentChatService.chat(request.message().trim());
+        String locale = request.locale() != null && List.of("en", "fr", "ar").contains(request.locale())
+                ? request.locale() : "en";
+        return agentChatService.chat(request.message().trim(), locale);
     }
 
     @PostMapping("/actions/{token}/confirm")
@@ -75,6 +77,6 @@ public class AgentController {
     public record AgentStatus(boolean enabled, boolean nvidiaApiKeyConfigured, String model, String state,
                               List<String> readOnlyCapabilities, List<String> actionCapabilities,
                               String mutationSafety) { }
-    public record ChatRequest(String message) { }
+    public record ChatRequest(String message, String locale) { }
     public record ActionConfirmation(String confirmation, String reason) { }
 }
