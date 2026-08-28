@@ -400,6 +400,26 @@ services:
       - ${DOCKER_DNS_PRIMARY:-8.8.8.8}
       - ${DOCKER_DNS_SECONDARY:-1.1.1.1}
 
+  analytics-migrate:
+    build:
+      context: ./analytics-service
+      dockerfile: Dockerfile
+    command: ["python", "-m", "app.migrate"]
+    env_file:
+      - .env
+    environment:
+      - ANALYTICS_DATABASE_URL=postgresql://analytics_query:${ANALYTICS_QUERY_PASSWORD}@erp-db:5432/erp_analytics
+      - SYNC_ANALYTICS_DATABASE_URL=postgresql://analytics_sync:${ANALYTICS_SYNC_PASSWORD}@erp-db:5432/erp_analytics
+      - MIGRATION_DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@erp-db:5432/erp_analytics
+      - JWT_SECRET=${JWT_SECRET}
+      - ANALYTICS_QUERY_PASSWORD=${ANALYTICS_QUERY_PASSWORD}
+      - ANALYTICS_SYNC_PASSWORD=${ANALYTICS_SYNC_PASSWORD}
+    depends_on:
+      database-init:
+        condition: service_completed_successfully
+    networks:
+      - erp-network
+
   analytics-service:
     build:
       context: ./analytics-service
@@ -421,7 +441,7 @@ services:
       - LLM_BASE_URL=${NVIDIA_BASE_URL:-https://integrate.api.nvidia.com}/v1
       - LLM_MODEL=${NVIDIA_MODEL:-meta/llama-3.1-70b-instruct}
     depends_on:
-      database-init:
+      analytics-migrate:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8091/health')"]

@@ -24,10 +24,19 @@ class Settings(BaseSettings):
     query_timeout_ms: PositiveInt = Field(default=5_000, le=30_000)
     query_max_rows: PositiveInt = Field(default=50, le=500)
     allowed_roles: str = "ROLE_ADMIN"
+    report_locales: str = "en,fr,ar"
 
     @property
     def allowed_role_set(self) -> set[str]:
         return {role.strip() for role in self.allowed_roles.split(",") if role.strip()}
+
+    @property
+    def report_locale_set(self) -> set[str]:
+        return {
+            locale.strip()
+            for locale in self.report_locales.split(",")
+            if locale.strip() in {"en", "fr", "ar"}
+        }
 
 
 @lru_cache

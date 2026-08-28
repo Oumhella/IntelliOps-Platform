@@ -4,6 +4,7 @@ import logging
 import time
 import uuid
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
@@ -16,8 +17,12 @@ from app.models import (
     AskResponse,
     ConversationMessage,
     ConversationMessageCreate,
+    HistoricalReport,
+    ReportGenerateRequest,
     SuggestionsResponse,
 )
+from app.reports.repository import get_report, list_reports
+from app.reports.service import generate_report
 from app.semantic import suggestions_for_role
 from app.service import answer_question
 
@@ -130,6 +135,82 @@ async def export_csv_report(
         output.getvalue(),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/api/v1/analytics/reports", response_model=list[HistoricalReport])
+def report_history(
+    principal: Annotated[Principal, Depends(authenticated_principal)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    locale: str | None = None,
+    period_type: str | None = None,
+    limit: int = 50,
+) -> list[HistoricalReport]:
+    if locale not in {None, "en", "fr", "ar"}:
+        raise HTTPException(400, "Invalid report locale")
+    if period_type not in {None, "WEEKLY", "MONTHLY"}:
+        raise HTTPException(400, "Invalid report period")
+    return list_reports(
+        settings,
+        principal.enterprise_id,
+        principal.user_id,
+        principal.role,
+        locale,
+        period_type,
+        min(max(limit, 1), 100),
+    )
+
+
+@app.post(
+    "/api/v1/analytics/reports/generate",
+    response_model=HistoricalReport,
+    status_code=201,
+)
+def create_report(
+    request: ReportGenerateRequest,
+    principal: Annotated[Principal, Depends(authenticated_principal)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> HistoricalReport:
+    try:
+        return generate_report(
+            settings,
+            enterprise_id=principal.enterprise_id,
+            user_id=principal.user_id,
+            role=principal.role,
+            period_type=request.period_type,
+            locale=request.locale,
+        )
+    except Exception as exc:
+        LOGGER.exception(
+            "analytics_pdf_report_failed enterprise_id=%s role=%s",
+            principal.enterprise_id,
+            principal.role,
+        )
+        raise HTTPException(502, "Analytics PDF report could not be generated") from exc
+
+
+@app.get("/api/v1/analytics/reports/{report_id}/download")
+def download_report(
+    report_id: UUID,
+    principal: Annotated[Principal, Depends(authenticated_principal)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Response:
+    stored = get_report(
+        settings,
+        report_id,
+        principal.enterprise_id,
+        principal.user_id,
+        principal.role,
+    )
+    if not stored:
+        raise HTTPException(404, "Report not found")
+    return Response(
+        stored.content,
+        media_type=stored.content_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{stored.report.file_name}"',
+            "Cache-Control": "private, no-store",
+        },
     )
 
 @app.get(

@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
-import { AnalyticsApiService, AnalyticsResponse } from '../../core/api';
+import { AnalyticsApiService, AnalyticsReport, AnalyticsReportPeriod, AnalyticsResponse } from '../../core/api';
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { I18nService } from '../../core/i18n/i18n.service';
@@ -28,6 +28,9 @@ export class AnalyticsComponent implements OnInit {
   readonly messages = signal<AnalyticsMessage[]>([]);
   readonly role = signal('');
   readonly exporting = signal<string | null>(null);
+  readonly reports = signal<readonly AnalyticsReport[]>([]);
+  readonly generatingReport = signal<AnalyticsReportPeriod | null>(null);
+  readonly downloadingReport = signal<string | null>(null);
   readonly palette = ['#4f46e5', '#06b6d4', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
   question = '';
   sending = false;
@@ -48,6 +51,7 @@ export class AnalyticsComponent implements OnInit {
       }))),
       error: () => undefined,
     });
+    this.loadReports();
   }
 
   ask(question = this.question): void {
@@ -131,5 +135,50 @@ export class AnalyticsComponent implements OnInit {
       next: () => this.messages.set([]),
       error: (error) => this.feedback.error(error),
     });
+  }
+
+  loadReports(): void {
+    this.api.reports().subscribe({
+      next: (reports) => this.reports.set(reports),
+      error: (error) => this.feedback.error(error, this.i18n.translate('analytics.reportLoadError')),
+    });
+  }
+
+  generateReport(period: AnalyticsReportPeriod): void {
+    if (this.generatingReport()) return;
+    this.generatingReport.set(period);
+    this.api.generateReport(period).pipe(
+      finalize(() => this.generatingReport.set(null)),
+    ).subscribe({
+      next: (report) => {
+        this.reports.update((items) => [report, ...items]);
+        this.feedback.success(this.i18n.translate('analytics.reportReady'));
+      },
+      error: (error) => this.feedback.error(error, this.i18n.translate('analytics.reportError')),
+    });
+  }
+
+  downloadReport(report: AnalyticsReport): void {
+    if (this.downloadingReport()) return;
+    this.downloadingReport.set(report.id);
+    this.api.downloadReport(report.id).pipe(
+      finalize(() => this.downloadingReport.set(null)),
+    ).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = report.file_name;
+        link.click();
+        URL.revokeObjectURL(url);
+      },
+      error: (error) => this.feedback.error(error, this.i18n.translate('analytics.reportDownloadError')),
+    });
+  }
+
+  reportPeriod(report: AnalyticsReport): string {
+    const inclusiveEnd = new Date(`${report.period_end}T00:00:00Z`);
+    inclusiveEnd.setUTCDate(inclusiveEnd.getUTCDate() - 1);
+    return `${report.period_start} — ${inclusiveEnd.toISOString().slice(0, 10)}`;
   }
 }

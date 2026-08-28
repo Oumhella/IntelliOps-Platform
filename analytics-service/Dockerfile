@@ -7,6 +7,7 @@ WORKDIR /app
 
 RUN apt-get update \
     && apt-get upgrade --yes \
+    && apt-get install --yes --no-install-recommends fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml ./

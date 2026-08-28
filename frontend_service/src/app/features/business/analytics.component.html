@@ -24,6 +24,42 @@
       </button>
     </div>
   </header>
+  <section class="surface-card report-center">
+    <div class="report-center-heading">
+      <div>
+        <p class="eyebrow">{{ "analytics.reportCenter" | t }}</p>
+        <h2>{{ "analytics.reportTitle" | t }}</h2>
+        <p>{{ "analytics.reportText" | t }}</p>
+      </div>
+      <div class="report-actions">
+        <button class="secondary-button" type="button" (click)="generateReport('WEEKLY')" [disabled]="!!generatingReport()">
+          {{ (generatingReport() === 'WEEKLY' ? "analytics.generating" : "analytics.generateWeekly") | t }}
+        </button>
+        <button class="primary-button" type="button" (click)="generateReport('MONTHLY')" [disabled]="!!generatingReport()">
+          {{ (generatingReport() === 'MONTHLY' ? "analytics.generating" : "analytics.generateMonthly") | t }}
+        </button>
+      </div>
+    </div>
+    @if (reports().length) {
+      <div class="report-history">
+        @for (report of reports(); track report.id) {
+          <article>
+            <div class="report-icon">PDF</div>
+            <div>
+              <strong>{{ (report.period_type === 'WEEKLY' ? "analytics.weekly" : "analytics.monthly") | t }}</strong>
+              <p>{{ reportPeriod(report) }}</p>
+              <small>{{ "analytics.reportOrders" | t }}: {{ report.summary.orders }} · {{ "analytics.reportDelivered" | t }}: {{ report.summary.delivered }} · {{ report.locale.toUpperCase() }}</small>
+            </div>
+            <button type="button" (click)="downloadReport(report)" [disabled]="downloadingReport() === report.id">
+              {{ (downloadingReport() === report.id ? "analytics.downloading" : "analytics.downloadPdf") | t }}
+            </button>
+          </article>
+        }
+      </div>
+    } @else {
+      <p class="empty-reports">{{ "analytics.noReports" | t }}</p>
+    }
+  </section>
   <section class="surface-card analytics-card">
     @if (!messages().length) {
       <div class="welcome">
