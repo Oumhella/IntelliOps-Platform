@@ -11,10 +11,12 @@ import {
   PageResponse,
 } from '../../core/api';
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
+import { DomainLabelPipe } from '../../core/i18n/domain-label.pipe';
+import { LocaleDatePipe } from '../../core/i18n/locale-date.pipe';
 
 @Component({
   selector: 'app-notifications',
-  imports: [FormsModule, DatePipe],
+  imports: [FormsModule, DatePipe, DomainLabelPipe, LocaleDatePipe],
   templateUrl: './notifications.component.html',
   styleUrl: './business-view.scss',
 })

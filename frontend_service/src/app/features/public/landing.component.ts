@@ -3,14 +3,18 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { PlanResponse, SubscriptionsApiService } from '../../core/api';
 import { AuthSessionService } from '../../core/auth/auth-session.service';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { LanguageSwitcherComponent } from '../../core/i18n/language-switcher.component';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 
 @Component({
   selector: 'app-landing',
-  imports: [RouterLink, DecimalPipe],
+  imports: [RouterLink, DecimalPipe, LanguageSwitcherComponent, TranslatePipe],
   templateUrl: './landing.component.html',
   styleUrl: './landing.component.scss',
 })
 export class LandingComponent implements OnInit {
+  readonly i18n = inject(I18nService);
   private readonly subscriptions = inject(SubscriptionsApiService);
   readonly session = inject(AuthSessionService);
   readonly plans = signal<readonly PlanResponse[]>([]);

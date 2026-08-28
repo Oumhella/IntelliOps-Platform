@@ -1,18 +1,184 @@
 <main class="view-page assistant-page">
-  <header class="view-heading"><div><p class="eyebrow"><span>{{'assistant.tools'|t}}</span><b>/</b> {{'assistant.aiOperations'|t}}</p><h1>{{'assistant.title'|t}}</h1><p>{{'assistant.subtitle'|t}}</p></div>
-    <div class="assistant-header-actions">@if(messages().length){<button class="action-button" type="button" (click)="clear()">Clear history</button>}@if(status();as s){<span class="status-badge" [class.status-badge-success]="s.enabled" [class.status-badge-critical]="!s.enabled"><span></span>{{s.enabled?'Operational':'Unavailable'}} · {{s.model}}</span>}</div></header>
-  <section class="surface-card chat-card">
-    <div class="chat-safety"><div><strong>{{'assistant.approval'|t}}</strong><span>{{status()?.mutationSafety||'Changes are previewed before execution.'}}</span></div><span class="role-chip">{{role?.replace('ROLE_','')}}</span></div>
-    <div class="chat-messages">
-      @if(!messages().length){<div class="assistant-welcome"><span>AI</span><h2>{{'assistant.welcome'|t}}</h2><p>{{'assistant.welcomeText'|t}}</p>
-        <div class="capability-columns"><div><strong>Analyze</strong><small>Leads, orders, inventory, delivery, payments and BI.</small></div><div><strong>Prepare</strong><small>Role-authorized operational changes with exact impact.</small></div><div><strong>Control</strong><small>One-time confirmation, rejection and domain authorization.</small></div></div>
-        <div class="capability-list">@for(suggestion of suggestions;track suggestion){<button type="button" (click)="useSuggestion(suggestion)">{{suggestion}}</button>}</div></div>}
-      @for(item of messages();track $index){<article class="chat-message" [class.chat-message-user]="item.role==='user'"><span>{{item.role==='user'?('common.you'|t):'AI'}}</span><div class="message-shell"><div class="message-content" [innerHTML]="format(item.text)"></div>
-        @if(item.action;as action){<section class="approval-card" [class.approval-high-risk]="action.riskLevel==='HIGH'" [class.approval-complete]="action.state==='executed'" [class.approval-rejected]="action.state==='rejected'||action.state==='failed'"><header><div><small>Proposed operation · {{action.riskLevel}} risk</small><strong>{{operationLabel(action.operation)}}</strong></div><span>{{action.state}}</span></header><p>{{action.summary}}</p><dl><div><dt>Impact</dt><dd>No change until confirmation</dd></div><div><dt>Approval expires</dt><dd>{{action.expiresAt|date:'medium'}}</dd></div></dl>
-          @if(action.state==='pending'&&!isExpired(action)){@if(action.riskLevel==='HIGH'){<div class="risk-confirmation"><strong>High-risk action</strong><p>Verify the target above. Enter a business reason and type <b>CONFIRM HIGH RISK</b> exactly.</p><textarea [(ngModel)]="action.reason" [ngModelOptions]="{standalone:true}" placeholder="Business reason (minimum 10 characters)"></textarea><input [(ngModel)]="action.confirmationText" [ngModelOptions]="{standalone:true}" placeholder="CONFIRM HIGH RISK" autocomplete="off" /></div>}<footer><button class="action-button" type="button" [disabled]="actionBusyToken===action.approvalToken" (click)="reject(action)">Reject</button><button class="primary-button" type="button" [disabled]="!canConfirm(action)" (click)="confirm(action)">{{actionBusyToken===action.approvalToken?'Processing…':'Confirm and execute'}}</button></footer>}@else if(action.state==='pending'){<p class="approval-feedback">Approval expired. Ask the assistant to prepare it again.</p>}@else if(action.feedback){<p class="approval-feedback">{{action.feedback}}</p>}</section>}
-        @if(item.safety){<small class="message-safety">{{item.safety}}</small>}</div></article>}
-      @if(sending){<article class="chat-message"><span>AI</span><div class="message-shell"><p class="typing">Working with live ERP data<span>•••</span></p></div></article>}
+  <header class="view-heading">
+    <div>
+      <p class="eyebrow">
+        <span>{{ "assistant.tools" | t }}</span
+        ><b>/</b> {{ "assistant.aiOperations" | t }}
+      </p>
+      <h1>{{ "assistant.title" | t }}</h1>
+      <p>{{ "assistant.subtitle" | t }}</p>
     </div>
-    <form class="chat-composer" (ngSubmit)="send()"><textarea name="message" maxlength="4000" [(ngModel)]="message" placeholder="Ask a question or describe an operation to prepare…"></textarea><div><span>{{message.length}} / 4000</span><button class="primary-button" [disabled]="sending||!message.trim()">Send →</button></div></form>
+    <div class="assistant-header-actions">
+      @if (messages().length) {
+        <button class="action-button" type="button" (click)="clear()">
+          {{ "assistant.clear" | t }}
+        </button>
+      }
+      @if (status(); as s) {
+        <span
+          class="status-badge"
+          [class.status-badge-success]="s.enabled"
+          [class.status-badge-critical]="!s.enabled"
+          ><span></span
+          >{{
+            (s.enabled ? "assistant.operational" : "assistant.unavailable") | t
+          }}
+          · {{ s.model }}</span
+        >
+      }
+    </div>
+  </header>
+  <section class="surface-card chat-card">
+    <div class="chat-safety">
+      <div>
+        <strong>{{ "assistant.approval" | t }}</strong
+        ><span>{{
+          status()?.mutationSafety || ("assistant.previewSafety" | t)
+        }}</span>
+      </div>
+      <span class="role-chip">{{ role?.replace("ROLE_", "") }}</span>
+    </div>
+    <div class="chat-messages">
+      @if (!messages().length) {
+        <div class="assistant-welcome">
+          <span>AI</span>
+          <h2>{{ "assistant.welcome" | t }}</h2>
+          <p>{{ "assistant.welcomeText" | t }}</p>
+          <div class="capability-columns">
+            <div>
+              <strong>{{ "assistant.analyze" | t }}</strong
+              ><small>{{ "assistant.analyzeText" | t }}</small>
+            </div>
+            <div>
+              <strong>{{ "assistant.prepare" | t }}</strong
+              ><small>{{ "assistant.prepareText" | t }}</small>
+            </div>
+            <div>
+              <strong>{{ "assistant.control" | t }}</strong
+              ><small>{{ "assistant.controlText" | t }}</small>
+            </div>
+          </div>
+          <div class="capability-list">
+            @for (suggestion of suggestions; track suggestion) {
+              <button type="button" (click)="useSuggestion(suggestion)">
+                {{ suggestion }}
+              </button>
+            }
+          </div>
+        </div>
+      }
+      @for (item of messages(); track $index) {
+        <article
+          class="chat-message"
+          [class.chat-message-user]="item.role === 'user'"
+        >
+          <span>{{ item.role === "user" ? ("common.you" | t) : "AI" }}</span>
+          <div class="message-shell">
+            <div class="message-content" [innerHTML]="format(item.text)"></div>
+            @if (item.action; as action) {
+              <section
+                class="approval-card"
+                [class.approval-high-risk]="action.riskLevel === 'HIGH'"
+                [class.approval-complete]="action.state === 'executed'"
+                [class.approval-rejected]="
+                  action.state === 'rejected' || action.state === 'failed'
+                "
+              >
+                <header>
+                  <div>
+                    <small
+                      >{{ "assistant.proposed" | t }} · {{ action.riskLevel }}
+                      {{ "assistant.risk" | t }}</small
+                    ><strong>{{ operationLabel(action.operation) }}</strong>
+                  </div>
+                  <span>{{ action.state }}</span>
+                </header>
+                <p>{{ action.summary }}</p>
+                <dl>
+                  <div>
+                    <dt>{{ "assistant.impact" | t }}</dt>
+                    <dd>{{ "assistant.noChange" | t }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ "assistant.expires" | t }}</dt>
+                    <dd>{{ action.expiresAt | date: "medium" }}</dd>
+                  </div>
+                </dl>
+                @if (action.state === "pending" && !isExpired(action)) {
+                  @if (action.riskLevel === "HIGH") {
+                    <div class="risk-confirmation">
+                      <strong>{{ "assistant.highRisk" | t }}</strong>
+                      <p>{{ "assistant.highRiskHelp" | t }}</p>
+                      <textarea
+                        [(ngModel)]="action.reason"
+                        [ngModelOptions]="{ standalone: true }"
+                        [placeholder]="'assistant.reason' | t"
+                      ></textarea
+                      ><input
+                        [(ngModel)]="action.confirmationText"
+                        [ngModelOptions]="{ standalone: true }"
+                        placeholder="CONFIRM HIGH RISK"
+                        autocomplete="off"
+                      />
+                    </div>
+                  }
+                  <footer>
+                    <button
+                      class="action-button"
+                      type="button"
+                      [disabled]="actionBusyToken === action.approvalToken"
+                      (click)="reject(action)"
+                    >
+                      {{ "common.reject" | t }}</button
+                    ><button
+                      class="primary-button"
+                      type="button"
+                      [disabled]="!canConfirm(action)"
+                      (click)="confirm(action)"
+                    >
+                      {{
+                        (actionBusyToken === action.approvalToken
+                          ? "common.processing"
+                          : "common.confirm"
+                        ) | t
+                      }}
+                    </button>
+                  </footer>
+                } @else if (action.state === "pending") {
+                  <p class="approval-feedback">{{ "assistant.expired" | t }}</p>
+                } @else if (action.feedback) {
+                  <p class="approval-feedback">{{ action.feedback }}</p>
+                }
+              </section>
+            }
+            @if (item.safety) {
+              <small class="message-safety">{{ item.safety }}</small>
+            }
+          </div>
+        </article>
+      }
+      @if (sending) {
+        <article class="chat-message">
+          <span>AI</span>
+          <div class="message-shell">
+            <p class="typing">{{ "assistant.working" | t }}<span>•••</span></p>
+          </div>
+        </article>
+      }
+    </div>
+    <form class="chat-composer" (ngSubmit)="send()">
+      <textarea
+        name="message"
+        maxlength="4000"
+        [(ngModel)]="message"
+        [placeholder]="'assistant.placeholder' | t"
+      ></textarea>
+      <div>
+        <span>{{ message.length }} / 4000</span
+        ><button class="primary-button" [disabled]="sending || !message.trim()">
+          {{ "assistant.send" | t }} →
+        </button>
+      </div>
+    </form>
   </section>
 </main>

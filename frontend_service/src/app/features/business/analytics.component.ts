@@ -4,6 +4,7 @@ import { finalize } from 'rxjs';
 import { AnalyticsApiService, AnalyticsResponse } from '../../core/api';
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 interface AnalyticsMessage {
   role: 'user' | 'assistant';
@@ -20,6 +21,7 @@ interface AnalyticsMessage {
   styleUrl: './analytics.component.scss',
 })
 export class AnalyticsComponent implements OnInit {
+  readonly i18n = inject(I18nService);
   private readonly api = inject(AnalyticsApiService);
   readonly feedback = inject(UiFeedbackService);
   readonly suggestions = signal<readonly string[]>([]);

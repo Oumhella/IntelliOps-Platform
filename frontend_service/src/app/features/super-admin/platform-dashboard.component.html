@@ -1,45 +1,95 @@
 <div class="app-shell" [class.sidebar-open]="sidebarOpen">
-  <button class="sidebar-backdrop" type="button" aria-label="Close navigation" (click)="closeSidebar()"></button>
+  <button
+    class="sidebar-backdrop"
+    type="button"
+    aria-label="Close navigation"
+    (click)="closeSidebar()"
+  ></button>
 
   <aside class="sidebar" aria-label="Platform administration navigation">
     <div class="brand">
-      <span class="brand-mark" aria-hidden="true"><img src="/logo.jfif" alt="" /></span>
-      <span class="brand-copy"><strong>IntelliOps</strong><small>Platform control</small></span>
-      <button class="sidebar-close" type="button" aria-label="Close navigation" (click)="closeSidebar()"><svg viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17" /></svg></button>
+      <span class="brand-mark" aria-hidden="true"
+        ><img src="/logo.jfif" alt=""
+      /></span>
+      <span class="brand-copy"
+        ><strong>IntelliOps</strong><small>Platform control</small></span
+      >
+      <button
+        class="sidebar-close"
+        type="button"
+        aria-label="Close navigation"
+        (click)="closeSidebar()"
+      >
+        <svg viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17" /></svg>
+      </button>
     </div>
 
     <nav class="sidebar-nav">
       <p class="nav-label">Platform</p>
       <a class="nav-item active" href="#overview" aria-current="page">
-        <svg viewBox="0 0 24 24"><path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z" /></svg><span>Overview</span>
+        <svg viewBox="0 0 24 24">
+          <path
+            d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z"
+          /></svg
+        ><span>Overview</span>
       </a>
       <a class="nav-item" href="#tenants">
-        <svg viewBox="0 0 24 24"><path d="M4 20V7l8-4 8 4v13M8 10h2m4 0h2m-8 4h2m4 0h2M3 20h18" /></svg><span>Enterprises</span>
-        @if (overview(); as data) { <span class="nav-count">{{ data.totals.enterprises }}</span> }
+        <svg viewBox="0 0 24 24">
+          <path d="M4 20V7l8-4 8 4v13M8 10h2m4 0h2m-8 4h2m4 0h2M3 20h18" /></svg
+        ><span>Enterprises</span>
+        @if (overview(); as data) {
+          <span class="nav-count">{{ data.totals.enterprises }}</span>
+        }
       </a>
       <a class="nav-item" href="#services">
-        <svg viewBox="0 0 24 24"><path d="M4 5h16v5H4V5Zm0 9h16v5H4v-5Zm3-6h.01M7 17h.01" /></svg><span>Services</span>
-        <span class="status-dot" [class.status-dot-success]="overview() && overview()!.totals.onlineServices === overview()!.totals.totalServices"></span>
+        <svg viewBox="0 0 24 24">
+          <path d="M4 5h16v5H4V5Zm0 9h16v5H4v-5Zm3-6h.01M7 17h.01" /></svg
+        ><span>Services</span>
+        <span
+          class="status-dot"
+          [class.status-dot-success]="
+            overview() &&
+            overview()!.totals.onlineServices ===
+              overview()!.totals.totalServices
+          "
+        ></span>
       </a>
       <a class="nav-item" href="#plans">
-        <svg viewBox="0 0 24 24"><path d="M4 6h16v12H4V6Zm4 4h8m-8 4h5" /></svg><span>Plan catalogue</span>
+        <svg viewBox="0 0 24 24"><path d="M4 6h16v12H4V6Zm4 4h8m-8 4h5" /></svg
+        ><span>Plan catalogue</span>
         <span class="nav-count">{{ plans().length }}</span>
       </a>
 
       <p class="nav-label nav-label-spaced">Administration</p>
       <a class="nav-item" href="#audit">
-        <svg viewBox="0 0 24 24"><path d="M5 4h14v16H5V4Zm4 5h6m-6 4h6m-6 4h4" /></svg><span>Audit log</span>
-        @if (!auditLoading()) { <span class="nav-count">{{ audit().length }}</span> }
+        <svg viewBox="0 0 24 24">
+          <path d="M5 4h14v16H5V4Zm4 5h6m-6 4h6m-6 4h4" /></svg
+        ><span>Audit log</span>
+        @if (!auditLoading()) {
+          <span class="nav-count">{{ audit().length }}</span>
+        }
       </a>
       <a class="nav-item" href="#settings">
-        <svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.4-3.5a7.8 7.8 0 0 0-.1-1l2-1.5-2-3.4-2.4 1a8 8 0 0 0-1.7-1L15 3.5h-4l-.3 2.6a8 8 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.5a7.8 7.8 0 0 0 0 2l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 1.7-1l.3 2.6h4l.3-2.6a8 8 0 0 0 1.7-1l2.4 1 2-3.4-2-1.5a7.8 7.8 0 0 0 .1-1Z" /></svg><span>Platform settings</span>
+        <svg viewBox="0 0 24 24">
+          <path
+            d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.4-3.5a7.8 7.8 0 0 0-.1-1l2-1.5-2-3.4-2.4 1a8 8 0 0 0-1.7-1L15 3.5h-4l-.3 2.6a8 8 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.5a7.8 7.8 0 0 0 0 2l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 1.7-1l.3 2.6h4l.3-2.6a8 8 0 0 0 1.7-1l2.4 1 2-3.4-2-1.5a7.8 7.8 0 0 0 .1-1Z"
+          /></svg
+        ><span>Platform settings</span>
       </a>
     </nav>
 
     <div class="sidebar-footer">
       <div class="environment-card">
-        <span class="environment-icon"><span class="status-dot status-dot-success"></span></span>
-        <span><strong>Eureka registry</strong><small>{{ overview()?.totals?.onlineServices ?? 0 }} services registered</small></span>
+        <span class="environment-icon"
+          ><span class="status-dot status-dot-success"></span
+        ></span>
+        <span
+          ><strong>Eureka registry</strong
+          ><small
+            >{{ overview()?.totals?.onlineServices ?? 0 }} services
+            registered</small
+          ></span
+        >
       </div>
       <p>Platform administration <span>Secure</span></p>
     </div>
@@ -48,126 +98,596 @@
   <section class="workspace">
     <header class="topbar">
       <div class="topbar-leading">
-        <button class="icon-button mobile-menu" type="button" aria-label="Open navigation" (click)="openSidebar()"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" /></svg></button>
+        <button
+          class="icon-button mobile-menu"
+          type="button"
+          aria-label="Open navigation"
+          (click)="openSidebar()"
+        >
+          <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+        </button>
         <label class="global-search">
-          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg>
+          <svg viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="6.5" />
+            <path d="m16 16 4 4" />
+          </svg>
           <span class="sr-only">Search enterprises and services</span>
-          <input type="search" placeholder="Search enterprises and services..." [value]="searchTerm()" (input)="updateSearch($event)" />
+          <input
+            type="search"
+            placeholder="Search enterprises and services..."
+            [value]="searchTerm()"
+            (input)="updateSearch($event)"
+          />
         </label>
       </div>
       <div class="topbar-actions">
         <span class="platform-role">Super admin</span>
         <span class="topbar-divider"></span>
-        <button class="profile-button" type="button" (click)="logout()" aria-label="Sign out">
-          <span class="avatar">{{ currentUser()?.firstname?.[0] || 'S' }}{{ currentUser()?.lastname?.[0] || 'A' }}</span>
-          <span class="profile-copy"><strong>{{ currentUser()?.firstname }} {{ currentUser()?.lastname }}</strong><small>Sign out</small></span>
+        <button
+          class="profile-button"
+          type="button"
+          (click)="logout()"
+          aria-label="Sign out"
+        >
+          <span class="avatar"
+            >{{ currentUser()?.firstname?.[0] || "S"
+            }}{{ currentUser()?.lastname?.[0] || "A" }}</span
+          >
+          <span class="profile-copy"
+            ><strong
+              >{{ currentUser()?.firstname }}
+              {{ currentUser()?.lastname }}</strong
+            ><small>Sign out</small></span
+          >
         </button>
       </div>
     </header>
 
     <main class="content" id="overview">
       <div class="page-heading">
-        <div><p class="eyebrow"><span>Platform</span><b>/</b> Control center</p><h1>Platform overview</h1><p>Real tenant, user, and service-registry data across IntelliOps.</p></div>
+        <div>
+          <p class="eyebrow"><span>Platform</span><b>/</b> Control center</p>
+          <h1>Platform overview</h1>
+          <p>Real tenant, user, and service-registry data across IntelliOps.</p>
+        </div>
         <div class="page-actions">
-          @if (overview(); as data) { <span class="sync-state"><span class="status-dot status-dot-success"></span>{{ data.generatedAt | date:'mediumTime' }}</span> }
-          <button class="secondary-button" type="button" (click)="loadOverview()" [disabled]="loading()">
-            <svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" /></svg>{{ loading() ? 'Refreshing...' : 'Refresh data' }}
+          @if (overview(); as data) {
+            <span class="sync-state"
+              ><span class="status-dot status-dot-success"></span
+              >{{ data.generatedAt | date: "mediumTime" }}</span
+            >
+          }
+          <button
+            class="secondary-button"
+            type="button"
+            (click)="loadOverview()"
+            [disabled]="loading()"
+          >
+            <svg viewBox="0 0 24 24">
+              <path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" /></svg
+            >{{ loading() ? "Refreshing..." : "Refresh data" }}
           </button>
         </div>
       </div>
 
       @if (errorMessage()) {
-        <section class="platform-error" role="alert"><div><strong>Platform data is unavailable</strong><p>{{ errorMessage() }}</p></div><button class="secondary-button" type="button" (click)="loadOverview()">Try again</button></section>
+        <section class="platform-error" role="alert">
+          <div>
+            <strong>Platform data is unavailable</strong>
+            <p>{{ errorMessage() }}</p>
+          </div>
+          <button
+            class="secondary-button"
+            type="button"
+            (click)="loadOverview()"
+          >
+            Try again
+          </button>
+        </section>
       }
 
       @if (loading() && !overview()) {
         <section class="dashboard-loading" aria-label="Loading platform data">
-          @for (item of [1, 2, 3, 4]; track item) { <span class="loading-card"></span> }
+          @for (item of [1, 2, 3, 4]; track item) {
+            <span class="loading-card"></span>
+          }
         </section>
       } @else {
         @if (overview(); as data) {
-        <section class="metric-grid" aria-label="Platform totals">
-          <article class="surface-card metric-card">
-            <div class="metric-topline"><span class="metric-icon metric-icon-indigo"><svg viewBox="0 0 24 24"><path d="M4 20V7l8-4 8 4v13M8 10h2m4 0h2m-8 4h2m4 0h2M3 20h18" /></svg></span><span class="metric-source">PostgreSQL</span></div>
-            <p>Enterprises</p><div class="metric-value"><strong>{{ data.totals.enterprises }}</strong></div><small>Registered business tenants</small>
-          </article>
-          <article class="surface-card metric-card">
-            <div class="metric-topline"><span class="metric-icon metric-icon-sky"><svg viewBox="0 0 24 24"><path d="M16 20v-1.7c0-1.8-1.5-3.3-3.3-3.3H7.3A3.3 3.3 0 0 0 4 18.3V20m6-9a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7-1 1.5 1.5L21 9" /></svg></span><span class="metric-source">PostgreSQL</span></div>
-            <p>Business users</p><div class="metric-value"><strong>{{ data.totals.users }}</strong></div><small>Across every enterprise</small>
-          </article>
-          <article class="surface-card metric-card">
-            <div class="metric-topline"><span class="metric-icon metric-icon-emerald"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" /></svg></span><span class="metric-source">{{ activeUserPercentage() }}% active</span></div>
-            <p>Active accounts</p><div class="metric-value"><strong>{{ data.totals.activeUsers }}</strong><span>/ {{ data.totals.users }}</span></div><small>Currently enabled accounts</small>
-          </article>
-          <article class="surface-card metric-card">
-            <div class="metric-topline"><span class="metric-icon" [class.metric-icon-emerald]="data.totals.onlineServices === data.totals.totalServices" [class.metric-icon-amber]="data.totals.onlineServices !== data.totals.totalServices"><svg viewBox="0 0 24 24"><path d="M4 5h16v5H4V5Zm0 9h16v5H4v-5Zm3-6h.01M7 17h.01" /></svg></span><span class="metric-source">Eureka</span></div>
-            <p>Online services</p><div class="metric-value"><strong>{{ data.totals.onlineServices }}</strong><span>/ {{ data.totals.totalServices }}</span></div><small>Registered service instances</small>
-          </article>
-        </section>
+          <section class="metric-grid" aria-label="Platform totals">
+            <article class="surface-card metric-card">
+              <div class="metric-topline">
+                <span class="metric-icon metric-icon-indigo"
+                  ><svg viewBox="0 0 24 24">
+                    <path
+                      d="M4 20V7l8-4 8 4v13M8 10h2m4 0h2m-8 4h2m4 0h2M3 20h18"
+                    /></svg></span
+                ><span class="metric-source">PostgreSQL</span>
+              </div>
+              <p>Enterprises</p>
+              <div class="metric-value">
+                <strong>{{ data.totals.enterprises }}</strong>
+              </div>
+              <small>Registered business tenants</small>
+            </article>
+            <article class="surface-card metric-card">
+              <div class="metric-topline">
+                <span class="metric-icon metric-icon-sky"
+                  ><svg viewBox="0 0 24 24">
+                    <path
+                      d="M16 20v-1.7c0-1.8-1.5-3.3-3.3-3.3H7.3A3.3 3.3 0 0 0 4 18.3V20m6-9a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7-1 1.5 1.5L21 9"
+                    /></svg></span
+                ><span class="metric-source">PostgreSQL</span>
+              </div>
+              <p>Business users</p>
+              <div class="metric-value">
+                <strong>{{ data.totals.users }}</strong>
+              </div>
+              <small>Across every enterprise</small>
+            </article>
+            <article class="surface-card metric-card">
+              <div class="metric-topline">
+                <span class="metric-icon metric-icon-emerald"
+                  ><svg viewBox="0 0 24 24">
+                    <path d="m5 12 4 4L19 6" /></svg></span
+                ><span class="metric-source"
+                  >{{ activeUserPercentage() }}% active</span
+                >
+              </div>
+              <p>Active accounts</p>
+              <div class="metric-value">
+                <strong>{{ data.totals.activeUsers }}</strong
+                ><span>/ {{ data.totals.users }}</span>
+              </div>
+              <small>Currently enabled accounts</small>
+            </article>
+            <article class="surface-card metric-card">
+              <div class="metric-topline">
+                <span
+                  class="metric-icon"
+                  [class.metric-icon-emerald]="
+                    data.totals.onlineServices === data.totals.totalServices
+                  "
+                  [class.metric-icon-amber]="
+                    data.totals.onlineServices !== data.totals.totalServices
+                  "
+                  ><svg viewBox="0 0 24 24">
+                    <path
+                      d="M4 5h16v5H4V5Zm0 9h16v5H4v-5Zm3-6h.01M7 17h.01"
+                    /></svg></span
+                ><span class="metric-source">Eureka</span>
+              </div>
+              <p>Online services</p>
+              <div class="metric-value">
+                <strong>{{ data.totals.onlineServices }}</strong
+                ><span>/ {{ data.totals.totalServices }}</span>
+              </div>
+              <small>Registered service instances</small>
+            </article>
+          </section>
 
-        <section class="platform-sections">
-          <article class="surface-card service-panel" id="services">
-            <header class="card-header"><div><div class="card-title-row"><h2>Service registry</h2><span class="status-badge" [class.status-badge-success]="data.totals.onlineServices === data.totals.totalServices" [class.status-badge-warning]="data.totals.onlineServices !== data.totals.totalServices"><span></span>{{ data.totals.onlineServices }} of {{ data.totals.totalServices }} online</span></div><p>Availability is read directly from Eureka registrations.</p></div></header>
-            <div class="table-wrap"><table><thead><tr><th>Service</th><th>Status</th><th>Instances</th><th>Source</th></tr></thead><tbody>
-              @for (service of filteredServices(); track service.serviceId) {
-                <tr><td><div class="service-name"><span class="service-monogram">{{ serviceMonogram(service) }}</span><span><strong>{{ service.name }}</strong><small>{{ service.serviceId }}</small></span></div></td>
-                  <td><span class="status-badge" [class.status-badge-success]="service.status === 'ONLINE'" [class.status-badge-critical]="service.status === 'OFFLINE'"><span></span>{{ service.status === 'ONLINE' ? 'Online' : 'Offline' }}</span></td>
-                  <td><strong class="availability">{{ service.instanceCount }}</strong></td><td><span class="micro-tag">EUREKA</span></td></tr>
-              } @empty { <tr><td colspan="4" class="empty-row">No services match your search.</td></tr> }
-            </tbody></table></div>
-          </article>
+          <section class="platform-sections">
+            <article class="surface-card service-panel" id="services">
+              <header class="card-header">
+                <div>
+                  <div class="card-title-row">
+                    <h2>Service registry</h2>
+                    <span
+                      class="status-badge"
+                      [class.status-badge-success]="
+                        data.totals.onlineServices === data.totals.totalServices
+                      "
+                      [class.status-badge-warning]="
+                        data.totals.onlineServices !== data.totals.totalServices
+                      "
+                      ><span></span>{{ data.totals.onlineServices }} of
+                      {{ data.totals.totalServices }} online</span
+                    >
+                  </div>
+                  <p>
+                    Availability is read directly from Eureka registrations.
+                  </p>
+                </div>
+              </header>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Service</th>
+                      <th>Status</th>
+                      <th>Instances</th>
+                      <th>Source</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (
+                      service of filteredServices();
+                      track service.serviceId
+                    ) {
+                      <tr>
+                        <td>
+                          <div class="service-name">
+                            <span class="service-monogram">{{
+                              serviceMonogram(service)
+                            }}</span
+                            ><span
+                              ><strong>{{ service.name }}</strong
+                              ><small>{{ service.serviceId }}</small></span
+                            >
+                          </div>
+                        </td>
+                        <td>
+                          <span
+                            class="status-badge"
+                            [class.status-badge-success]="
+                              service.status === 'ONLINE'
+                            "
+                            [class.status-badge-critical]="
+                              service.status === 'OFFLINE'
+                            "
+                            ><span></span
+                            >{{
+                              service.status === "ONLINE" ? "Online" : "Offline"
+                            }}</span
+                          >
+                        </td>
+                        <td>
+                          <strong class="availability">{{
+                            service.instanceCount
+                          }}</strong>
+                        </td>
+                        <td><span class="micro-tag">EUREKA</span></td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="4" class="empty-row">
+                          No services match your search.
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </article>
 
-          <article class="surface-card service-panel" id="tenants">
-            <header class="card-header"><div><div class="card-title-row"><h2>Registered enterprises</h2><span class="record-count">{{ data.totals.enterprises }} records</span></div><p>Tenant records and account counts from the identity database.</p></div></header>
-            <div class="table-wrap"><table><thead><tr><th>Enterprise</th><th>Activity</th><th>Users</th><th>Status</th><th>Registered</th></tr></thead><tbody>
-              @for (tenant of filteredTenants(); track tenant.enterpriseId) {
-                <tr><td><div class="tenant-name"><span class="tenant-monogram">{{ (tenant.companyName?.[0] || 'E').toUpperCase() }}</span><span><strong>{{ tenant.companyName || 'Unnamed enterprise' }}</strong><small>ID {{ tenant.enterpriseId }}</small></span></div></td>
-                  <td>{{ tenant.activityType || 'Not specified' }}</td><td><strong class="availability">{{ tenant.userCount }}</strong></td>
-                  <td><span class="status-badge" [class.status-badge-success]="tenant.active" [class.status-badge-critical]="!tenant.active"><span></span>{{ tenant.active ? 'Active' : 'Suspended' }}</span></td>
-                  <td>{{ tenant.createdAt | date:'mediumDate' }}</td></tr>
-              } @empty { <tr><td colspan="5" class="empty-row">{{ searchTerm() ? 'No enterprises match your search.' : 'No business enterprises are registered yet.' }}</td></tr> }
-            </tbody></table></div>
-          </article>
-        </section>
+            <article class="surface-card service-panel" id="tenants">
+              <header class="card-header">
+                <div>
+                  <div class="card-title-row">
+                    <h2>Registered enterprises</h2>
+                    <span class="record-count"
+                      >{{ data.totals.enterprises }} records</span
+                    >
+                  </div>
+                  <p>
+                    Tenant records and account counts from the identity
+                    database.
+                  </p>
+                </div>
+              </header>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Enterprise</th>
+                      <th>Activity</th>
+                      <th>Users</th>
+                      <th>Status</th>
+                      <th>Registered</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (
+                      tenant of filteredTenants();
+                      track tenant.enterpriseId
+                    ) {
+                      <tr>
+                        <td>
+                          <div class="tenant-name">
+                            <span class="tenant-monogram">{{
+                              (tenant.companyName?.[0] || "E").toUpperCase()
+                            }}</span
+                            ><span
+                              ><strong>{{
+                                tenant.companyName || "Unnamed enterprise"
+                              }}</strong
+                              ><small>ID {{ tenant.enterpriseId }}</small></span
+                            >
+                          </div>
+                        </td>
+                        <td>{{ tenant.activityType || "Not specified" }}</td>
+                        <td>
+                          <strong class="availability">{{
+                            tenant.userCount
+                          }}</strong>
+                        </td>
+                        <td>
+                          <span
+                            class="status-badge"
+                            [class.status-badge-success]="tenant.active"
+                            [class.status-badge-critical]="!tenant.active"
+                            ><span></span
+                            >{{ tenant.active ? "Active" : "Suspended" }}</span
+                          >
+                        </td>
+                        <td>{{ tenant.createdAt | date: "mediumDate" }}</td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="5" class="empty-row">
+                          {{
+                            searchTerm()
+                              ? "No enterprises match your search."
+                              : "No business enterprises are registered yet."
+                          }}
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </section>
 
-        <section class="platform-sections admin-sections">
-          <article class="surface-card service-panel" id="audit">
-            <header class="card-header"><div><div class="card-title-row"><h2>Platform audit log</h2><span class="record-count">{{ audit().length }} events</span></div><p>Observed service health and enterprise registry activity from the platform API.</p></div><button class="secondary-button" type="button" (click)="loadAudit()" [disabled]="auditLoading()">{{ auditLoading() ? 'Refreshing...' : 'Refresh' }}</button></header>
-            @if (auditError()) { <p class="plan-notice" role="alert">{{ auditError() }}</p> }
-            <div class="table-wrap"><table><thead><tr><th>Type</th><th>Subject</th><th>Detail</th><th>Observed</th><th>Severity</th></tr></thead><tbody>
-              @if (auditLoading()) { <tr><td colspan="5" class="empty-row">Loading platform activity...</td></tr> }
-              @for (event of audit(); track event.type + event.subject) {
-                <tr><td><span class="micro-tag">{{ event.type }}</span></td><td><strong>{{ event.subject }}</strong></td><td>{{ event.detail }}</td><td>{{ event.observedAt | date:'medium' }}</td><td><span class="status-badge" [class.status-badge-success]="event.severity === 'INFO'" [class.status-badge-warning]="event.severity === 'WARNING'"><span></span>{{ event.severity }}</span></td></tr>
-              } @empty { @if (!auditLoading()) { <tr><td colspan="5" class="empty-row">No platform events are available.</td></tr> } }
-            </tbody></table></div>
-          </article>
+          <section class="platform-sections admin-sections">
+            <article class="surface-card service-panel" id="audit">
+              <header class="card-header">
+                <div>
+                  <div class="card-title-row">
+                    <h2>Platform audit log</h2>
+                    <span class="record-count"
+                      >{{ audit().length }} events</span
+                    >
+                  </div>
+                  <p>
+                    Observed service health and enterprise registry activity
+                    from the platform API.
+                  </p>
+                </div>
+                <button
+                  class="secondary-button"
+                  type="button"
+                  (click)="loadAudit()"
+                  [disabled]="auditLoading()"
+                >
+                  {{ auditLoading() ? "Refreshing..." : "Refresh" }}
+                </button>
+              </header>
+              @if (auditError()) {
+                <p class="plan-notice" role="alert">{{ auditError() }}</p>
+              }
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Type</th>
+                      <th>Subject</th>
+                      <th>Detail</th>
+                      <th>Observed</th>
+                      <th>Severity</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @if (auditLoading()) {
+                      <tr>
+                        <td colspan="5" class="empty-row">
+                          Loading platform activity...
+                        </td>
+                      </tr>
+                    }
+                    @for (event of audit(); track event.type + event.subject) {
+                      <tr>
+                        <td>
+                          <span class="micro-tag">{{ event.type }}</span>
+                        </td>
+                        <td>
+                          <strong>{{ event.subject }}</strong>
+                        </td>
+                        <td>{{ event.detail }}</td>
+                        <td>{{ event.observedAt | date: "medium" }}</td>
+                        <td>
+                          <span
+                            class="status-badge"
+                            [class.status-badge-success]="
+                              event.severity === 'INFO'
+                            "
+                            [class.status-badge-warning]="
+                              event.severity === 'WARNING'
+                            "
+                            ><span></span>{{ event.severity }}</span
+                          >
+                        </td>
+                      </tr>
+                    } @empty {
+                      @if (!auditLoading()) {
+                        <tr>
+                          <td colspan="5" class="empty-row">
+                            No platform events are available.
+                          </td>
+                        </tr>
+                      }
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </article>
 
-          <article class="surface-card service-panel" id="settings">
-            <header class="card-header"><div><div class="card-title-row"><h2>Platform settings</h2><span class="status-badge status-badge-info"><span></span>Read only</span></div><p>Runtime values reported by the platform service. Deployment changes remain managed through configuration.</p></div><button class="secondary-button" type="button" (click)="loadSettings()" [disabled]="settingsLoading()">{{ settingsLoading() ? 'Refreshing...' : 'Refresh' }}</button></header>
-            @if (settingsError()) { <p class="plan-notice" role="alert">{{ settingsError() }}</p> }
-            @if (settings(); as platformSettings) {
-              <div class="settings-grid"><div><span>Environment</span><strong>{{ platformSettings.environment }}</strong></div><div><span>Authentication</span><strong>{{ platformSettings.authentication }}</strong></div><div><span>Service discovery</span><strong>{{ platformSettings.serviceDiscovery }}</strong></div><div><span>Expected services</span><strong>{{ platformSettings.expectedServices.length }}</strong></div></div>
-              <div class="settings-services"><span class="section-kicker">Expected registry members</span><div>@for (service of platformSettings.expectedServices; track service) { <span class="micro-tag">{{ service }}</span> }</div></div>
-            } @else if (settingsLoading()) { <p class="empty-row">Loading platform settings...</p> } @else { <p class="empty-row">Platform settings are unavailable.</p> }
-          </article>
-        </section>
+            <article class="surface-card service-panel" id="settings">
+              <header class="card-header">
+                <div>
+                  <div class="card-title-row">
+                    <h2>Platform settings</h2>
+                    <span class="status-badge status-badge-info"
+                      ><span></span>Read only</span
+                    >
+                  </div>
+                  <p>
+                    Runtime values reported by the platform service. Deployment
+                    changes remain managed through configuration.
+                  </p>
+                </div>
+                <button
+                  class="secondary-button"
+                  type="button"
+                  (click)="loadSettings()"
+                  [disabled]="settingsLoading()"
+                >
+                  {{ settingsLoading() ? "Refreshing..." : "Refresh" }}
+                </button>
+              </header>
+              @if (settingsError()) {
+                <p class="plan-notice" role="alert">{{ settingsError() }}</p>
+              }
+              @if (settings(); as platformSettings) {
+                <div class="settings-grid">
+                  <div>
+                    <span>Environment</span
+                    ><strong>{{ platformSettings.environment }}</strong>
+                  </div>
+                  <div>
+                    <span>Authentication</span
+                    ><strong>{{ platformSettings.authentication }}</strong>
+                  </div>
+                  <div>
+                    <span>Service discovery</span
+                    ><strong>{{ platformSettings.serviceDiscovery }}</strong>
+                  </div>
+                  <div>
+                    <span>Expected services</span
+                    ><strong>{{
+                      platformSettings.expectedServices.length
+                    }}</strong>
+                  </div>
+                </div>
+                <div class="settings-services">
+                  <span class="section-kicker">Expected registry members</span>
+                  <div>
+                    @for (
+                      service of platformSettings.expectedServices;
+                      track service
+                    ) {
+                      <span class="micro-tag">{{ service }}</span>
+                    }
+                  </div>
+                </div>
+              } @else if (settingsLoading()) {
+                <p class="empty-row">Loading platform settings...</p>
+              } @else {
+                <p class="empty-row">Platform settings are unavailable.</p>
+              }
+            </article>
+          </section>
 
-        <section class="surface-card service-panel plan-catalogue" id="plans">
-          <header class="card-header">
-            <div><div class="card-title-row"><h2>Global plan catalogue</h2><span class="record-count">{{ plans().length }} offers</span></div><p>Commercial plans are platform products shared by every enterprise. Tenant administrators can select active offers but cannot edit them.</p></div>
-            <button class="primary-button" type="button" (click)="openPlan()">Create plan</button>
-          </header>
-          @if (planNotice()) { <p class="plan-notice" role="status">{{ planNotice() }}</p> }
-          <div class="table-wrap"><table><thead><tr><th>Plan</th><th>Billing period</th><th>Price</th><th>Monthly orders</th><th>Status</th><th></th></tr></thead><tbody>
-            @if (planLoading()) { <tr><td colspan="6" class="empty-row">Loading the global catalogue...</td></tr> }
-            @for (plan of plans(); track plan.idPlan) {
-              <tr><td><div class="tenant-name"><span class="tenant-monogram">{{ plan.nomPlan[0].toUpperCase() }}</span><span><strong>{{ plan.nomPlan }}</strong><small>{{ plan.description || 'No description' }}</small></span></div></td>
-                <td>{{ planLabel(plan.duree) }}</td><td><strong class="availability">{{ plan.prix }} MAD</strong></td><td>{{ plan.limiteCommandesMois > 0 ? plan.limiteCommandesMois : 'Unlimited' }}</td>
-                <td><span class="status-badge" [class]="'status-badge status-badge-' + planTone(plan.estActif)"><span></span>{{ planLabel(plan.estActif) }}</span></td>
-                <td><div class="row-actions"><button class="action-button" type="button" (click)="openPlan(plan)">Edit</button><button class="action-button action-button-danger" type="button" (click)="archivePlan(plan)" [disabled]="plan.estActif === 'SUPPRIME'">Archive</button></div></td></tr>
-            } @empty { @if (!planLoading()) { <tr><td colspan="6" class="empty-row">No commercial plans exist yet.</td></tr> } }
-          </tbody></table></div>
-        </section>
+          <section class="surface-card service-panel plan-catalogue" id="plans">
+            <header class="card-header">
+              <div>
+                <div class="card-title-row">
+                  <h2>Global plan catalogue</h2>
+                  <span class="record-count">{{ plans().length }} offers</span>
+                </div>
+                <p>
+                  Commercial plans are platform products shared by every
+                  enterprise. Tenant administrators can select active offers but
+                  cannot edit them.
+                </p>
+              </div>
+              <button class="primary-button" type="button" (click)="openPlan()">
+                Create plan
+              </button>
+            </header>
+            @if (planNotice()) {
+              <p class="plan-notice" role="status">{{ planNotice() }}</p>
+            }
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Plan</th>
+                    <th>Billing period</th>
+                    <th>Price</th>
+                    <th>Monthly orders</th>
+                    <th>Status</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @if (planLoading()) {
+                    <tr>
+                      <td colspan="6" class="empty-row">
+                        Loading the global catalogue...
+                      </td>
+                    </tr>
+                  }
+                  @for (plan of plans(); track plan.idPlan) {
+                    <tr>
+                      <td>
+                        <div class="tenant-name">
+                          <span class="tenant-monogram">{{
+                            plan.nomPlan[0].toUpperCase()
+                          }}</span
+                          ><span
+                            ><strong>{{ plan.nomPlan }}</strong
+                            ><small>{{
+                              plan.description || "No description"
+                            }}</small></span
+                          >
+                        </div>
+                      </td>
+                      <td>{{ planLabel(plan.duree) }}</td>
+                      <td>
+                        <strong class="availability"
+                          >{{ plan.prix }} MAD</strong
+                        >
+                      </td>
+                      <td>
+                        {{
+                          plan.limiteCommandesMois > 0
+                            ? plan.limiteCommandesMois
+                            : "Unlimited"
+                        }}
+                      </td>
+                      <td>
+                        <span
+                          class="status-badge"
+                          [class]="
+                            'status-badge status-badge-' +
+                            planTone(plan.estActif)
+                          "
+                          ><span></span>{{ planLabel(plan.estActif) }}</span
+                        >
+                      </td>
+                      <td>
+                        <div class="row-actions">
+                          <button
+                            class="action-button"
+                            type="button"
+                            (click)="openPlan(plan)"
+                          >
+                            Edit</button
+                          ><button
+                            class="action-button action-button-danger"
+                            type="button"
+                            (click)="archivePlan(plan)"
+                            [disabled]="plan.estActif === 'SUPPRIME'"
+                          >
+                            Archive
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  } @empty {
+                    @if (!planLoading()) {
+                      <tr>
+                        <td colspan="6" class="empty-row">
+                          No commercial plans exist yet.
+                        </td>
+                      </tr>
+                    }
+                  }
+                </tbody>
+              </table>
+            </div>
+          </section>
         }
       }
     </main>
@@ -175,21 +695,92 @@
 </div>
 
 @if (planPanelOpen) {
-  <button class="drawer-backdrop" type="button" aria-label="Close plan editor" (click)="closePlan()"></button>
+  <button
+    class="drawer-backdrop"
+    type="button"
+    aria-label="Close plan editor"
+    (click)="closePlan()"
+  ></button>
   <aside class="form-drawer" aria-label="Plan editor">
-    <header class="drawer-header"><div><h2>{{ editingPlan ? 'Edit global plan' : 'Create global plan' }}</h2><p>This offer becomes part of the platform-wide catalogue.</p></div><button class="drawer-close" type="button" (click)="closePlan()">×</button></header>
+    <header class="drawer-header">
+      <div>
+        <h2>{{ editingPlan ? "Edit global plan" : "Create global plan" }}</h2>
+        <p>This offer becomes part of the platform-wide catalogue.</p>
+      </div>
+      <button class="drawer-close" type="button" (click)="closePlan()">
+        ×
+      </button>
+    </header>
     <form (ngSubmit)="savePlan()">
       <div class="form-grid">
-        <label class="form-field form-field-full"><span>Plan name</span><input name="name" [(ngModel)]="planForm.nomPlan" required /></label>
-        <label class="form-field form-field-full"><span>Description</span><textarea name="description" [(ngModel)]="planForm.description"></textarea></label>
-        <label class="form-field"><span>Price (MAD)</span><input name="price" type="number" min="0" step="0.01" [(ngModel)]="planForm.prix" required /></label>
-        <label class="form-field"><span>Billing period</span><select name="duration" [(ngModel)]="planForm.duree">@for (duration of durations; track duration) { <option [value]="duration">{{ planLabel(duration) }}</option> }</select></label>
-        <label class="form-field"><span>Minimum days before pause</span><input name="minimumPause" type="number" min="0" [(ngModel)]="planForm.minJoursEntreDesactivation" /></label>
-        <label class="form-field"><span>Maximum pause duration</span><input name="maximumPause" type="number" min="0" [(ngModel)]="planForm.maxPeriodeDesactivation" /></label>
-        <label class="form-field"><span>Monthly order limit</span><input name="orderLimit" type="number" min="0" [(ngModel)]="planForm.limiteCommandesMois" /><small class="form-help">Use 0 for unlimited orders.</small></label>
-        <label class="form-field"><span>Commercial status</span><select name="status" [(ngModel)]="planForm.estActif">@for (status of offerStatuses; track status) { <option [value]="status">{{ planLabel(status) }}</option> }</select></label>
+        <label class="form-field form-field-full"
+          ><span>Plan name</span
+          ><input name="name" [(ngModel)]="planForm.nomPlan" required
+        /></label>
+        <label class="form-field form-field-full"
+          ><span>Description</span
+          ><textarea
+            name="description"
+            [(ngModel)]="planForm.description"
+          ></textarea>
+        </label>
+        <label class="form-field"
+          ><span>Price (MAD)</span
+          ><input
+            name="price"
+            type="number"
+            min="0"
+            step="0.01"
+            [(ngModel)]="planForm.prix"
+            required
+        /></label>
+        <label class="form-field"
+          ><span>Billing period</span
+          ><select name="duration" [(ngModel)]="planForm.duree">
+            @for (duration of durations; track duration) {
+              <option [value]="duration">{{ planLabel(duration) }}</option>
+            }
+          </select></label
+        >
+        <label class="form-field"
+          ><span>Minimum days before pause</span
+          ><input
+            name="minimumPause"
+            type="number"
+            min="0"
+            [(ngModel)]="planForm.minJoursEntreDesactivation"
+        /></label>
+        <label class="form-field"
+          ><span>Maximum pause duration</span
+          ><input
+            name="maximumPause"
+            type="number"
+            min="0"
+            [(ngModel)]="planForm.maxPeriodeDesactivation"
+        /></label>
+        <label class="form-field"
+          ><span>Monthly order limit</span
+          ><input
+            name="orderLimit"
+            type="number"
+            min="0"
+            [(ngModel)]="planForm.limiteCommandesMois"
+          /><small class="form-help">Use 0 for unlimited orders.</small></label
+        >
+        <label class="form-field"
+          ><span>Commercial status</span
+          ><select name="status" [(ngModel)]="planForm.estActif">
+            @for (status of offerStatuses; track status) {
+              <option [value]="status">{{ planLabel(status) }}</option>
+            }
+          </select></label
+        >
       </div>
-      <div class="form-actions"><button class="primary-button" type="submit" [disabled]="savingPlan">{{ savingPlan ? 'Saving...' : 'Save plan' }}</button></div>
+      <div class="form-actions">
+        <button class="primary-button" type="submit" [disabled]="savingPlan">
+          {{ savingPlan ? "Saving..." : "Save plan" }}
+        </button>
+      </div>
     </form>
   </aside>
 }

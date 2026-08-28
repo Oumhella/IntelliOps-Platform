@@ -4,12 +4,15 @@ import { forkJoin, Observable, of } from 'rxjs';
 import { AuthSessionService } from '../../core/auth/auth-session.service';
 import { CrmApiService, DeliveriesApiService, NotificationsApiService, PaymentsApiService, StockApiService, SubscriptionsApiService, UsersApiService } from '../../core/api';
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 
 interface OverviewMetric { label: string; value: number | string; note: string; tone: string; route: string; }
 interface WorkflowStep { label: string; detail: string; route: string; }
 
-@Component({ selector: 'app-business-home', imports: [RouterLink], templateUrl: './business-home.component.html', styleUrl: './business-home.component.scss' })
+@Component({ selector: 'app-business-home', imports: [RouterLink, TranslatePipe], templateUrl: './business-home.component.html', styleUrl: './business-home.component.scss' })
 export class BusinessHomeComponent implements OnInit {
+  readonly i18n = inject(I18nService);
   private readonly session = inject(AuthSessionService);
   private readonly usersApi = inject(UsersApiService);
   private readonly crmApi = inject(CrmApiService);

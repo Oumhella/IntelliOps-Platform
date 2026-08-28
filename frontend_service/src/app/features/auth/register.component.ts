@@ -4,16 +4,20 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AuthApiService, PlanResponse, SubscriptionsApiService } from '../../core/api';
 import { ApiError } from '../../core/http/api-error';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { LanguageSwitcherComponent } from '../../core/i18n/language-switcher.component';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 
 const ONBOARDING_PLAN_KEY = 'intelliops.onboarding-plan';
 
 @Component({
   selector: 'app-register',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, LanguageSwitcherComponent, TranslatePipe],
   templateUrl: './register.component.html',
   styleUrl: './register.component.scss',
 })
 export class RegisterComponent implements OnInit {
+  readonly i18n = inject(I18nService);
   private readonly api = inject(AuthApiService);
   private readonly subscriptions = inject(SubscriptionsApiService);
   private readonly route = inject(ActivatedRoute);

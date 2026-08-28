@@ -3,9 +3,10 @@ import { FormsModule } from '@angular/forms';
 import { InventoryResponse, PlatformType, ProductResponse, STOCK_MOVEMENT_TYPES, StockApiService, StockMovementType, StoreResponse } from '../../core/api';
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
 import { AuthSessionService } from '../../core/auth/auth-session.service';
+import { DomainLabelPipe } from '../../core/i18n/domain-label.pipe';
 
 type StockTab='stores'|'products'|'inventory'; type StockPanel='store'|'product'|'inventory'|null;
-@Component({selector:'app-stock',imports:[FormsModule],templateUrl:'./stock.component.html',styleUrl:'./business-view.scss'})
+@Component({selector:'app-stock',imports:[FormsModule,DomainLabelPipe],templateUrl:'./stock.component.html',styleUrl:'./business-view.scss'})
 export class StockComponent implements OnInit{
  private readonly api=inject(StockApiService);readonly feedback=inject(UiFeedbackService);readonly movements=STOCK_MOVEMENT_TYPES;
  readonly canManageIntegrations=inject(AuthSessionService).currentUser()?.role==='ROLE_ADMIN';
