@@ -5,6 +5,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Arrays;
+import java.text.Normalizer;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -13,7 +15,7 @@ import java.util.regex.Pattern;
 @Component
 public class AgentActionIntentGuard {
     private static final Pattern EXPLICIT_WRITE = Pattern.compile(
-            "(?i)\\b(create|convert|adjust|add|remove|refund|reimburse|cancel|assign|start|complete|mark|update|change|delete|send|replenish|return|prepare|confirm|annuler|rembourser|modifier|ajouter|supprimer|assigner|convertir)\\b");
+            "(?iu)(?:\\b(create|convert|adjust|add|remove|refund|reimburse|cancel|assign|start|complete|mark|update|change|delete|send|replenish|return|prepare|confirm|annuler|rembourser|modifier|ajouter|supprimer|assigner|affecter|convertir|preparer)\\b|إنشاء|تعديل|إلغاء|تأكيد|إسناد|حضر)");
     private static final Set<String> GENERIC_OPERATION_WORDS = Set.of(
             "create", "update", "delete", "patch", "post", "put", "api", "operation", "request", "confirm");
     private static final Pattern JSON_STRING_VALUE = Pattern.compile(":\\s*\"([^\"]+)\"");
@@ -22,7 +24,7 @@ public class AgentActionIntentGuard {
 
     public void begin(String userMessage) {
         String message = userMessage == null ? "" : userMessage.trim();
-        current.set(new IntentContext(message, EXPLICIT_WRITE.matcher(message).find()));
+        current.set(new IntentContext(message, EXPLICIT_WRITE.matcher(normalizeIntent(message)).find()));
     }
 
     public boolean actionsAllowed() {
@@ -86,6 +88,12 @@ public class AgentActionIntentGuard {
     private boolean containsValue(String message, String value) {
         return Pattern.compile("(?<![A-Za-z0-9])" + Pattern.quote(value) + "(?![A-Za-z0-9])",
                 Pattern.CASE_INSENSITIVE).matcher(message).find();
+    }
+
+    private String normalizeIntent(String message) {
+        return Normalizer.normalize(message, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toLowerCase(Locale.ROOT);
     }
 
     private void requireBodyValues(String message, String body) {

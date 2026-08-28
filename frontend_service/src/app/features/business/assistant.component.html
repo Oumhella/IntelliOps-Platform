@@ -32,9 +32,7 @@
     <div class="chat-safety">
       <div>
         <strong>{{ "assistant.approval" | t }}</strong
-        ><span>{{
-          status()?.mutationSafety || ("assistant.previewSafety" | t)
-        }}</span>
+        ><span>{{ "assistant.mutationSafety" | t }}</span>
       </div>
       <span class="role-chip">{{ role?.replace("ROLE_", "") }}</span>
     </div>

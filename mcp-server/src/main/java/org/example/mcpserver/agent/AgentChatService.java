@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 @Service
 public class AgentChatService implements AgentChat {
@@ -58,6 +59,7 @@ public class AgentChatService implements AgentChat {
     private final ReadOnlyAgentTools readOnlyAgentTools;
     private final AgentReadRouter readRouter;
     private final AgentIntentClassifier intentClassifier;
+    private final AgentActionRouter actionRouter;
     private final ActionPreviewAgentTools actionPreviewAgentTools;
     private final ApprovalService approvalService;
     private final AgentActionIntentGuard intentGuard;
@@ -67,6 +69,7 @@ public class AgentChatService implements AgentChat {
                             ReadOnlyAgentTools readOnlyAgentTools,
                             AgentReadRouter readRouter,
                             AgentIntentClassifier intentClassifier,
+                            AgentActionRouter actionRouter,
                             ActionPreviewAgentTools actionPreviewAgentTools,
                             ApprovalService approvalService,
                             AgentActionIntentGuard intentGuard,
@@ -81,6 +84,7 @@ public class AgentChatService implements AgentChat {
         this.readOnlyAgentTools = readOnlyAgentTools;
         this.readRouter = readRouter;
         this.intentClassifier = intentClassifier;
+        this.actionRouter = actionRouter;
         this.actionPreviewAgentTools = actionPreviewAgentTools;
         this.approvalService = approvalService;
         this.intentGuard = intentGuard;
@@ -98,6 +102,20 @@ public class AgentChatService implements AgentChat {
         String responseLocale = normalizeLocale(locale);
         intentGuard.begin(message);
         try {
+            var deterministicAction = actionRouter.route(message)
+                    .map(action -> localizePreview(action, responseLocale));
+            if (deterministicAction.isPresent()) {
+                return new AgentReply(
+                        localized(responseLocale,
+                                "I prepared the lead conversion for your review. Verify the target, location, product, and quantity before confirming.",
+                                "J’ai préparé la conversion du prospect. Vérifiez le prospect, le lieu, le produit et la quantité avant de confirmer.",
+                                "حضّرت تحويل العميل المحتمل للمراجعة. تحقق من العميل والموقع والمنتج والكمية قبل التأكيد."),
+                        localized(responseLocale,
+                                "A change was prepared, but nothing has been executed. Review the approval card.",
+                                "Une modification a été préparée, mais rien n’a été exécuté. Vérifiez la carte d’approbation.",
+                                "تم تحضير تغيير دون تنفيذه. راجع بطاقة الموافقة."),
+                        deterministicAction.get());
+            }
             if (!intentGuard.actionsAllowed()) {
                 var routed = readRouter.route(message);
                 if (routed.isEmpty()) {
@@ -108,16 +126,26 @@ public class AgentChatService implements AgentChat {
                     AgentReadRouter.RoutedRead read = routed.get();
                     if (read.isDirect()) {
                         return new AgentReply(localizeDirect(read.directAnswer(), responseLocale),
-                                "No ERP data was changed and no operation was prepared.", null);
+                                localized(responseLocale,
+                                        "No ERP data was changed and no operation was prepared.",
+                                        "Aucune donnée ERP n’a été modifiée et aucune opération n’a été préparée.",
+                                        "لم تتغير أي بيانات في نظام ERP ولم تُحضّر أي عملية."), null);
                     }
                     requireChatModel();
                     return new AgentReply(formatToolResult(message, read.backendResult(), responseLocale),
-                            "Live, permission-scoped ERP data was consulted. No changes were made.", null);
+                            localized(responseLocale,
+                                    "Live, permission-scoped ERP data was consulted. No changes were made.",
+                                    "Les données ERP en temps réel autorisées pour votre rôle ont été consultées. Aucun changement n’a été effectué.",
+                                    "تم الرجوع إلى بيانات ERP الفعلية المسموح بها لدورك، ولم يُجرَ أي تغيير."), null);
                 }
-                return new AgentReply("I could not map that request to a safe, authoritative ERP query. "
-                        + "Please name the resource and scope—for example, ‘show available products’, "
-                        + "‘show my leads’, ‘inventory for product 12 at location 3’, or ‘orders by status’.",
-                        "No tool was called and no business data was changed.", null);
+                return new AgentReply(localized(responseLocale,
+                                "I could not map that request to a safe, authoritative ERP query. Please name the resource and scope—for example, ‘show available products’, ‘show my leads’, ‘inventory for product 12 at location 3’, or ‘orders by status’.",
+                                "Je n’ai pas pu associer cette demande à une requête ERP sûre et fiable. Précisez la ressource et le périmètre, par exemple : « afficher les produits disponibles », « afficher mes prospects », « stock du produit 12 au lieu 3 » ou « commandes par statut ».",
+                                "تعذر ربط الطلب باستعلام آمن وموثوق في نظام ERP. حدّد المورد والنطاق، مثل: «عرض المنتجات المتاحة» أو «عرض العملاء المحتملين المسندين إليّ» أو «مخزون المنتج 12 في الموقع 3» أو «الطلبات حسب الحالة»."),
+                        localized(responseLocale,
+                                "No tool was called and no business data was changed.",
+                                "Aucun outil n’a été appelé et aucune donnée métier n’a été modifiée.",
+                                "لم تُستدعَ أي أداة ولم تتغير أي بيانات أعمال."), null);
             }
 
             requireChatModel();
@@ -135,28 +163,46 @@ public class AgentChatService implements AgentChat {
 
             ApprovalService.ActionPreview action = approvalService
                     .latestForCurrentCallerSince(requestStartedAt).orElse(null);
+            action = localizePreview(action, responseLocale);
             if (action != null) {
-                answer = "I prepared an operational action for your review. No business data has changed yet. "
-                        + "Review the impact below, then confirm or reject it.";
+                answer = localized(responseLocale,
+                        "I prepared an operational action for your review. No business data has changed yet. Review the impact below, then confirm or reject it.",
+                        "J’ai préparé une opération pour votre vérification. Aucune donnée métier n’a encore changé. Vérifiez l’impact ci-dessous, puis confirmez ou refusez.",
+                        "حضّرت عملية لمراجعتك، ولم تتغير أي بيانات أعمال بعد. راجع الأثر أدناه ثم أكّد العملية أو ارفضها.");
             } else if (looksLikeRawToolCall(answer)) {
-                answer = "I could not safely translate the tool response into a business answer. "
-                        + "No action was executed; please refine the request and try again.";
+                answer = localized(responseLocale,
+                        "I could not safely translate the tool response into a business answer. No action was executed; please refine the request and try again.",
+                        "Je n’ai pas pu convertir la réponse de l’outil en réponse métier sûre. Aucune opération n’a été exécutée ; précisez la demande et réessayez.",
+                        "تعذر تحويل استجابة الأداة إلى إجابة أعمال آمنة. لم تُنفذ أي عملية؛ وضّح الطلب ثم أعد المحاولة.");
             }
 
             return new AgentReply(answer,
                     action == null
-                            ? "Live ERP data was consulted. No changes were made."
-                            : "A change was prepared, but nothing has been executed. Review the approval card.",
+                            ? localized(responseLocale, "Live ERP data was consulted. No changes were made.",
+                                    "Les données ERP en temps réel ont été consultées. Aucun changement n’a été effectué.",
+                                    "تم الرجوع إلى بيانات ERP الفعلية، ولم يُجرَ أي تغيير.")
+                            : localized(responseLocale, "A change was prepared, but nothing has been executed. Review the approval card.",
+                                    "Une modification a été préparée, mais rien n’a été exécuté. Vérifiez la carte d’approbation.",
+                                    "تم تحضير تغيير دون تنفيذه. راجع بطاقة الموافقة."),
                     action);
         }
         catch (ResponseStatusException exception) {
             if (exception.getStatusCode().value() == 400) {
-                return new AgentReply(exception.getReason(),
-                        "The request was blocked before execution. No business data was changed.", null);
+                return new AgentReply(localizeBlockedReason(exception.getReason(), responseLocale),
+                        localized(responseLocale,
+                                "The request was blocked before execution. No business data was changed.",
+                                "La demande a été bloquée avant exécution. Aucune donnée métier n’a été modifiée.",
+                                "حُظر الطلب قبل التنفيذ ولم تتغير أي بيانات أعمال."), null);
             }
             if (exception.getStatusCode().value() == 403) {
-                return new AgentReply("Your authenticated role is not permitted to view that resource.",
-                        "The request was denied by the domain service. No business data was changed.", null);
+                return new AgentReply(localized(responseLocale,
+                                "Your authenticated role is not permitted to view that resource.",
+                                "Votre rôle authentifié n’est pas autorisé à consulter cette ressource.",
+                                "دورك الموثق غير مخول لعرض هذا المورد."),
+                        localized(responseLocale,
+                                "The request was denied by the domain service. No business data was changed.",
+                                "La demande a été refusée par le service métier. Aucune donnée n’a été modifiée.",
+                                "رفضت خدمة المجال الطلب ولم تتغير أي بيانات أعمال."), null);
             }
             if (exception.getStatusCode().value() == 401) {
                 log.error("A read-only assistant dependency rejected its internal authenticated call", exception);
@@ -341,6 +387,8 @@ public class AgentChatService implements AgentChat {
 
                 Answer the question using only this result. Use concise natural-language markdown.
                 Respond in the language represented by locale "%s" (en=English, fr=French, ar=Arabic).
+                When the result contains IDs for actionable resources, include those IDs in the answer so the
+                user can safely identify an exact target in a later operation request.
                 Never output JSON, tool names, function-call narration, or invented values.
                 """, userMessage, toolResult, locale);
         String formatted = chatClient.prompt().user(formatPrompt).call().content();
@@ -366,6 +414,43 @@ public class AgentChatService implements AgentChat {
 
     private String normalizeLocale(String locale) {
         return locale != null && List.of("en", "fr", "ar").contains(locale) ? locale : "en";
+    }
+
+    private String localized(String locale, String english, String french, String arabic) {
+        return switch (locale) {
+            case "fr" -> french;
+            case "ar" -> arabic;
+            default -> english;
+        };
+    }
+
+    private String localizeBlockedReason(String reason, String locale) {
+        if ("en".equals(locale)) return reason;
+        return localized(locale, reason,
+                "La demande ne contient pas tous les identifiants ou paramètres requis pour préparer cette opération en toute sécurité.",
+                "لا يحتوي الطلب على جميع المعرّفات أو المعلمات المطلوبة لتحضير العملية بأمان.");
+    }
+
+    private ApprovalService.ActionPreview localizePreview(
+            ApprovalService.ActionPreview preview, String locale) {
+        if (preview == null || "en".equals(locale)) return preview;
+        String summary = preview.summary();
+        var conversion = Pattern.compile(
+                "Convert lead (\\d+) into an order with (\\d+) line\\(s\\) fulfilled by location (\\d+); catalog prices will be applied by the ERP")
+                .matcher(summary);
+        if (conversion.matches()) {
+            summary = "fr".equals(locale)
+                    ? "Convertir le prospect %s en commande avec %s ligne(s), préparée(s) depuis le lieu %s ; les prix du catalogue seront appliqués par l’ERP"
+                            .formatted(conversion.group(1), conversion.group(2), conversion.group(3))
+                    : "تحويل العميل المحتمل %s إلى طلب يضم %s بند، وتجهيزه من الموقع %s؛ وسيطبق نظام ERP أسعار الكتالوج"
+                            .formatted(conversion.group(1), conversion.group(2), conversion.group(3));
+        }
+        return new ApprovalService.ActionPreview(
+                preview.approvalToken(), preview.operation(), summary, preview.expiresAt(),
+                preview.requiresExplicitConfirmation(), preview.riskLevel(), preview.requiresReason(),
+                localized(locale, preview.nextStep(),
+                        "Vérifiez cette opération, puis confirmez-la ou refusez-la explicitement.",
+                        "راجع هذه العملية، ثم أكّدها أو ارفضها صراحةً."));
     }
 
     private String localizeDirect(String answer, String locale) {

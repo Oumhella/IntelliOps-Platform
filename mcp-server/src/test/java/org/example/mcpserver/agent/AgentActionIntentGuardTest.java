@@ -36,4 +36,10 @@ class AgentActionIntentGuardTest {
         guard.begin("Refund payment 42 because it was duplicated");
         assertDoesNotThrow(() -> guard.requireGenericMutation("rembourser", Map.of("paymentId", "42")));
     }
+
+    @Test
+    void recognizesFrenchPreparationAndConversionNounsAsWriteIntent() {
+        guard.begin("Préparer la conversion du prospect 2 avec le produit 8 au lieu 1");
+        assertDoesNotThrow(guard::requireExplicitWrite);
+    }
 }
