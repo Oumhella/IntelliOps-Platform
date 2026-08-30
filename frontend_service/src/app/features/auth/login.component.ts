@@ -5,10 +5,13 @@ import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AuthApiService } from '../../core/api';
 import { ApiError } from '../../core/http/api-error';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { LanguageSwitcherComponent } from '../../core/i18n/language-switcher.component';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 
 @Component({
   selector: 'app-login',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, LanguageSwitcherComponent, TranslatePipe],
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss',
 })
@@ -16,6 +19,7 @@ export class LoginComponent implements OnInit {
   private readonly authApi = inject(AuthApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly i18n = inject(I18nService);
 
   email = '';
   password = '';
@@ -38,7 +42,7 @@ export class LoginComponent implements OnInit {
 
   submit(): void {
     if (!this.email.trim() || !this.password || this.submitting) {
-      this.errorMessage = 'Enter your email address and password.';
+      this.errorMessage = this.i18n.translate('auth.required');
       return;
     }
 
@@ -65,7 +69,7 @@ export class LoginComponent implements OnInit {
         error: (error: unknown) => {
           this.errorMessage = error instanceof ApiError
             ? error.message
-            : 'Sign-in failed. Please try again.';
+            : this.i18n.translate('auth.failed');
         },
       });
   }

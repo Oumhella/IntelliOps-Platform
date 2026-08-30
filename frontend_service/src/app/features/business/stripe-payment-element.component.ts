@@ -2,9 +2,11 @@ import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnDestroy, O
 import { loadStripe } from '@stripe/stripe-js/pure';
 import type { Stripe, StripeElements, StripePaymentElement } from '@stripe/stripe-js';
 import { CheckoutPreparationResponse } from '../../core/api';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 
 @Component({
   selector: 'app-stripe-payment-element',
+  imports: [TranslatePipe],
   templateUrl: './stripe-payment-element.component.html',
   styleUrl: './stripe-payment-element.component.scss',
 })

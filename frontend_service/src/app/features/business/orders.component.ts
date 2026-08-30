@@ -3,8 +3,9 @@ import { FormsModule } from '@angular/forms';
 import { CrmApiService, ORDER_STATUSES, OrderResponse, OrderStatus, PageResponse, SalesProductResponse, StockApiService } from '../../core/api';
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
 import { AuthSessionService } from '../../core/auth/auth-session.service';
+import { DomainLabelPipe } from '../../core/i18n/domain-label.pipe';
 
-@Component({ selector:'app-orders', imports:[FormsModule], templateUrl:'./orders.component.html', styleUrl:'./business-view.scss' })
+@Component({ selector:'app-orders', imports:[FormsModule,DomainLabelPipe], templateUrl:'./orders.component.html', styleUrl:'./business-view.scss' })
 export class OrdersComponent implements OnInit {
   private readonly api=inject(CrmApiService); readonly feedback=inject(UiFeedbackService); readonly statuses=ORDER_STATUSES;
   private readonly stockApi=inject(StockApiService);

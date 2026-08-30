@@ -1,5 +1,80 @@
-<main class="view-page"><header class="view-heading"><div><p class="eyebrow"><span>Workspace</span><b>/</b> Overview</p><h1>Good to see you, {{ user()?.firstname || 'team member' }}</h1><p>Live totals from the services available to your role.</p></div><div class="view-actions">@if(canUseBi){<a class="secondary-button" routerLink="/app/analytics">Open my BI</a>}<button class="secondary-button" type="button" (click)="load()">Refresh</button></div></header>
-  @if (loading()) { <div class="dashboard-loading">@for (item of [1,2,3,4]; track item) { <span class="loading-card"></span> }</div> }
-  @else { <section class="metric-grid">@for (metric of metrics(); track metric.label) { <a class="surface-card metric-card metric-link" [routerLink]="metric.route"><div class="metric-topline"><span class="metric-icon" [class]="'metric-icon metric-icon-' + metric.tone"><span class="metric-glyph">{{ metric.label[0] }}</span></span><span class="text-button">Open →</span></div><p>{{ metric.label }}</p><div class="metric-value"><strong>{{ metric.value }}</strong></div><small>{{ metric.note }}</small></a> }</section> }
-  <section class="surface-card workspace-guide"><div><span class="section-kicker">Next operational steps</span><h2>Move work through the handoff.</h2><p>Open the next queue for your role and leave each record ready for the team that follows.</p></div><div class="role-workflow">@for(step of workflow;track step.label;let index=$index){<a [routerLink]="step.route"><b>{{index + 1}}</b><span><strong>{{step.label}}</strong><small>{{step.detail}}</small></span></a>}</div></section>
+<main class="view-page">
+  <header class="view-heading">
+    <div>
+      <p class="eyebrow">
+        <span>{{ "nav.workspace" | t }}</span
+        ><b>/</b> {{ "nav.overview" | t }}
+      </p>
+      <h1>
+        {{
+          i18n.translate("home.greeting", {
+            name: user()?.firstname || ("home.teamMember" | t),
+          })
+        }}
+      </h1>
+      <p>{{ "home.subtitle" | t }}</p>
+    </div>
+    <div class="view-actions">
+      @if (canUseBi) {
+        <a class="secondary-button" routerLink="/app/analytics">{{
+          "home.openBi" | t
+        }}</a>
+      }
+      <button class="secondary-button" type="button" (click)="load()">
+        {{ "common.refresh" | t }}
+      </button>
+    </div>
+  </header>
+  @if (loading()) {
+    <div class="dashboard-loading">
+      @for (item of [1, 2, 3, 4]; track item) {
+        <span class="loading-card"></span>
+      }
+    </div>
+  } @else {
+    <section class="metric-grid">
+      @for (metric of metrics(); track metric.label) {
+        <a
+          class="surface-card metric-card metric-link"
+          [routerLink]="metric.route"
+          ><div class="metric-topline">
+            <span
+              class="metric-icon"
+              [class]="'metric-icon metric-icon-' + metric.tone"
+              ><span class="metric-glyph">{{
+                (metric.label | t)[0]
+              }}</span></span
+            ><span class="text-button">{{ "home.open" | t }} →</span>
+          </div>
+          <p>{{ metric.label | t }}</p>
+          <div class="metric-value">
+            <strong>{{
+              typeof metric.value === "string"
+                ? (metric.value | t)
+                : metric.value
+            }}</strong>
+          </div>
+          <small>{{ metric.note | t }}</small></a
+        >
+      }
+    </section>
+  }
+  <section class="surface-card workspace-guide">
+    <div>
+      <span class="section-kicker">{{ "home.nextSteps" | t }}</span>
+      <h2>{{ "home.handoff" | t }}</h2>
+      <p>{{ "home.handoffText" | t }}</p>
+    </div>
+    <div class="role-workflow">
+      @for (step of workflow; track step.label; let index = $index) {
+        <a [routerLink]="step.route"
+          ><b>{{ index + 1 }}</b
+          ><span
+            ><strong>{{ step.label | t }}</strong
+            ><small>{{ step.detail | t }}</small></span
+          ></a
+        >
+      }
+    </div>
+  </section>
 </main>

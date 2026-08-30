@@ -17,12 +17,13 @@ import {
 } from '../../core/api';
 import { AuthSessionService } from '../../core/auth/auth-session.service';
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
+import { DomainLabelPipe } from '../../core/i18n/domain-label.pipe';
 
 type LeadPanel = 'create' | 'detail' | 'assign' | 'interaction' | 'convert' | null;
 
 @Component({
   selector: 'app-leads',
-  imports: [FormsModule],
+  imports: [FormsModule, DomainLabelPipe],
   templateUrl: './leads.component.html',
   styleUrl: './business-view.scss',
 })

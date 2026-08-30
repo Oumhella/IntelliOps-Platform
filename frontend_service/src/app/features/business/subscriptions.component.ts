@@ -13,6 +13,7 @@ import {
 } from '../../core/api';
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
 import { StripePaymentElementComponent } from './stripe-payment-element.component';
+import { DomainLabelPipe } from '../../core/i18n/domain-label.pipe';
 
 type SubscriptionPanel = 'subscribe' | 'details' | 'pause' | 'renew' | 'upgrade' | null;
 type PendingCheckout = {
@@ -25,7 +26,7 @@ const PENDING_CHECKOUT_KEY = 'intelliops.pending-subscription-checkout';
 
 @Component({
   selector: 'app-subscriptions',
-  imports: [FormsModule, StripePaymentElementComponent],
+  imports: [FormsModule, StripePaymentElementComponent, DomainLabelPipe],
   templateUrl: './subscriptions.component.html',
   styleUrl: './business-view.scss',
 })

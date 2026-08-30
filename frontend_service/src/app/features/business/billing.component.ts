@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -20,10 +19,12 @@ import {
 } from '../../core/api';
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
 import { StripePaymentElementComponent } from './stripe-payment-element.component';
+import { DomainLabelPipe } from '../../core/i18n/domain-label.pipe';
+import { LocaleDatePipe } from '../../core/i18n/locale-date.pipe';
 
 const PENDING_BILLING_PAYMENT_KEY = 'intelliops.pending-billing-payment';
 
-@Component({ selector: 'app-billing', imports: [FormsModule, DatePipe, StripePaymentElementComponent], templateUrl: './billing.component.html', styleUrl: './business-view.scss' })
+@Component({ selector: 'app-billing', imports: [FormsModule, StripePaymentElementComponent, DomainLabelPipe, LocaleDatePipe], templateUrl: './billing.component.html', styleUrl: './business-view.scss' })
 export class BillingComponent implements OnInit {
   private readonly api = inject(PaymentsApiService);
   private readonly crmApi = inject(CrmApiService);

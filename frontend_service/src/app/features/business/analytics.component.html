@@ -1,66 +1,219 @@
 <main class="view-page analytics-page">
   <header class="view-heading">
     <div>
-      <p class="eyebrow"><span>Intelligence</span><b>/</b> Conversational BI</p>
-      <h1>Ask your business data</h1>
-      <p>Tenant-isolated, role-aware answers with persistent history, charts and reports.</p>
+      <p class="eyebrow">
+        <span>{{ "analytics.section" | t }}</span
+        ><b>/</b> {{ "analytics.label" | t }}
+      </p>
+      <h1>{{ "analytics.title" | t }}</h1>
+      <p>{{ "analytics.subtitle" | t }}</p>
     </div>
     <div class="heading-actions">
-      @if(role()){<span class="role-scope">{{roleLabel()}} scope</span>}
-      <button class="secondary-button" type="button" (click)="clear()" [disabled]="!messages().length">Clear history</button>
+      @if (role()) {
+        <span class="role-scope">{{
+          i18n.translate("analytics.scope", { role: roleLabel() })
+        }}</span>
+      }
+      <button
+        class="secondary-button"
+        type="button"
+        (click)="clear()"
+        [disabled]="!messages().length"
+      >
+        {{ "analytics.clear" | t }}
+      </button>
     </div>
   </header>
+  <section class="surface-card report-center">
+    <div class="report-center-heading">
+      <div>
+        <p class="eyebrow">{{ "analytics.reportCenter" | t }}</p>
+        <h2>{{ "analytics.reportTitle" | t }}</h2>
+        <p>{{ "analytics.reportText" | t }}</p>
+      </div>
+      <div class="report-actions">
+        <button class="secondary-button" type="button" (click)="generateReport('WEEKLY')" [disabled]="!!generatingReport()">
+          {{ (generatingReport() === 'WEEKLY' ? "analytics.generating" : "analytics.generateWeekly") | t }}
+        </button>
+        <button class="primary-button" type="button" (click)="generateReport('MONTHLY')" [disabled]="!!generatingReport()">
+          {{ (generatingReport() === 'MONTHLY' ? "analytics.generating" : "analytics.generateMonthly") | t }}
+        </button>
+      </div>
+    </div>
+    @if (reports().length) {
+      <div class="report-history">
+        @for (report of reports(); track report.id) {
+          <article>
+            <div class="report-icon">PDF</div>
+            <div>
+              <strong>{{ (report.period_type === 'WEEKLY' ? "analytics.weekly" : "analytics.monthly") | t }}</strong>
+              <p>{{ reportPeriod(report) }}</p>
+              <small>{{ "analytics.reportOrders" | t }}: {{ report.summary.orders }} · {{ "analytics.reportDelivered" | t }}: {{ report.summary.delivered }} · {{ report.locale.toUpperCase() }}</small>
+            </div>
+            <button type="button" (click)="downloadReport(report)" [disabled]="downloadingReport() === report.id">
+              {{ (downloadingReport() === report.id ? "analytics.downloading" : "analytics.downloadPdf") | t }}
+            </button>
+          </article>
+        }
+      </div>
+    } @else {
+      <p class="empty-reports">{{ "analytics.noReports" | t }}</p>
+    }
+  </section>
   <section class="surface-card analytics-card">
-    @if(!messages().length){
+    @if (!messages().length) {
       <div class="welcome">
-        <h2>What would you like to understand?</h2>
-        <p>Your available questions reflect your operational responsibilities.</p>
+        <h2>{{ "analytics.welcome" | t }}</h2>
+        <p>{{ "analytics.welcomeText" | t }}</p>
         <div class="suggestions">
-          @for(item of suggestions();track item){<button type="button" (click)="ask(item)">{{item}}</button>}
+          @for (item of suggestions(); track item) {
+            <button type="button" (click)="ask(item)">{{ item }}</button>
+          }
         </div>
       </div>
     }
     <div class="messages">
-      @for(message of messages();track $index){
-        <article [class.user]="message.role==='user'" [class.failed]="message.failed">
-          <strong>{{message.role==='user'?'You':'BI'}}</strong>
-          <p>{{message.text}}</p>
-          @if(message.response;as response){
-            @if(response.visualization.type==='single_value'&&response.result.rows.length){
-              <div class="bi-kpi">{{cell(response.result.rows[0],response.visualization.y||response.result.columns[0].name)}}</div>
+      @for (message of messages(); track $index) {
+        <article
+          [class.user]="message.role === 'user'"
+          [class.failed]="message.failed"
+        >
+          <strong>{{
+            message.role === "user" ? ("common.you" | t) : "BI"
+          }}</strong>
+          <p>{{ message.text }}</p>
+          @if (message.response; as response) {
+            @if (
+              response.visualization.type === "single_value" &&
+              response.result.rows.length
+            ) {
+              <div class="bi-kpi">
+                {{
+                  cell(
+                    response.result.rows[0],
+                    response.visualization.y || response.result.columns[0].name
+                  )
+                }}
+              </div>
             }
-            @if((response.visualization.type==='bar'||response.visualization.type==='line')&&response.result.rows.length){
+            @if (
+              (response.visualization.type === "bar" ||
+                response.visualization.type === "line") &&
+              response.result.rows.length
+            ) {
               <div class="bi-chart">
-                @for(row of response.result.rows;track $index){
-                  <div class="bi-bar-row"><span>{{cell(row,response.visualization.x||'')}}</span><div><i [style.width]="barWidth(row,response)"></i></div><b>{{cell(row,response.visualization.y||'')}}</b></div>
+                @for (row of response.result.rows; track $index) {
+                  <div class="bi-bar-row">
+                    <span>{{ cell(row, response.visualization.x || "") }}</span>
+                    <div><i [style.width]="barWidth(row, response)"></i></div>
+                    <b>{{ cell(row, response.visualization.y || "") }}</b>
+                  </div>
                 }
               </div>
             }
-            @if(response.visualization.type==='donut'&&response.result.rows.length){
+            @if (
+              response.visualization.type === "donut" &&
+              response.result.rows.length
+            ) {
               <div class="donut-chart">
-                <div class="donut" [style.background]="donutBackground(response)"><span>{{response.result.rows.length}} groups</span></div>
+                <div
+                  class="donut"
+                  [style.background]="donutBackground(response)"
+                >
+                  <span>{{
+                    i18n.translate("analytics.groups", {
+                      count: response.result.rows.length,
+                    })
+                  }}</span>
+                </div>
                 <div class="donut-legend">
-                  @for(row of response.result.rows;track $index){
-                    <div><i [style.background]="palette[$index%palette.length]"></i><span>{{cell(row,response.visualization.x||'')}}</span><b>{{cell(row,response.visualization.y||'')}}</b></div>
+                  @for (row of response.result.rows; track $index) {
+                    <div>
+                      <i
+                        [style.background]="palette[$index % palette.length]"
+                      ></i
+                      ><span>{{
+                        cell(row, response.visualization.x || "")
+                      }}</span
+                      ><b>{{ cell(row, response.visualization.y || "") }}</b>
+                    </div>
                   }
                 </div>
               </div>
             }
-            @if(response.result.rows.length&&response.visualization.type==='table'){
-              <div class="table-wrap"><table><thead><tr>@for(column of response.result.columns;track column.name){<th>{{column.name}}</th>}</tr></thead><tbody>@for(row of response.result.rows;track $index){<tr>@for(column of response.result.columns;track column.name){<td>{{cell(row,column.name)}}</td>}</tr>}</tbody></table></div>
+            @if (
+              response.result.rows.length &&
+              response.visualization.type === "table"
+            ) {
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      @for (
+                        column of response.result.columns;
+                        track column.name
+                      ) {
+                        <th>{{ column.name }}</th>
+                      }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (row of response.result.rows; track $index) {
+                      <tr>
+                        @for (
+                          column of response.result.columns;
+                          track column.name
+                        ) {
+                          <td>{{ cell(row, column.name) }}</td>
+                        }
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
             }
             <footer class="result-footer">
-              <small>Metric: {{response.metadata.metric}} · Freshness: {{response.metadata.data_freshness||'not available'}}</small>
-              <button type="button" (click)="exportCsv(message)" [disabled]="exporting()===exportKey(message)">{{exporting()===exportKey(message)?'Exporting…':'Export CSV'}}</button>
+              <small
+                >{{ "analytics.metric" | t }}: {{ response.metadata.metric }} ·
+                {{ "analytics.freshness" | t }}:
+                {{
+                  response.metadata.data_freshness ||
+                    ("analytics.notAvailable" | t)
+                }}</small
+              >
+              <button
+                type="button"
+                (click)="exportCsv(message)"
+                [disabled]="exporting() === exportKey(message)"
+              >
+                {{
+                  (exporting() === exportKey(message)
+                    ? "analytics.exporting"
+                    : "analytics.exportCsv"
+                  ) | t
+                }}
+              </button>
             </footer>
           }
         </article>
       }
-      @if(sending){<article><strong>BI</strong><p>Analyzing authorized reporting data…</p></article>}
+      @if (sending) {
+        <article>
+          <strong>BI</strong>
+          <p>{{ "analytics.analyzing" | t }}</p>
+        </article>
+      }
     </div>
     <form (ngSubmit)="ask()">
-      <textarea name="question" maxlength="1000" [(ngModel)]="question" placeholder="Ask an analytics question within your role"></textarea>
-      <button class="primary-button" [disabled]="sending||!question.trim()">Ask →</button>
+      <textarea
+        name="question"
+        maxlength="1000"
+        [(ngModel)]="question"
+        [placeholder]="'analytics.placeholder' | t"
+      ></textarea>
+      <button class="primary-button" [disabled]="sending || !question.trim()">
+        {{ "analytics.ask" | t }} →
+      </button>
     </form>
   </section>
 </main>

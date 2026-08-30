@@ -6,3 +6,23 @@ export interface AnalyticsResponse { readonly question: string; readonly answer:
 export type ConversationSurface='ASSISTANT'|'BI';
 export interface ConversationMessage {readonly id:number;readonly surface:ConversationSurface;readonly role:'user'|'assistant';readonly content:string;readonly payload?:Record<string,unknown>;readonly created_at:string;}
 export interface AnalyticsSuggestions {readonly role:string;readonly suggestions:readonly string[];}
+export type AnalyticsReportPeriod = 'WEEKLY' | 'MONTHLY';
+export interface AnalyticsReportSummary {
+  readonly orders: number;
+  readonly paid_revenue: number;
+  readonly average_order_value: number;
+  readonly delivered: number;
+  readonly low_stock_items: number;
+  readonly recommendations: readonly string[];
+}
+export interface AnalyticsReport {
+  readonly id: string;
+  readonly audience_role: string;
+  readonly period_type: AnalyticsReportPeriod;
+  readonly period_start: string;
+  readonly period_end: string;
+  readonly locale: 'en' | 'fr' | 'ar';
+  readonly generated_at: string;
+  readonly file_name: string;
+  readonly summary: AnalyticsReportSummary;
+}

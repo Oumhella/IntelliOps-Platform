@@ -85,7 +85,7 @@ def deterministic_plan(
     role: str = "ROLE_ADMIN",
     user_id: str | None = None,
 ) -> QueryPlan | None:
-    normalized = re.sub(r"\s+", " ", question.lower()).strip()
+    normalized = _canonicalize_question(question)
     count_requested = any(
         phrase in normalized for phrase in ("how many", "count", "number of")
     )
@@ -217,6 +217,44 @@ def deterministic_plan(
             [],
         )
     return None
+
+
+def _canonicalize_question(question: str) -> str:
+    normalized = re.sub(r"\s+", " ", question.lower()).strip()
+    aliases = {
+        "combien": "how many", "nombre de": "number of", "كم": "how many", "عدد": "count",
+        "prospects": "leads", "prospect": "lead", "العملاء المحتملون": "leads",
+        "statuts": "status",
+        "statut": "status",
+        "état": "status",
+        "الحالة": "status",
+        "حالة": "status",
+        "regroupées": "group",
+        "regroupés": "group",
+        "groupées": "group",
+        "مجمعة": "group",
+        "produits": "products",
+        "produit": "product",
+        "المنتجات": "products",
+        "منتج": "product",
+        "commandes": "orders", "commande": "order", "الطلبات": "orders", "طلب": "order",
+        "livraisons": "deliveries",
+        "livraison": "delivery",
+        "التوصيلات": "deliveries",
+        "توصيل": "delivery",
+        "chiffre d’affaires": "revenue",
+        "chiffre d'affaires": "revenue",
+        "revenu": "revenue",
+        "رقم المعاملات": "revenue", "الإيرادات": "revenue",
+        "مخزون": "stock",
+        "faible stock": "low stock",
+        "stock faible": "low stock",
+        "مخزون منخفض": "low stock",
+        "meilleurs": "top", "أفضل": "top",
+    }
+    for source, target in aliases.items():
+        normalized = normalized.replace(source, target)
+    return normalized
 
 
 def suggestions_for_role(role: str) -> list[str]:

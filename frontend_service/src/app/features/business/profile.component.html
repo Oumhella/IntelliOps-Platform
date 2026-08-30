@@ -1,2 +1,166 @@
-<main class="view-page"><header class="view-heading"><div><p class="eyebrow"><span>Account</span><b>/</b> Profile</p><h1>Profile and company</h1><p>Manage personal identity and workspace business information.</p></div></header><div class="view-grid"><section class="surface-card side-card"><h2>Personal information</h2><form (ngSubmit)="saveProfile()"><div class="form-grid"><label class="form-field"><span>First name</span><input name="first" [(ngModel)]="profileForm.firstname"/></label><label class="form-field"><span>Last name</span><input name="last" [(ngModel)]="profileForm.lastname"/></label><label class="form-field form-field-full"><span>Email</span><input [value]="profile()?.email||sessionUser()?.email" disabled/></label><label class="form-field form-field-full"><span>Phone</span><input name="phone" [(ngModel)]="profileForm.phone"/></label></div><div class="form-actions"><button class="primary-button" [disabled]="busy">Save profile</button></div></form></section><section class="surface-card side-card"><h2>Change password</h2><form (ngSubmit)="changePassword()"><div class="form-grid"><label class="form-field form-field-full"><span>Current password</span><input name="current" type="password" [(ngModel)]="passwordForm.currentPassword"/></label><label class="form-field form-field-full"><span>New password</span><input name="new" type="password" minlength="8" [(ngModel)]="passwordForm.newPassword"/></label><label class="form-field form-field-full"><span>Confirm password</span><input name="confirm" type="password" [(ngModel)]="passwordForm.confirmPassword"/></label></div><div class="form-actions"><button class="primary-button" [disabled]="busy">Change password</button></div></form></section></div>
-@if(sessionUser()?.role==='ROLE_ADMIN'){<section class="surface-card side-card"><h2>Company information</h2><p>Only administrators can update tenant-wide legal, contact, and localization settings.</p><form (ngSubmit)="saveCompany()"><div class="form-grid"><label class="form-field"><span>Trading name</span><input name="company" [(ngModel)]="companyForm.companyName" required/></label><label class="form-field"><span>Activity</span><input name="activity" [(ngModel)]="companyForm.activityType" required/></label><label class="form-field"><span>Legal name</span><input name="legalName" [(ngModel)]="companyForm.legalName"/></label><label class="form-field"><span>Registration / ICE</span><input name="legalId" [(ngModel)]="companyForm.legalIdentifier"/></label><label class="form-field"><span>Tax identifier</span><input name="taxId" [(ngModel)]="companyForm.taxIdentifier"/></label><label class="form-field"><span>Business email</span><input type="email" name="businessEmail" [(ngModel)]="companyForm.contactEmail"/></label><label class="form-field"><span>Business phone</span><input name="businessPhone" [(ngModel)]="companyForm.contactPhone"/></label><label class="form-field"><span>Website</span><input name="website" [(ngModel)]="companyForm.website"/></label><label class="form-field form-field-full"><span>Address</span><input name="address" [(ngModel)]="companyForm.addressLine1"/></label><label class="form-field form-field-full"><span>Address complement</span><input name="address2" [(ngModel)]="companyForm.addressLine2"/></label><label class="form-field"><span>City</span><input name="city" [(ngModel)]="companyForm.city"/></label><label class="form-field"><span>Postal code</span><input name="postal" [(ngModel)]="companyForm.postalCode"/></label><label class="form-field"><span>Country (ISO)</span><input name="country" maxlength="2" [(ngModel)]="companyForm.countryCode"/></label><label class="form-field"><span>Currency</span><input name="currency" maxlength="3" [(ngModel)]="companyForm.currencyCode"/></label><label class="form-field form-field-full"><span>Timezone</span><input name="timezone" [(ngModel)]="companyForm.timezone"/></label></div><div class="form-actions"><button class="primary-button" [disabled]="busy">Save company</button></div></form></section>}</main>
+<main class="view-page">
+  <header class="view-heading">
+    <div>
+      <p class="eyebrow">
+        <span>{{ "profile.section" | t }}</span
+        ><b>/</b> {{ "profile.label" | t }}
+      </p>
+      <h1>{{ "profile.title" | t }}</h1>
+      <p>{{ "profile.subtitle" | t }}</p>
+    </div>
+  </header>
+  <div class="view-grid">
+    <section class="surface-card side-card">
+      <h2>{{ "profile.personal" | t }}</h2>
+      <form (ngSubmit)="saveProfile()">
+        <div class="form-grid">
+          <label class="form-field"
+            ><span>{{ "profile.firstName" | t }}</span
+            ><input name="first" [(ngModel)]="profileForm.firstname"
+          /></label>
+          <label class="form-field"
+            ><span>{{ "profile.lastName" | t }}</span
+            ><input name="last" [(ngModel)]="profileForm.lastname"
+          /></label>
+          <label class="form-field form-field-full"
+            ><span>{{ "common.email" | t }}</span
+            ><input [value]="profile()?.email || sessionUser()?.email" disabled
+          /></label>
+          <label class="form-field form-field-full"
+            ><span>{{ "common.phone" | t }}</span
+            ><input name="phone" [(ngModel)]="profileForm.phone"
+          /></label>
+        </div>
+        <div class="form-actions">
+          <button class="primary-button" [disabled]="busy">
+            {{ "profile.save" | t }}
+          </button>
+        </div>
+      </form>
+    </section>
+    <section class="surface-card side-card">
+      <h2>{{ "profile.changePassword" | t }}</h2>
+      <form (ngSubmit)="changePassword()">
+        <div class="form-grid">
+          <label class="form-field form-field-full"
+            ><span>{{ "profile.currentPassword" | t }}</span
+            ><input
+              name="current"
+              type="password"
+              [(ngModel)]="passwordForm.currentPassword"
+          /></label>
+          <label class="form-field form-field-full"
+            ><span>{{ "profile.newPassword" | t }}</span
+            ><input
+              name="new"
+              type="password"
+              minlength="8"
+              [(ngModel)]="passwordForm.newPassword"
+          /></label>
+          <label class="form-field form-field-full"
+            ><span>{{ "profile.confirmPassword" | t }}</span
+            ><input
+              name="confirm"
+              type="password"
+              [(ngModel)]="passwordForm.confirmPassword"
+          /></label>
+        </div>
+        <div class="form-actions">
+          <button class="primary-button" [disabled]="busy">
+            {{ "profile.changePassword" | t }}
+          </button>
+        </div>
+      </form>
+    </section>
+  </div>
+  @if (sessionUser()?.role === "ROLE_ADMIN") {
+    <section class="surface-card side-card">
+      <h2>{{ "profile.company" | t }}</h2>
+      <p>{{ "profile.companyHelp" | t }}</p>
+      <form (ngSubmit)="saveCompany()">
+        <div class="form-grid">
+          <label class="form-field"
+            ><span>{{ "profile.tradingName" | t }}</span
+            ><input
+              name="company"
+              [(ngModel)]="companyForm.companyName"
+              required
+          /></label>
+          <label class="form-field"
+            ><span>{{ "profile.activity" | t }}</span
+            ><input
+              name="activity"
+              [(ngModel)]="companyForm.activityType"
+              required
+          /></label>
+          <label class="form-field"
+            ><span>{{ "profile.legalName" | t }}</span
+            ><input name="legalName" [(ngModel)]="companyForm.legalName"
+          /></label>
+          <label class="form-field"
+            ><span>{{ "profile.registration" | t }}</span
+            ><input name="legalId" [(ngModel)]="companyForm.legalIdentifier"
+          /></label>
+          <label class="form-field"
+            ><span>{{ "profile.taxId" | t }}</span
+            ><input name="taxId" [(ngModel)]="companyForm.taxIdentifier"
+          /></label>
+          <label class="form-field"
+            ><span>{{ "profile.businessEmail" | t }}</span
+            ><input
+              type="email"
+              name="businessEmail"
+              [(ngModel)]="companyForm.contactEmail"
+          /></label>
+          <label class="form-field"
+            ><span>{{ "profile.businessPhone" | t }}</span
+            ><input name="businessPhone" [(ngModel)]="companyForm.contactPhone"
+          /></label>
+          <label class="form-field"
+            ><span>{{ "profile.website" | t }}</span
+            ><input name="website" [(ngModel)]="companyForm.website"
+          /></label>
+          <label class="form-field form-field-full"
+            ><span>{{ "profile.address" | t }}</span
+            ><input name="address" [(ngModel)]="companyForm.addressLine1"
+          /></label>
+          <label class="form-field form-field-full"
+            ><span>{{ "profile.address2" | t }}</span
+            ><input name="address2" [(ngModel)]="companyForm.addressLine2"
+          /></label>
+          <label class="form-field"
+            ><span>{{ "profile.city" | t }}</span
+            ><input name="city" [(ngModel)]="companyForm.city"
+          /></label>
+          <label class="form-field"
+            ><span>{{ "profile.postal" | t }}</span
+            ><input name="postal" [(ngModel)]="companyForm.postalCode"
+          /></label>
+          <label class="form-field"
+            ><span>{{ "profile.country" | t }}</span
+            ><input
+              name="country"
+              maxlength="2"
+              [(ngModel)]="companyForm.countryCode"
+          /></label>
+          <label class="form-field"
+            ><span>{{ "profile.currency" | t }}</span
+            ><input
+              name="currency"
+              maxlength="3"
+              [(ngModel)]="companyForm.currencyCode"
+          /></label>
+          <label class="form-field form-field-full"
+            ><span>{{ "profile.timezone" | t }}</span
+            ><input name="timezone" [(ngModel)]="companyForm.timezone"
+          /></label>
+        </div>
+        <div class="form-actions">
+          <button class="primary-button" [disabled]="busy">
+            {{ "profile.saveCompany" | t }}
+          </button>
+        </div>
+      </form>
+    </section>
+  }
+</main>

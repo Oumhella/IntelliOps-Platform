@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 class AskRequest(BaseModel):
     question: str = Field(min_length=3, max_length=1_000)
+    locale: Literal["en", "fr", "ar"] = "en"
 
 
 class Column(BaseModel):
@@ -44,6 +45,32 @@ class AskResponse(BaseModel):
 class SuggestionsResponse(BaseModel):
     role: str
     suggestions: list[str]
+
+
+class ReportGenerateRequest(BaseModel):
+    period_type: Literal["WEEKLY", "MONTHLY"] = "WEEKLY"
+    locale: Literal["en", "fr", "ar"] = "en"
+
+
+class ReportSummary(BaseModel):
+    orders: int = 0
+    paid_revenue: float = 0
+    average_order_value: float = 0
+    delivered: int = 0
+    low_stock_items: int = 0
+    recommendations: list[str] = []
+
+
+class HistoricalReport(BaseModel):
+    id: str
+    audience_role: str
+    period_type: Literal["WEEKLY", "MONTHLY"]
+    period_start: date
+    period_end: date
+    locale: Literal["en", "fr", "ar"]
+    generated_at: datetime
+    file_name: str
+    summary: ReportSummary
 
 class ConversationMessageCreate(BaseModel):
     surface: Literal["ASSISTANT", "BI"]

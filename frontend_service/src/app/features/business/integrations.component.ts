@@ -3,10 +3,11 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { finalize, take, timer } from 'rxjs';
 import { ExternalProductResponse, IntegrationCapabilities, IntegrationEventResponse, IntegrationPlatform, IntegrationsApiService, ProductMappingResponse, ProductResponse, StockApiService, StoreConnectionResponse, StoreResponse } from '../../core/api';
+import { DomainLabelPipe } from '../../core/i18n/domain-label.pipe';
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
 
 type Panel='connect'|'mapping'|null;
-@Component({selector:'app-integrations',imports:[FormsModule],templateUrl:'./integrations.component.html',styleUrl:'./business-view.scss'})
+@Component({selector:'app-integrations',imports:[FormsModule,DomainLabelPipe],templateUrl:'./integrations.component.html',styleUrl:'./business-view.scss'})
 export class IntegrationsComponent implements OnInit{
  private readonly api=inject(IntegrationsApiService);private readonly stock=inject(StockApiService);private readonly route=inject(ActivatedRoute);private readonly router=inject(Router);readonly feedback=inject(UiFeedbackService);
  readonly capabilities=signal<IntegrationCapabilities|null>(null);readonly connections=signal<readonly StoreConnectionResponse[]>([]);readonly stores=signal<readonly StoreResponse[]>([]);readonly products=signal<readonly ProductResponse[]>([]);readonly externalProducts=signal<readonly ExternalProductResponse[]>([]);readonly mappings=signal<readonly ProductMappingResponse[]>([]);readonly events=signal<readonly IntegrationEventResponse[]>([]);readonly selectedConnection=signal<StoreConnectionResponse|null>(null);readonly loading=signal(true);

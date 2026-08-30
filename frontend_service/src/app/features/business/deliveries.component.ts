@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
@@ -19,10 +18,12 @@ import {
 } from '../../core/api';
 import { AuthSessionService } from '../../core/auth/auth-session.service';
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
+import { DomainLabelPipe } from '../../core/i18n/domain-label.pipe';
+import { LocaleDatePipe } from '../../core/i18n/locale-date.pipe';
 
 @Component({
   selector: 'app-deliveries',
-  imports: [FormsModule, DatePipe],
+  imports: [FormsModule, DomainLabelPipe, LocaleDatePipe],
   templateUrl: './deliveries.component.html',
   styleUrls: ['./business-view.scss', './deliveries.component.scss'],
 })

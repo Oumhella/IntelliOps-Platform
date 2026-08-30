@@ -3,10 +3,12 @@ import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/rou
 import { AuthApiService, UserRole } from '../../core/api';
 import { AuthSessionService } from '../../core/auth/auth-session.service';
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
+import { LanguageSwitcherComponent } from '../../core/i18n/language-switcher.component';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 
 @Component({
   selector: 'app-business-shell',
-  imports: [RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [RouterLink, RouterLinkActive, RouterOutlet, LanguageSwitcherComponent, TranslatePipe],
   templateUrl: './business-shell.component.html',
   styleUrl: './business-shell.component.scss',
 })

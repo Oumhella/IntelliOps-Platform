@@ -21,7 +21,7 @@ describe('application routes', () => {
 
   it('restricts management routes to enterprise administrators', () => {
     const children = routes.find((route) => route.path === 'app')?.children ?? [];
-    for (const path of ['billing', 'subscriptions', 'integrations', 'team', 'notifications', 'assistant']) {
+    for (const path of ['billing', 'subscriptions', 'integrations', 'team', 'notifications']) {
       expect(children.find((route) => route.path === path)?.data?.['roles']).toEqual(['ROLE_ADMIN']);
     }
   });
@@ -41,6 +41,12 @@ describe('application routes', () => {
     expect(children.find((route) => route.path === 'deliveries')?.data?.['roles']).toContain('ROLE_LIVREUR');
     expect(children.find((route) => route.path === 'profile')?.data?.['roles']).toContain('ROLE_LIVREUR');
     expect(children.find((route) => route.path === 'orders')?.data?.['roles']).not.toContain('ROLE_LIVREUR');
-    expect(children.find((route) => route.path === 'assistant')?.data?.['roles']).not.toContain('ROLE_LIVREUR');
+    expect(children.find((route) => route.path === 'assistant')?.data?.['roles']).toContain('ROLE_LIVREUR');
+  });
+
+  it('makes the operational assistant available to every workspace role', () => {
+    const assistantRoles = routes.find((route) => route.path === 'app')?.children
+      ?.find((route) => route.path === 'assistant')?.data?.['roles'];
+    expect(assistantRoles).toEqual(['ROLE_ADMIN', 'ROLE_CSM', 'ROLE_LOGISTIC', 'ROLE_LIVREUR']);
   });
 });

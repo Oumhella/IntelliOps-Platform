@@ -3,18 +3,49 @@
     <div>
       <p class="eyebrow"><span>Workspace</span><b>/</b> Subscription</p>
       <h1>Organization subscription</h1>
-      <p>Review the paid plan and entitlement used by this enterprise workspace.</p>
+      <p>
+        Review the paid plan and entitlement used by this enterprise workspace.
+      </p>
     </div>
     <div class="view-actions">
-      @if (!current()) { <button class="primary-button" type="button" (click)="open('subscribe')">Choose a plan</button> }
-      @if (current(); as subscription) { <button class="secondary-button" type="button" (click)="open('details', subscription)">View entitlement</button> }
+      @if (!current()) {
+        <button
+          class="primary-button"
+          type="button"
+          (click)="open('subscribe')"
+        >
+          Choose a plan
+        </button>
+      }
+      @if (current(); as subscription) {
+        <button
+          class="secondary-button"
+          type="button"
+          (click)="open('details', subscription)"
+        >
+          View entitlement
+        </button>
+      }
     </div>
   </header>
 
   @if (pendingCompletion()) {
     <section class="surface-card empty-state">
-      <div><strong>Payment verification pending</strong><p>Stripe has not returned a final successful status yet. The subscription has not been changed.</p></div>
-      <button class="primary-button" type="button" [disabled]="busy" (click)="retryPaymentVerification()">{{ busy ? 'Checking Stripe…' : 'Check payment again' }}</button>
+      <div>
+        <strong>Payment verification pending</strong>
+        <p>
+          Stripe has not returned a final successful status yet. The
+          subscription has not been changed.
+        </p>
+      </div>
+      <button
+        class="primary-button"
+        type="button"
+        [disabled]="busy"
+        (click)="retryPaymentVerification()"
+      >
+        {{ busy ? "Checking Stripe…" : "Check payment again" }}
+      </button>
     </section>
   }
 
@@ -22,88 +53,396 @@
     <section class="surface-card detail-panel subscription-summary">
       <div class="card-header">
         <div>
-          <div class="card-title-row"><h2>{{ subscription.planAbonnement.nomPlan }}</h2><span class="status-badge" [class]="'status-badge status-badge-' + tone(subscription.statut)"><span></span>{{ label(subscription.statut) }}</span></div>
-          <p>This plan applies to the entire enterprise—not to an individual employee.</p>
+          <div class="card-title-row">
+            <h2>{{ subscription.planAbonnement.nomPlan }}</h2>
+            <span
+              class="status-badge"
+              [class]="'status-badge status-badge-' + tone(subscription.statut)"
+              ><span></span>{{ subscription.statut | domainLabel }}</span
+            >
+          </div>
+          <p>
+            This plan applies to the entire enterprise—not to an individual
+            employee.
+          </p>
         </div>
       </div>
       <dl class="detail-list">
-        <div><dt>Current price</dt><dd>{{ subscription.prixPaye }} MAD / {{ label(subscription.planAbonnement.duree) }}</dd></div>
-        <div><dt>Valid through</dt><dd>{{ subscription.dateFin }}</dd></div>
-        <div><dt>Remaining</dt><dd>{{ remainingDays() === null ? 'Unavailable' : remainingDays() + ' days' }}</dd></div>
-        <div><dt>Monthly orders</dt><dd>{{ subscription.planAbonnement.limiteCommandesMois > 0 ? subscription.planAbonnement.limiteCommandesMois : 'Unlimited' }}</dd></div>
+        <div>
+          <dt>Current price</dt>
+          <dd>
+            {{ subscription.prixPaye }} MAD /
+            {{ subscription.planAbonnement.duree | domainLabel }}
+          </dd>
+        </div>
+        <div>
+          <dt>Valid through</dt>
+          <dd>{{ subscription.dateFin }}</dd>
+        </div>
+        <div>
+          <dt>Remaining</dt>
+          <dd>
+            {{
+              remainingDays() === null
+                ? "Unavailable"
+                : remainingDays() + " days"
+            }}
+          </dd>
+        </div>
+        <div>
+          <dt>Monthly orders</dt>
+          <dd>
+            {{
+              subscription.planAbonnement.limiteCommandesMois > 0
+                ? subscription.planAbonnement.limiteCommandesMois
+                : "Unlimited"
+            }}
+          </dd>
+        </div>
       </dl>
       <div class="form-actions">
-        @if (subscription.statut === 'ACTIF' && upgradePlans().length) { <button class="primary-button" type="button" (click)="open('upgrade', subscription)">Upgrade plan</button> }
-        @if (subscription.statut === 'ACTIF' && subscription.planAbonnement.maxPeriodeDesactivation > 0) { <button class="secondary-button" type="button" (click)="open('pause', subscription)">Pause workspace</button> }
-        <button class="secondary-button" type="button" (click)="open('renew', subscription)">Renew subscription</button>
+        @if (subscription.statut === "ACTIF" && upgradePlans().length) {
+          <button
+            class="primary-button"
+            type="button"
+            (click)="open('upgrade', subscription)"
+          >
+            Upgrade plan
+          </button>
+        }
+        @if (
+          subscription.statut === "ACTIF" &&
+          subscription.planAbonnement.maxPeriodeDesactivation > 0
+        ) {
+          <button
+            class="secondary-button"
+            type="button"
+            (click)="open('pause', subscription)"
+          >
+            Pause workspace
+          </button>
+        }
+        <button
+          class="secondary-button"
+          type="button"
+          (click)="open('renew', subscription)"
+        >
+          Renew subscription
+        </button>
       </div>
     </section>
   } @else {
-    <section class="surface-card empty-state"><div><strong>No active workspace plan</strong><p>Select an offer and complete its payment to activate the workspace.</p></div></section>
+    <section class="surface-card empty-state">
+      <div>
+        <strong>No active workspace plan</strong>
+        <p>
+          Select an offer and complete its payment to activate the workspace.
+        </p>
+      </div>
+    </section>
   }
 
   <section class="section-block">
-    <div class="section-heading"><div><p class="eyebrow"><span>Commercial catalogue</span></p><h2>Available plans</h2><p>Offers are maintained by the platform super administrator.</p></div></div>
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow"><span>Commercial catalogue</span></p>
+        <h2>Available plans</h2>
+        <p>Offers are maintained by the platform super administrator.</p>
+      </div>
+    </div>
     <div class="metric-grid">
       @for (plan of plans(); track plan.idPlan) {
         <article class="surface-card metric-card">
-          <div class="metric-topline"><span class="micro-tag">{{ label(plan.duree) }}</span><span class="status-badge status-badge-success"><span></span>Available</span></div>
-          <p>{{ plan.nomPlan }}</p><div class="metric-value"><strong>{{ plan.prix }}</strong><span>MAD</span></div>
-          <small>{{ plan.description || (plan.limiteCommandesMois > 0 ? plan.limiteCommandesMois + ' orders per month' : 'Unlimited monthly orders') }}</small>
+          <div class="metric-topline">
+            <span class="micro-tag">{{ plan.duree | domainLabel }}</span
+            ><span class="status-badge status-badge-success"
+              ><span></span>Available</span
+            >
+          </div>
+          <p>{{ plan.nomPlan }}</p>
+          <div class="metric-value">
+            <strong>{{ plan.prix }}</strong
+            ><span>MAD</span>
+          </div>
+          <small>{{
+            plan.description ||
+              (plan.limiteCommandesMois > 0
+                ? plan.limiteCommandesMois + " orders per month"
+                : "Unlimited monthly orders")
+          }}</small>
         </article>
-      } @empty { <article class="surface-card empty-state"><div><strong>No active offers</strong><p>The platform team has not published a plan yet.</p></div></article> }
+      } @empty {
+        <article class="surface-card empty-state">
+          <div>
+            <strong>No active offers</strong>
+            <p>The platform team has not published a plan yet.</p>
+          </div>
+        </article>
+      }
     </div>
   </section>
 
   <section class="section-block">
-    <div class="data-toolbar surface-card"><div><strong>Subscription history</strong><p>Previous and current entitlements for this enterprise.</p></div><select class="filter-control" [(ngModel)]="statusFilter" (change)="loadHistory()"><option value="">All statuses</option>@for (status of statuses; track status) { <option [value]="status">{{ label(status) }}</option> }</select></div>
+    <div class="data-toolbar surface-card">
+      <div>
+        <strong>Subscription history</strong>
+        <p>Previous and current entitlements for this enterprise.</p>
+      </div>
+      <select
+        class="filter-control"
+        [(ngModel)]="statusFilter"
+        (change)="loadHistory()"
+      >
+        <option value="">All statuses</option>
+        @for (status of statuses; track status) {
+          <option [value]="status">{{ status | domainLabel }}</option>
+        }
+      </select>
+    </div>
     <div class="surface-card data-card">
-      <div class="table-wrap"><table><thead><tr><th>Record</th><th>Plan</th><th>Period</th><th>Price</th><th>Status</th><th></th></tr></thead><tbody>
-        @for (subscription of history()?.content || []; track subscription.idAbonnement) {
-          <tr><td><span class="row-primary">Subscription #{{ subscription.idAbonnement }}</span><span class="row-secondary">Activated by account #{{ subscription.userId }}</span></td><td>{{ subscription.planAbonnement.nomPlan }}</td><td>{{ subscription.dateDebut }} → {{ subscription.dateFin }}</td><td>{{ subscription.prixPaye }} MAD</td><td><span class="status-badge" [class]="'status-badge status-badge-' + tone(subscription.statut)"><span></span>{{ label(subscription.statut) }}</span></td><td><button class="action-button" type="button" (click)="open('details', subscription)">Details</button></td></tr>
-        } @empty { <tr><td colspan="6"><div class="empty-state"><div><strong>No subscription history</strong><p>The first paid activation will appear here.</p></div></div></td></tr> }
-      </tbody></table></div>
-      @if (history(); as page) { <div class="pagination"><p>Page {{ page.page + 1 }} of {{ page.totalPages || 1 }}</p><div class="pagination-actions"><button [disabled]="page.first" (click)="loadHistory(page.page - 1)">Previous</button><button [disabled]="page.last" (click)="loadHistory(page.page + 1)">Next</button></div></div> }
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Record</th>
+              <th>Plan</th>
+              <th>Period</th>
+              <th>Price</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (
+              subscription of history()?.content || [];
+              track subscription.idAbonnement
+            ) {
+              <tr>
+                <td>
+                  <span class="row-primary"
+                    >Subscription #{{ subscription.idAbonnement }}</span
+                  ><span class="row-secondary"
+                    >Activated by account #{{ subscription.userId }}</span
+                  >
+                </td>
+                <td>{{ subscription.planAbonnement.nomPlan }}</td>
+                <td>
+                  {{ subscription.dateDebut }} → {{ subscription.dateFin }}
+                </td>
+                <td>{{ subscription.prixPaye }} MAD</td>
+                <td>
+                  <span
+                    class="status-badge"
+                    [class]="
+                      'status-badge status-badge-' + tone(subscription.statut)
+                    "
+                    ><span></span>{{ subscription.statut | domainLabel }}</span
+                  >
+                </td>
+                <td>
+                  <button
+                    class="action-button"
+                    type="button"
+                    (click)="open('details', subscription)"
+                  >
+                    Details
+                  </button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6">
+                  <div class="empty-state">
+                    <div>
+                      <strong>No subscription history</strong>
+                      <p>The first paid activation will appear here.</p>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (history(); as page) {
+        <div class="pagination">
+          <p>Page {{ page.page + 1 }} of {{ page.totalPages || 1 }}</p>
+          <div class="pagination-actions">
+            <button
+              [disabled]="page.first"
+              (click)="loadHistory(page.page - 1)"
+            >
+              Previous</button
+            ><button
+              [disabled]="page.last"
+              (click)="loadHistory(page.page + 1)"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      }
     </div>
   </section>
 </main>
 
 @if (panel) {
-  <button class="drawer-backdrop" type="button" aria-label="Close subscription panel" (click)="close()"></button>
+  <button
+    class="drawer-backdrop"
+    type="button"
+    aria-label="Close subscription panel"
+    (click)="close()"
+  ></button>
   <aside class="form-drawer">
     <header class="drawer-header">
-      <div><h2>{{ panel === 'subscribe' ? 'Subscribe & pay' : panel === 'upgrade' ? 'Upgrade & pay' : panel === 'pause' ? 'Pause workspace access' : panel === 'renew' ? 'Renew & pay' : 'Entitlement details' }}</h2><p>Subscription changes apply to every user in this enterprise.</p></div>
+      <div>
+        <h2>
+          {{
+            panel === "subscribe"
+              ? "Subscribe & pay"
+              : panel === "upgrade"
+                ? "Upgrade & pay"
+                : panel === "pause"
+                  ? "Pause workspace access"
+                  : panel === "renew"
+                    ? "Renew & pay"
+                    : "Entitlement details"
+          }}
+        </h2>
+        <p>Subscription changes apply to every user in this enterprise.</p>
+      </div>
       <button class="drawer-close" type="button" (click)="close()">×</button>
     </header>
 
-    @if (panel === 'subscribe' || panel === 'upgrade') {
+    @if (panel === "subscribe" || panel === "upgrade") {
       @if (checkoutPreparation(); as preparation) {
-        <app-stripe-payment-element [preparation]="preparation" [returnUrl]="paymentReturnUrl" (confirmed)="paymentConfirmed()" />
+        <app-stripe-payment-element
+          [preparation]="preparation"
+          [returnUrl]="paymentReturnUrl"
+          (confirmed)="paymentConfirmed()"
+        />
       } @else {
-        <form (ngSubmit)="panel === 'subscribe' ? startActivation() : startUpgrade()">
+        <form
+          (ngSubmit)="
+            panel === 'subscribe' ? startActivation() : startUpgrade()
+          "
+        >
           <div class="form-grid">
             <label class="form-field form-field-full">
               <span>Plan</span>
-              <select name="plan" [(ngModel)]="planId" required><option [ngValue]="null">Select an offer</option>@for (plan of (panel === 'upgrade' ? upgradePlans() : plans()); track plan.idPlan) { <option [ngValue]="plan.idPlan">{{ plan.nomPlan }} — {{ plan.prix }} MAD / {{ label(plan.duree) }}</option> }</select>
-              <small class="form-help">The amount comes from the platform catalogue. Paid plans continue to Stripe's encrypted checkout.</small>
+              <select name="plan" [(ngModel)]="planId" required>
+                <option [ngValue]="null">Select an offer</option>
+                @for (
+                  plan of panel === "upgrade" ? upgradePlans() : plans();
+                  track plan.idPlan
+                ) {
+                  <option [ngValue]="plan.idPlan">
+                    {{ plan.nomPlan }} — {{ plan.prix }} MAD /
+                    {{ plan.duree | domainLabel }}
+                  </option>
+                }
+              </select>
+              <small class="form-help"
+                >The amount comes from the platform catalogue. Paid plans
+                continue to Stripe's encrypted checkout.</small
+              >
             </label>
           </div>
-          <div class="form-actions"><button class="primary-button" [disabled]="busy || !planId">{{ busy ? 'Preparing Stripe…' : requiresPayment() ? 'Continue to secure payment' : 'Activate free plan' }}</button></div>
+          <div class="form-actions">
+            <button class="primary-button" [disabled]="busy || !planId">
+              {{
+                busy
+                  ? "Preparing Stripe…"
+                  : requiresPayment()
+                    ? "Continue to secure payment"
+                    : "Activate free plan"
+              }}
+            </button>
+          </div>
         </form>
       }
     }
 
-    @if (panel === 'pause') { <form (ngSubmit)="pause()"><label class="form-field"><span>Business reason</span><textarea name="reason" [(ngModel)]="pauseReason" required></textarea><small class="form-help">The maximum pause period is controlled by the platform plan.</small></label><div class="form-actions"><button class="primary-button" [disabled]="busy">Pause workspace</button></div></form> }
+    @if (panel === "pause") {
+      <form (ngSubmit)="pause()">
+        <label class="form-field"
+          ><span>Business reason</span
+          ><textarea name="reason" [(ngModel)]="pauseReason" required></textarea
+          ><small class="form-help"
+            >The maximum pause period is controlled by the platform plan.</small
+          ></label
+        >
+        <div class="form-actions">
+          <button class="primary-button" [disabled]="busy">
+            Pause workspace
+          </button>
+        </div>
+      </form>
+    }
 
-    @if (panel === 'renew') {
+    @if (panel === "renew") {
       @if (checkoutPreparation(); as preparation) {
-        <app-stripe-payment-element [preparation]="preparation" [returnUrl]="paymentReturnUrl" (confirmed)="paymentConfirmed()" />
+        <app-stripe-payment-element
+          [preparation]="preparation"
+          [returnUrl]="paymentReturnUrl"
+          (confirmed)="paymentConfirmed()"
+        />
       } @else {
-        <div class="detail-panel"><p>Stripe will charge the current plan's authoritative catalogue price. Renewal occurs only after the resulting PaymentIntent is verified and consumed.</p></div>
-        <div class="form-actions"><button class="primary-button" type="button" [disabled]="busy" (click)="startRenewal()">{{ busy ? 'Preparing Stripe…' : 'Continue to secure payment' }}</button></div>
+        <div class="detail-panel">
+          <p>
+            Stripe will charge the current plan's authoritative catalogue price.
+            Renewal occurs only after the resulting PaymentIntent is verified
+            and consumed.
+          </p>
+        </div>
+        <div class="form-actions">
+          <button
+            class="primary-button"
+            type="button"
+            [disabled]="busy"
+            (click)="startRenewal()"
+          >
+            {{ busy ? "Preparing Stripe…" : "Continue to secure payment" }}
+          </button>
+        </div>
       }
     }
 
-    @if (panel === 'details' && selected(); as subscription) { <div class="detail-panel"><dl class="detail-list"><div><dt>Subscription</dt><dd>#{{ subscription.idAbonnement }}</dd></div><div><dt>Status</dt><dd>{{ label(subscription.statut) }}</dd></div><div><dt>Plan</dt><dd>{{ subscription.planAbonnement.nomPlan }}</dd></div><div><dt>Price</dt><dd>{{ subscription.prixPaye }} MAD</dd></div><div><dt>Period</dt><dd>{{ subscription.dateDebut }} → {{ subscription.dateFin }}</dd></div><div><dt>Activation payment</dt><dd>{{ subscription.paiementId ? '#' + subscription.paiementId : 'Zero-price plan' }}</dd></div></dl></div> }
+    @if (panel === "details" && selected(); as subscription) {
+      <div class="detail-panel">
+        <dl class="detail-list">
+          <div>
+            <dt>Subscription</dt>
+            <dd>#{{ subscription.idAbonnement }}</dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd>{{ subscription.statut | domainLabel }}</dd>
+          </div>
+          <div>
+            <dt>Plan</dt>
+            <dd>{{ subscription.planAbonnement.nomPlan }}</dd>
+          </div>
+          <div>
+            <dt>Price</dt>
+            <dd>{{ subscription.prixPaye }} MAD</dd>
+          </div>
+          <div>
+            <dt>Period</dt>
+            <dd>{{ subscription.dateDebut }} → {{ subscription.dateFin }}</dd>
+          </div>
+          <div>
+            <dt>Activation payment</dt>
+            <dd>
+              {{
+                subscription.paiementId
+                  ? "#" + subscription.paiementId
+                  : "Zero-price plan"
+              }}
+            </dd>
+          </div>
+        </dl>
+      </div>
+    }
   </aside>
 }
