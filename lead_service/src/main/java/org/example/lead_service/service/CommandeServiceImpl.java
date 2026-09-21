@@ -101,60 +101,64 @@ public class CommandeServiceImpl implements CommandeService {
         }
     }
 
-        @Override
-        @Transactional(readOnly = true)
-        public LogisticsReadinessDTO verifierPreparationLogistique(Long idCommande) {
+    @Override
+    @Transactional(readOnly = true)
+    public LogisticsReadinessDTO verifierPreparationLogistique(Long idCommande) {
         Commande order = findOrder(idCommande);
         List<LogisticsReadinessDTO.Check> checks = new ArrayList<>();
         boolean paymentReady = order.getStatutPaiement() == StatutPaiementCommande.PAID
-            || order.getStatutPaiement() == StatutPaiementCommande.AWAITING_COLLECTION;
+                || order.getStatutPaiement() == StatutPaiementCommande.AWAITING_COLLECTION;
         checks.add(new LogisticsReadinessDTO.Check(
-            "PAYMENT", "Payment arranged", paymentReady,
-            paymentReady ? "Paid or cash on delivery." : "Payment must be paid or configured for cash on delivery."));
+                "PAYMENT", "Payment arranged", paymentReady,
+                paymentReady ? "Paid or cash on delivery."
+                        : "Payment must be paid or configured for cash on delivery."));
 
         boolean hasLines = order.getLignesCommande() != null && !order.getLignesCommande().isEmpty();
         checks.add(new LogisticsReadinessDTO.Check(
-            "LINES", "Order lines", hasLines,
-            hasLines ? order.getLignesCommande().size() + " product line(s) ready." : "Add at least one product before preparation."));
+                "LINES", "Order lines", hasLines,
+                hasLines ? order.getLignesCommande().size() + " product line(s) ready."
+                        : "Add at least one product before preparation."));
 
         boolean addressReady = order.getInfosClient() != null
-            && hasText(order.getInfosClient().getNomComplet())
-            && hasText(order.getInfosClient().getTelephone())
-            && hasText(order.getInfosClient().getAdresseLivraison())
-            && hasText(order.getInfosClient().getVille());
+                && hasText(order.getInfosClient().getNomComplet())
+                && hasText(order.getInfosClient().getTelephone())
+                && hasText(order.getInfosClient().getAdresseLivraison())
+                && hasText(order.getInfosClient().getVille());
         checks.add(new LogisticsReadinessDTO.Check(
-            "DELIVERY", "Delivery details", addressReady,
-            addressReady ? "Customer and delivery address are complete." : "Complete customer name, phone, address, and city."));
+                "DELIVERY", "Delivery details", addressReady,
+                addressReady ? "Customer and delivery address are complete."
+                        : "Complete customer name, phone, address, and city."));
 
         boolean stockReady = false;
         String stockDetail;
-        if (order.getStockLocationId() == null || order.getLignesCommande() == null || order.getLignesCommande().isEmpty()) {
+        if (order.getStockLocationId() == null || order.getLignesCommande() == null
+                || order.getLignesCommande().isEmpty()) {
             stockDetail = "No fulfillment location or product lines are available to verify.";
         } else {
             Map<Long, Integer> required = order.getLignesCommande().stream()
-                .collect(Collectors.toMap(line -> line.getProduitId(), line -> line.getQuantite(), Integer::sum));
+                    .collect(Collectors.toMap(line -> line.getProduitId(), line -> line.getQuantite(), Integer::sum));
             stockReady = true;
             for (Map.Entry<Long, Integer> entry : required.entrySet()) {
-            StockInventoryDTO inventory = stockClient.obtenirInventaire(order.getStockLocationId(), entry.getKey());
-            if (inventory == null || inventory.getQuantiteReservee() < entry.getValue()) {
-                stockReady = false;
-                break;
-            }
+                StockInventoryDTO inventory = stockClient.obtenirInventaire(order.getStockLocationId(), entry.getKey());
+                if (inventory == null || inventory.getQuantiteReservee() < entry.getValue()) {
+                    stockReady = false;
+                    break;
+                }
             }
             stockDetail = stockReady
-                ? "Reserved stock covers every product line."
-                : "Reserved stock is missing for one or more product lines.";
+                    ? "Reserved stock covers every product line."
+                    : "Reserved stock is missing for one or more product lines.";
         }
         checks.add(new LogisticsReadinessDTO.Check("STOCK", "Reserved stock", stockReady, stockDetail));
 
         boolean ready = order.getStatutCommande() == StatutCommande.CONFIRMEE
-            && checks.stream().allMatch(LogisticsReadinessDTO.Check::passed);
+                && checks.stream().allMatch(LogisticsReadinessDTO.Check::passed);
         return new LogisticsReadinessDTO(order.getIdCommande(), order.getReference(), ready, checks);
-        }
+    }
 
-        private boolean hasText(String value) {
+    private boolean hasText(String value) {
         return value != null && !value.isBlank();
-        }
+    }
 
     @Override
     public CommandeDTO changerStatutCommande(Long idCommande, StatutCommande nouveauStatut) {
@@ -245,7 +249,7 @@ public class CommandeServiceImpl implements CommandeService {
 
     private Commande findOrder(Long idCommande) {
         return commandeRepository.findByIdCommandeAndLeadEnterpriseId(
-                        idCommande, TenantContext.requireEnterpriseId())
+                idCommande, TenantContext.requireEnterpriseId())
                 .orElseThrow(() -> new EntityNotFoundException("Order not found: " + idCommande));
     }
 
@@ -259,11 +263,12 @@ public class CommandeServiceImpl implements CommandeService {
     private boolean hasCurrentRole(String role) {
         return SecurityContextHolder.getContext().getAuthentication() != null
                 && SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
-                .anyMatch(authority -> role.equals(authority.getAuthority()));
+                        .anyMatch(authority -> role.equals(authority.getAuthority()));
     }
 
     private boolean isAllowedTransition(StatutCommande current, StatutCommande next) {
-        if (current == next) return false;
+        if (current == next)
+            return false;
         return switch (current) {
             case EN_ATTENTE -> next == StatutCommande.CONFIRMEE || next == StatutCommande.ANNULEE;
             case CONFIRMEE -> next == StatutCommande.PREPARATION || next == StatutCommande.ANNULEE;
