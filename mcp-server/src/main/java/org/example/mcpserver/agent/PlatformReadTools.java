@@ -58,7 +58,8 @@ public class PlatformReadTools {
             throw new ResponseStatusException(exception.getStatusCode(),
                     exception.getStatusCode().value() == 403
                             ? "Your role is not permitted to view this resource."
-                            : "The ERP rejected this read request.", exception);
+                            : "The ERP rejected this read request.",
+                    exception);
         }
     }
 }

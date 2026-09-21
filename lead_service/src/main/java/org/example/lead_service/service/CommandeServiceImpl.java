@@ -9,6 +9,7 @@ import org.example.common.security.TenantContext;
 import org.example.lead_service.client.StockClient;
 import org.example.lead_service.dto.AddOrderLineRequest;
 import org.example.lead_service.dto.CommandeDTO;
+import org.example.lead_service.dto.LogisticsReadinessDTO;
 import org.example.lead_service.dto.StockInventoryDTO;
 import org.example.lead_service.dto.StockProductDTO;
 import org.example.lead_service.entity.Commande;
@@ -22,6 +23,11 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -95,6 +101,61 @@ public class CommandeServiceImpl implements CommandeService {
         }
     }
 
+        @Override
+        @Transactional(readOnly = true)
+        public LogisticsReadinessDTO verifierPreparationLogistique(Long idCommande) {
+        Commande order = findOrder(idCommande);
+        List<LogisticsReadinessDTO.Check> checks = new ArrayList<>();
+        boolean paymentReady = order.getStatutPaiement() == StatutPaiementCommande.PAID
+            || order.getStatutPaiement() == StatutPaiementCommande.AWAITING_COLLECTION;
+        checks.add(new LogisticsReadinessDTO.Check(
+            "PAYMENT", "Payment arranged", paymentReady,
+            paymentReady ? "Paid or cash on delivery." : "Payment must be paid or configured for cash on delivery."));
+
+        boolean hasLines = order.getLignesCommande() != null && !order.getLignesCommande().isEmpty();
+        checks.add(new LogisticsReadinessDTO.Check(
+            "LINES", "Order lines", hasLines,
+            hasLines ? order.getLignesCommande().size() + " product line(s) ready." : "Add at least one product before preparation."));
+
+        boolean addressReady = order.getInfosClient() != null
+            && hasText(order.getInfosClient().getNomComplet())
+            && hasText(order.getInfosClient().getTelephone())
+            && hasText(order.getInfosClient().getAdresseLivraison())
+            && hasText(order.getInfosClient().getVille());
+        checks.add(new LogisticsReadinessDTO.Check(
+            "DELIVERY", "Delivery details", addressReady,
+            addressReady ? "Customer and delivery address are complete." : "Complete customer name, phone, address, and city."));
+
+        boolean stockReady = false;
+        String stockDetail;
+        if (order.getStockLocationId() == null || order.getLignesCommande() == null || order.getLignesCommande().isEmpty()) {
+            stockDetail = "No fulfillment location or product lines are available to verify.";
+        } else {
+            Map<Long, Integer> required = order.getLignesCommande().stream()
+                .collect(Collectors.toMap(line -> line.getProduitId(), line -> line.getQuantite(), Integer::sum));
+            stockReady = true;
+            for (Map.Entry<Long, Integer> entry : required.entrySet()) {
+            StockInventoryDTO inventory = stockClient.obtenirInventaire(order.getStockLocationId(), entry.getKey());
+            if (inventory == null || inventory.getQuantiteReservee() < entry.getValue()) {
+                stockReady = false;
+                break;
+            }
+            }
+            stockDetail = stockReady
+                ? "Reserved stock covers every product line."
+                : "Reserved stock is missing for one or more product lines.";
+        }
+        checks.add(new LogisticsReadinessDTO.Check("STOCK", "Reserved stock", stockReady, stockDetail));
+
+        boolean ready = order.getStatutCommande() == StatutCommande.CONFIRMEE
+            && checks.stream().allMatch(LogisticsReadinessDTO.Check::passed);
+        return new LogisticsReadinessDTO(order.getIdCommande(), order.getReference(), ready, checks);
+        }
+
+        private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+        }
+
     @Override
     public CommandeDTO changerStatutCommande(Long idCommande, StatutCommande nouveauStatut) {
         Commande order = findOrder(idCommande);
@@ -113,11 +174,15 @@ public class CommandeServiceImpl implements CommandeService {
                     "Invalid order transition from " + order.getStatutCommande() + " to " + nouveauStatut + ".");
         }
 
-        if (nouveauStatut == StatutCommande.PREPARATION
-                && order.getStatutPaiement() != StatutPaiementCommande.PAID
-                && order.getStatutPaiement() != StatutPaiementCommande.AWAITING_COLLECTION) {
-            throw new IllegalStateException(
-                    "An order must be paid or configured for cash on delivery before preparation.");
+        if (nouveauStatut == StatutCommande.PREPARATION) {
+            LogisticsReadinessDTO readiness = verifierPreparationLogistique(idCommande);
+            if (!readiness.ready()) {
+                String blockedChecks = readiness.checks().stream()
+                        .filter(check -> !check.passed())
+                        .map(LogisticsReadinessDTO.Check::label)
+                        .collect(Collectors.joining(", "));
+                throw new IllegalStateException("Order is not ready for preparation. Resolve: " + blockedChecks + ".");
+            }
         }
 
         if (nouveauStatut == StatutCommande.ANNULEE) {

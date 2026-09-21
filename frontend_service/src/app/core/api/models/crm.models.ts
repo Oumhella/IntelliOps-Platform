@@ -95,3 +95,17 @@ export interface OrderResponse {
   readonly createdAt: IsoDateTime;
   readonly statutPaiement: OrderPaymentStatus;
 }
+
+export interface LogisticsReadinessCheck {
+  readonly code: string;
+  readonly label: string;
+  readonly passed: boolean;
+  readonly detail: string;
+}
+
+export interface LogisticsReadinessResponse {
+  readonly orderId: number;
+  readonly reference: string;
+  readonly ready: boolean;
+  readonly checks: readonly LogisticsReadinessCheck[];
+}

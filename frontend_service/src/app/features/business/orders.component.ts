@@ -1,6 +1,6 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { CrmApiService, ORDER_STATUSES, OrderResponse, OrderStatus, PageResponse, SalesProductResponse, StockApiService } from '../../core/api';
+import { CrmApiService, LogisticsReadinessResponse, ORDER_STATUSES, OrderResponse, OrderStatus, PageResponse, SalesProductResponse, StockApiService } from '../../core/api';
 import { UiFeedbackService } from '../../core/ui/ui-feedback.service';
 import { AuthSessionService } from '../../core/auth/auth-session.service';
 import { DomainLabelPipe } from '../../core/i18n/domain-label.pipe';
@@ -14,15 +14,18 @@ export class OrdersComponent implements OnInit {
   readonly canChangeStatus=this.role==='ROLE_CSM'||this.role==='ROLE_LOGISTIC';
   readonly page=signal<PageResponse<OrderResponse>|null>(null); readonly selected=signal<OrderResponse|null>(null); readonly loading=signal(true);
   readonly products=signal<readonly SalesProductResponse[]>([]);
+  readonly readiness=signal<LogisticsReadinessResponse|null>(null);
+  readonly checkingReadiness=signal(false);
   statusFilter:OrderStatus|''=this.role==='ROLE_LOGISTIC'?'CONFIRMEE':this.role==='ROLE_CSM'?'EN_ATTENTE':''; panel:'detail'|'line'|'status'|null=null; busy=false;
   lineForm={productId:null as number|null,quantity:1}; newStatus:OrderStatus='EN_ATTENTE'; lookupId:number|null=null;
   ngOnInit():void{this.load();if(this.canEditLines)this.stockApi.getSalesCatalog().subscribe({next:v=>this.products.set(v),error:e=>this.feedback.error(e,'Products could not be loaded.')});}
   load(page=0):void{this.loading.set(true);this.api.searchOrders(page,20,this.statusFilter||undefined).subscribe({next:v=>{this.page.set(v);this.loading.set(false)},error:e=>{this.loading.set(false);this.feedback.error(e,'Orders could not be loaded.')}})}
   lookup():void{if(!this.lookupId)return;this.api.getOrderById(this.lookupId).subscribe({next:v=>{this.selected.set(v);this.panel='detail'},error:e=>this.feedback.error(e)});}
-  open(panel:'detail'|'line'|'status',order:OrderResponse):void{this.selected.set(order);this.panel=panel;if(panel==='status')this.newStatus=this.allowedStatuses(order)[0]??order.statutCommande;if(panel==='detail')this.api.getOrderById(order.idCommande).subscribe({next:v=>this.selected.set(v),error:e=>this.feedback.error(e)});}
-  close():void{this.panel=null;this.selected.set(null)}
+  open(panel:'detail'|'line'|'status',order:OrderResponse):void{this.selected.set(order);this.panel=panel;this.readiness.set(null);if(panel==='status'){this.newStatus=this.allowedStatuses(order)[0]??order.statutCommande;if(this.role==='ROLE_LOGISTIC'&&order.statutCommande==='CONFIRMEE')this.checkReadiness(order)}if(panel==='detail')this.api.getOrderById(order.idCommande).subscribe({next:v=>this.selected.set(v),error:e=>this.feedback.error(e)});}
+  close():void{this.panel=null;this.selected.set(null);this.readiness.set(null)}
+  checkReadiness(order:OrderResponse):void{this.checkingReadiness.set(true);this.api.checkLogisticsReadiness(order.idCommande).subscribe({next:v=>{this.readiness.set(v);this.checkingReadiness.set(false)},error:e=>{this.checkingReadiness.set(false);this.feedback.error(e,'Readiness checks could not be loaded.')}})}
   addLine():void{const o=this.selected(),f=this.lineForm;if(!o||!f.productId)return;this.busy=true;this.api.addProductToOrder(o.idCommande,f.productId,f.quantity).subscribe({next:()=>{this.busy=false;this.feedback.success('Product added at the current catalog price with stock reserved.');this.close();this.load()},error:e=>{this.busy=false;this.feedback.error(e)}})}
-  changeStatus():void{const o=this.selected();if(!o)return;this.busy=true;this.api.changeOrderStatus(o.idCommande,this.newStatus).subscribe({next:()=>{this.busy=false;this.feedback.success(this.newStatus==='CONFIRMEE'?'Order confirmed and handed to the logistics queue.':this.newStatus==='PREPARATION'?'Order accepted for preparation. Create its shipment in Deliveries when ready.':'Order status updated.');this.close();this.load()},error:e=>{this.busy=false;this.feedback.error(e)}})}
+  changeStatus():void{const o=this.selected();if(!o)return;if(this.role==='ROLE_LOGISTIC'&&this.newStatus==='PREPARATION'&&!this.readiness()?.ready){this.feedback.error('Complete the logistics readiness checks before preparing this order.');return}this.busy=true;this.api.changeOrderStatus(o.idCommande,this.newStatus).subscribe({next:()=>{this.busy=false;this.feedback.success(this.newStatus==='CONFIRMEE'?'Order confirmed and handed to the logistics queue.':this.newStatus==='PREPARATION'?'Order accepted for preparation. Create its shipment in Deliveries when ready.':'Order status updated.');this.close();this.load()},error:e=>{this.busy=false;this.feedback.error(e)}})}
   allowedStatuses(order:OrderResponse):readonly OrderStatus[]{if(this.role==='ROLE_CSM'){return order.statutCommande==='EN_ATTENTE'?['CONFIRMEE','ANNULEE']:[]}if(this.role==='ROLE_LOGISTIC'){return order.statutCommande==='CONFIRMEE'?['PREPARATION','ANNULEE']:order.statutCommande==='PREPARATION'?['ANNULEE']:[]}return[]}
   queue(status:OrderStatus|''):void{this.statusFilter=status;this.load()}
   queueTitle():string{return this.role==='ROLE_CSM'?'My customer orders':this.role==='ROLE_LOGISTIC'?'Logistics handoff queue':'Enterprise order lifecycle'}

@@ -6,6 +6,7 @@ import org.example.lead_service.dto.UpdateOrderPaymentStatusRequest;
 import org.example.lead_service.dto.UpdateOrderFulfillmentStatusRequest;
 import org.example.lead_service.entity.StatutCommande;
 import org.example.lead_service.dto.CommandeDTO;
+import org.example.lead_service.dto.LogisticsReadinessDTO;
 import org.example.lead_service.service.CommandeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -66,6 +67,12 @@ public class CommandeController {
         }
 
         return ResponseEntity.ok(commandeService.changerStatutCommande(idCommande, nouveauStatut));
+    }
+
+    @GetMapping("/{idCommande}/logistics-readiness")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LOGISTIC')")
+    public ResponseEntity<LogisticsReadinessDTO> verifierPreparationLogistique(@PathVariable Long idCommande) {
+        return ResponseEntity.ok(commandeService.verifierPreparationLogistique(idCommande));
     }
 
     @PatchMapping("/{idCommande}/payment-status")

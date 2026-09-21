@@ -173,7 +173,7 @@
                       {{
                         role === "ROLE_CSM"
                           ? "Confirm / cancel"
-                          : "Accept / cancel"
+                          : "Review / cancel"
                       }}
                     </button>
                   }
@@ -302,6 +302,26 @@
       </form>
     }
     @if (panel === "status") {
+      @if (role === "ROLE_LOGISTIC" && order.statutCommande === "CONFIRMEE") {
+        <section class="readiness-panel">
+          <div class="inline-action">
+            <h3>Fulfillment readiness</h3>
+            <p class="row-secondary">Review the order before releasing it to preparation.</p>
+          </div>
+          @if (checkingReadiness()) {
+            <p class="row-secondary">Checking payment, delivery details, and reserved stock...</p>
+          } @else {
+            @if (readiness(); as review) {
+              @for (check of review.checks; track check.code) {
+                <div class="readiness-check" [class.ready-check]="check.passed">
+                  <strong>{{ check.passed ? "Ready" : "Blocked" }} · {{ check.label }}</strong>
+                  <span>{{ check.detail }}</span>
+                </div>
+              }
+            }
+          }
+        </section>
+      }
       <form (ngSubmit)="changeStatus()">
         <label class="form-field"
           ><span>Next valid status</span
@@ -312,8 +332,8 @@
           </select></label
         >
         <div class="form-actions">
-          <button class="primary-button" [disabled]="busy">
-            Advance order
+          <button class="primary-button" [disabled]="busy || checkingReadiness() || (role === 'ROLE_LOGISTIC' && newStatus === 'PREPARATION' && !readiness()?.ready)">
+            {{ role === "ROLE_LOGISTIC" && newStatus === "PREPARATION" ? "Approve preparation" : "Advance order" }}
           </button>
         </div>
       </form>

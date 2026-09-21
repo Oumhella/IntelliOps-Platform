@@ -22,7 +22,7 @@ public class ReadOnlyAgentTools {
     private final AnalyticsMcpTools analyticsTools;
 
     public ReadOnlyAgentTools(StockMcpTools stockTools, LeadMcpTools leadTools,
-                              OpenApiMcpTools openApiTools, AnalyticsMcpTools analyticsTools) {
+            OpenApiMcpTools openApiTools, AnalyticsMcpTools analyticsTools) {
         this.stockTools = stockTools;
         this.leadTools = leadTools;
         this.openApiTools = openApiTools;

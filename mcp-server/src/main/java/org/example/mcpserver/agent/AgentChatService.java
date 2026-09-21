@@ -66,18 +66,19 @@ public class AgentChatService implements AgentChat {
     private final ObjectMapper objectMapper;
 
     public AgentChatService(ObjectProvider<ChatModel> chatModelProvider,
-                            ReadOnlyAgentTools readOnlyAgentTools,
-                            AgentReadRouter readRouter,
-                            AgentIntentClassifier intentClassifier,
-                            AgentActionRouter actionRouter,
-                            ActionPreviewAgentTools actionPreviewAgentTools,
-                            ApprovalService approvalService,
-                            AgentActionIntentGuard intentGuard,
-                            ObjectProvider<ObjectMapper> objectMapperProvider) {
+            ReadOnlyAgentTools readOnlyAgentTools,
+            AgentReadRouter readRouter,
+            AgentIntentClassifier intentClassifier,
+            AgentActionRouter actionRouter,
+            ActionPreviewAgentTools actionPreviewAgentTools,
+            ApprovalService approvalService,
+            AgentActionIntentGuard intentGuard,
+            ObjectProvider<ObjectMapper> objectMapperProvider) {
         ChatModel chatModel = chatModelProvider.getIfAvailable();
-        this.chatClient = chatModel == null ? null : ChatClient.builder(chatModel)
-                .defaultSystem(SYSTEM_PROMPT)
-                .build();
+        this.chatClient = chatModel == null ? null
+                : ChatClient.builder(chatModel)
+                        .defaultSystem(SYSTEM_PROMPT)
+                        .build();
         this.operationalToolProvider = MethodToolCallbackProvider.builder()
                 .toolObjects(readOnlyAgentTools, actionPreviewAgentTools)
                 .build();
@@ -129,23 +130,26 @@ public class AgentChatService implements AgentChat {
                                 localized(responseLocale,
                                         "No ERP data was changed and no operation was prepared.",
                                         "Aucune donnée ERP n’a été modifiée et aucune opération n’a été préparée.",
-                                        "لم تتغير أي بيانات في نظام ERP ولم تُحضّر أي عملية."), null);
+                                        "لم تتغير أي بيانات في نظام ERP ولم تُحضّر أي عملية."),
+                                null);
                     }
                     requireChatModel();
                     return new AgentReply(formatToolResult(message, read.backendResult(), responseLocale),
                             localized(responseLocale,
                                     "Live, permission-scoped ERP data was consulted. No changes were made.",
                                     "Les données ERP en temps réel autorisées pour votre rôle ont été consultées. Aucun changement n’a été effectué.",
-                                    "تم الرجوع إلى بيانات ERP الفعلية المسموح بها لدورك، ولم يُجرَ أي تغيير."), null);
+                                    "تم الرجوع إلى بيانات ERP الفعلية المسموح بها لدورك، ولم يُجرَ أي تغيير."),
+                            null);
                 }
                 return new AgentReply(localized(responseLocale,
-                                "I could not map that request to a safe, authoritative ERP query. Please name the resource and scope—for example, ‘show available products’, ‘show my leads’, ‘inventory for product 12 at location 3’, or ‘orders by status’.",
-                                "Je n’ai pas pu associer cette demande à une requête ERP sûre et fiable. Précisez la ressource et le périmètre, par exemple : « afficher les produits disponibles », « afficher mes prospects », « stock du produit 12 au lieu 3 » ou « commandes par statut ».",
-                                "تعذر ربط الطلب باستعلام آمن وموثوق في نظام ERP. حدّد المورد والنطاق، مثل: «عرض المنتجات المتاحة» أو «عرض العملاء المحتملين المسندين إليّ» أو «مخزون المنتج 12 في الموقع 3» أو «الطلبات حسب الحالة»."),
+                        "I could not map that request to a safe, authoritative ERP query. Please name the resource and scope—for example, ‘show available products’, ‘show my leads’, ‘inventory for product 12 at location 3’, or ‘orders by status’.",
+                        "Je n’ai pas pu associer cette demande à une requête ERP sûre et fiable. Précisez la ressource et le périmètre, par exemple : « afficher les produits disponibles », « afficher mes prospects », « stock du produit 12 au lieu 3 » ou « commandes par statut ».",
+                        "تعذر ربط الطلب باستعلام آمن وموثوق في نظام ERP. حدّد المورد والنطاق، مثل: «عرض المنتجات المتاحة» أو «عرض العملاء المحتملين المسندين إليّ» أو «مخزون المنتج 12 في الموقع 3» أو «الطلبات حسب الحالة»."),
                         localized(responseLocale,
                                 "No tool was called and no business data was changed.",
                                 "Aucun outil n’a été appelé et aucune donnée métier n’a été modifiée.",
-                                "لم تُستدعَ أي أداة ولم تتغير أي بيانات أعمال."), null);
+                                "لم تُستدعَ أي أداة ولم تتغير أي بيانات أعمال."),
+                        null);
             }
 
             requireChatModel();
@@ -181,42 +185,43 @@ public class AgentChatService implements AgentChat {
                             ? localized(responseLocale, "Live ERP data was consulted. No changes were made.",
                                     "Les données ERP en temps réel ont été consultées. Aucun changement n’a été effectué.",
                                     "تم الرجوع إلى بيانات ERP الفعلية، ولم يُجرَ أي تغيير.")
-                            : localized(responseLocale, "A change was prepared, but nothing has been executed. Review the approval card.",
+                            : localized(responseLocale,
+                                    "A change was prepared, but nothing has been executed. Review the approval card.",
                                     "Une modification a été préparée, mais rien n’a été exécuté. Vérifiez la carte d’approbation.",
                                     "تم تحضير تغيير دون تنفيذه. راجع بطاقة الموافقة."),
                     action);
-        }
-        catch (ResponseStatusException exception) {
+        } catch (ResponseStatusException exception) {
             if (exception.getStatusCode().value() == 400) {
                 return new AgentReply(localizeBlockedReason(exception.getReason(), responseLocale),
                         localized(responseLocale,
                                 "The request was blocked before execution. No business data was changed.",
                                 "La demande a été bloquée avant exécution. Aucune donnée métier n’a été modifiée.",
-                                "حُظر الطلب قبل التنفيذ ولم تتغير أي بيانات أعمال."), null);
+                                "حُظر الطلب قبل التنفيذ ولم تتغير أي بيانات أعمال."),
+                        null);
             }
             if (exception.getStatusCode().value() == 403) {
                 return new AgentReply(localized(responseLocale,
-                                "Your authenticated role is not permitted to view that resource.",
-                                "Votre rôle authentifié n’est pas autorisé à consulter cette ressource.",
-                                "دورك الموثق غير مخول لعرض هذا المورد."),
+                        "Your authenticated role is not permitted to view that resource.",
+                        "Votre rôle authentifié n’est pas autorisé à consulter cette ressource.",
+                        "دورك الموثق غير مخول لعرض هذا المورد."),
                         localized(responseLocale,
                                 "The request was denied by the domain service. No business data was changed.",
                                 "La demande a été refusée par le service métier. Aucune donnée n’a été modifiée.",
-                                "رفضت خدمة المجال الطلب ولم تتغير أي بيانات أعمال."), null);
+                                "رفضت خدمة المجال الطلب ولم تتغير أي بيانات أعمال."),
+                        null);
             }
             if (exception.getStatusCode().value() == 401) {
                 log.error("A read-only assistant dependency rejected its internal authenticated call", exception);
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
-                        "A downstream ERP tool rejected the assistant call. Your IntelliOps session remains valid.", exception);
+                        "A downstream ERP tool rejected the assistant call. Your IntelliOps session remains valid.",
+                        exception);
             }
             throw exception;
-        }
-        catch (Exception exception) {
+        } catch (Exception exception) {
             log.error("Conversational assistant request failed", exception);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     "The NVIDIA agent or a downstream ERP service could not complete the request.", exception);
-        }
-        finally {
+        } finally {
             intentGuard.clear();
         }
     }
@@ -239,9 +244,11 @@ public class AgentChatService implements AgentChat {
                 case "listProducts" -> readOnlyAgentTools.listProducts();
                 default -> null;
             };
-            if (toolResult != null) return formatToolResult(userMessage, toolResult, locale);
+            if (toolResult != null)
+                return formatToolResult(userMessage, toolResult, locale);
         }
-        if (!answer.contains("{")) return answer;
+        if (!answer.contains("{"))
+            return answer;
         try {
             int start = answer.indexOf("{");
             int end = answer.lastIndexOf("}");
@@ -279,17 +286,20 @@ public class AgentChatService implements AgentChat {
                 case "getInventory" -> {
                     Long storeId = longValue(params, "storeId", "idBoutique");
                     Long productId = longValue(params, "productId", "idProduit");
-                    if (storeId == null || productId == null) return "Please provide both the store/location ID and product ID.";
+                    if (storeId == null || productId == null)
+                        return "Please provide both the store/location ID and product ID.";
                     toolResult = readOnlyAgentTools.getInventory(storeId, productId);
                 }
                 case "getLead" -> {
                     Long leadId = longValue(params, "leadId", "idLead");
-                    if (leadId == null) return "Please provide the lead ID you want to inspect.";
+                    if (leadId == null)
+                        return "Please provide the lead ID you want to inspect.";
                     toolResult = readOnlyAgentTools.getLead(leadId);
                 }
                 case "listAgentLeads" -> {
                     Long agentId = longValue(params, "agentId");
-                    if (agentId == null) return "Please provide the CSM agent ID, or ask for your own assigned leads.";
+                    if (agentId == null)
+                        return "Please provide the CSM agent ID, or ask for your own assigned leads.";
                     toolResult = readOnlyAgentTools.listAgentLeads(agentId);
                 }
                 case "askBusinessQuestion" -> {
@@ -322,7 +332,8 @@ public class AgentChatService implements AgentChat {
             }
 
             if (toolResult != null) {
-                log.info("Successfully executed tool {} via fallback interceptor, result length={}", toolName, toolResult.length());
+                log.info("Successfully executed tool {} via fallback interceptor, result length={}", toolName,
+                        toolResult.length());
                 return formatToolResult(userMessage, toolResult, locale);
             }
         } catch (ResponseStatusException exception) {
@@ -337,35 +348,39 @@ public class AgentChatService implements AgentChat {
     private Map<String, String> parseMap(JsonNode parent, String fieldName) {
         Map<String, String> result = new HashMap<>();
         if (parent.has(fieldName) && parent.get(fieldName).isObject()) {
-            parent.get(fieldName).fields().forEachRemaining(entry ->
-                    result.put(entry.getKey(), entry.getValue().asText()));
+            parent.get(fieldName).fields()
+                    .forEachRemaining(entry -> result.put(entry.getKey(), entry.getValue().asText()));
         }
         return result;
     }
 
     private String textValue(JsonNode node, String... names) {
         for (String name : names) {
-            if (node.has(name)) return node.get(name).asText();
+            if (node.has(name))
+                return node.get(name).asText();
         }
         return "";
     }
 
     private Long longValue(JsonNode node, String... names) {
         for (String name : names) {
-            if (node.has(name)) return node.get(name).asLong();
+            if (node.has(name))
+                return node.get(name).asLong();
         }
         return null;
     }
 
     private int intValue(JsonNode node, String... names) {
         for (String name : names) {
-            if (node.has(name)) return node.get(name).asInt();
+            if (node.has(name))
+                return node.get(name).asInt();
         }
         return 0;
     }
 
     private boolean looksLikeRawToolCall(String answer) {
-        if (answer == null) return false;
+        if (answer == null)
+            return false;
         String value = answer.trim();
         return value.startsWith("{") && (value.contains("\"name\"")
                 || value.contains("\"parameters\"") || value.contains("\"operationId\""));
@@ -373,8 +388,10 @@ public class AgentChatService implements AgentChat {
 
     private String narratedToolName(String answer) {
         String normalized = answer.toLowerCase();
-        if (normalized.contains("askbusinessquestion")) return "askBusinessQuestion";
-        if (normalized.contains("listproducts")) return "listProducts";
+        if (normalized.contains("askbusinessquestion"))
+            return "askBusinessQuestion";
+        if (normalized.contains("listproducts"))
+            return "listProducts";
         return null;
     }
 
@@ -407,7 +424,8 @@ public class AgentChatService implements AgentChat {
                 }
             }
         } catch (Exception ignored) {
-            // Never fall back to displaying untrusted raw JSON or a function-call transcript.
+            // Never fall back to displaying untrusted raw JSON or a function-call
+            // transcript.
         }
         return "The ERP returned data, but the model could not safely format it. No values were invented and no change was made.";
     }
@@ -425,7 +443,8 @@ public class AgentChatService implements AgentChat {
     }
 
     private String localizeBlockedReason(String reason, String locale) {
-        if ("en".equals(locale)) return reason;
+        if ("en".equals(locale))
+            return reason;
         return localized(locale, reason,
                 "La demande ne contient pas tous les identifiants ou paramètres requis pour préparer cette opération en toute sécurité.",
                 "لا يحتوي الطلب على جميع المعرّفات أو المعلمات المطلوبة لتحضير العملية بأمان.");
@@ -433,7 +452,8 @@ public class AgentChatService implements AgentChat {
 
     private ApprovalService.ActionPreview localizePreview(
             ApprovalService.ActionPreview preview, String locale) {
-        if (preview == null || "en".equals(locale)) return preview;
+        if (preview == null || "en".equals(locale))
+            return preview;
         String summary = preview.summary();
         var conversion = Pattern.compile(
                 "Convert lead (\\d+) into an order with (\\d+) line\\(s\\) fulfilled by location (\\d+); catalog prices will be applied by the ERP")
@@ -454,7 +474,8 @@ public class AgentChatService implements AgentChat {
     }
 
     private String localizeDirect(String answer, String locale) {
-        if ("en".equals(locale)) return answer;
+        if ("en".equals(locale))
+            return answer;
         if (answer.startsWith("Hi!")) {
             return "fr".equals(locale)
                     ? "Bonjour ! Je peux consulter les données ERP, analyser les performances ou préparer une opération contrôlée. Que souhaitez-vous faire ?"

@@ -15,10 +15,12 @@ import java.util.regex.Pattern;
 public class AgentReadRouter {
     private static final Pattern LEAD_ID = Pattern.compile("\\blead\\s*(?:id\\s*)?[#:]?\\s*(\\d+)\\b");
     private static final Pattern PRODUCT_ID = Pattern.compile("\\bproduct\\s*(?:id\\s*)?[#:]?\\s*(\\d+)\\b");
-    private static final Pattern LOCATION_ID = Pattern.compile("\\b(?:store|location)\\s*(?:id\\s*)?[#:]?\\s*(\\d+)\\b");
+    private static final Pattern LOCATION_ID = Pattern
+            .compile("\\b(?:store|location)\\s*(?:id\\s*)?[#:]?\\s*(\\d+)\\b");
     private static final Pattern ORDER_ID = Pattern.compile("\\border\\s*(?:id\\s*)?[#:]?\\s*(\\d+)\\b");
     private static final Pattern DELIVERY_ID = Pattern.compile("\\bdelivery\\s*(?:id\\s*)?[#:]?\\s*(\\d+)\\b");
-    private static final Pattern PAYMENT_ID = Pattern.compile("\\b(?:payment|transaction)\\s*(?:id\\s*)?[#:]?\\s*(\\d+)\\b");
+    private static final Pattern PAYMENT_ID = Pattern
+            .compile("\\b(?:payment|transaction)\\s*(?:id\\s*)?[#:]?\\s*(\\d+)\\b");
     private static final Pattern NOTIFICATION_ID = Pattern.compile("\\bnotification\\s*(?:id\\s*)?[#:]?\\s*(\\d+)\\b");
 
     private final ReadOnlyAgentTools tools;
@@ -32,7 +34,8 @@ public class AgentReadRouter {
     public Optional<RoutedRead> route(String message) {
         String normalized = normalize(message);
         if (isGreeting(normalized)) {
-            return Optional.of(RoutedRead.direct("Hi! I can inspect live ERP data, analyze business performance, or prepare a controlled operation for your approval. What would you like to work on?"));
+            return Optional.of(RoutedRead.direct(
+                    "Hi! I can inspect live ERP data, analyze business performance, or prepare a controlled operation for your approval. What would you like to work on?"));
         }
         if (isCapabilityQuestion(normalized)) {
             return Optional.of(RoutedRead.direct(capabilityAnswer()));
@@ -65,19 +68,23 @@ public class AgentReadRouter {
         }
         if (normalized.matches(".*\\borders?\\b.*")) {
             Long id = extractId(ORDER_ID, normalized);
-            return Optional.of(RoutedRead.backend(id == null ? platformTools.listOrders() : platformTools.getOrder(id)));
+            return Optional
+                    .of(RoutedRead.backend(id == null ? platformTools.listOrders() : platformTools.getOrder(id)));
         }
         if (normalized.matches(".*\\b(deliveries|delivery|shipments?)\\b.*")) {
             Long id = extractId(DELIVERY_ID, normalized);
-            return Optional.of(RoutedRead.backend(id == null ? platformTools.listDeliveries() : platformTools.getDelivery(id)));
+            return Optional.of(
+                    RoutedRead.backend(id == null ? platformTools.listDeliveries() : platformTools.getDelivery(id)));
         }
         if (normalized.matches(".*\\b(payments?|transactions?)\\b.*")) {
             Long id = extractId(PAYMENT_ID, normalized);
-            return Optional.of(RoutedRead.backend(id == null ? platformTools.listPayments() : platformTools.getPayment(id)));
+            return Optional
+                    .of(RoutedRead.backend(id == null ? platformTools.listPayments() : platformTools.getPayment(id)));
         }
         if (normalized.matches(".*\\bnotifications?\\b.*")) {
             Long id = extractId(NOTIFICATION_ID, normalized);
-            return Optional.of(RoutedRead.backend(id == null ? platformTools.listNotifications() : platformTools.getNotification(id)));
+            return Optional.of(RoutedRead
+                    .backend(id == null ? platformTools.listNotifications() : platformTools.getNotification(id)));
         }
         if (normalized.matches(".*\\b(plan|subscription|entitlement|abonnement)\\b.*")) {
             return Optional.of(RoutedRead.backend(platformTools.currentSubscription()));
@@ -86,12 +93,13 @@ public class AgentReadRouter {
     }
 
     public Optional<RoutedRead> route(String originalMessage,
-                                      AgentIntentClassifier.ClassifiedIntent classified) {
+            AgentIntentClassifier.ClassifiedIntent classified) {
         if (classified == null || classified.intent() == AgentIntentClassifier.Intent.UNSUPPORTED) {
             return Optional.empty();
         }
         return Optional.of(switch (classified.intent()) {
-            case GREETING -> RoutedRead.direct("Hi! I can inspect live ERP data, analyze business performance, or prepare a controlled operation for your approval. What would you like to work on?");
+            case GREETING -> RoutedRead.direct(
+                    "Hi! I can inspect live ERP data, analyze business performance, or prepare a controlled operation for your approval. What would you like to work on?");
             case CAPABILITIES -> RoutedRead.direct(capabilityAnswer());
             case LIST_PRODUCTS -> RoutedRead.backend(tools.listProducts());
             case LIST_LEADS -> RoutedRead.backend(tools.listVisibleLeads());
@@ -99,18 +107,22 @@ public class AgentReadRouter {
                     ? RoutedRead.direct("Please provide the lead ID you want to inspect.")
                     : RoutedRead.backend(tools.getLead(classified.resourceId()));
             case GET_INVENTORY -> classified.productId() == null || classified.locationId() == null
-                    ? RoutedRead.direct("Please provide both the product ID and the store/location ID so I can retrieve the authoritative inventory record.")
+                    ? RoutedRead.direct(
+                            "Please provide both the product ID and the store/location ID so I can retrieve the authoritative inventory record.")
                     : RoutedRead.backend(tools.getInventory(classified.locationId(), classified.productId()));
             case ANALYTICS -> routeAnalytics(classified.canonicalQuestion() == null
-                    ? originalMessage : classified.canonicalQuestion());
+                    ? originalMessage
+                    : classified.canonicalQuestion());
             case LIST_ORDERS -> RoutedRead.backend(platformTools.listOrders());
             case GET_ORDER -> resourceOrClarification(classified.resourceId(), "order", platformTools::getOrder);
             case LIST_DELIVERIES -> RoutedRead.backend(platformTools.listDeliveries());
-            case GET_DELIVERY -> resourceOrClarification(classified.resourceId(), "delivery", platformTools::getDelivery);
+            case GET_DELIVERY ->
+                resourceOrClarification(classified.resourceId(), "delivery", platformTools::getDelivery);
             case LIST_PAYMENTS -> RoutedRead.backend(platformTools.listPayments());
             case GET_PAYMENT -> resourceOrClarification(classified.resourceId(), "payment", platformTools::getPayment);
             case LIST_NOTIFICATIONS -> RoutedRead.backend(platformTools.listNotifications());
-            case GET_NOTIFICATION -> resourceOrClarification(classified.resourceId(), "notification", platformTools::getNotification);
+            case GET_NOTIFICATION ->
+                resourceOrClarification(classified.resourceId(), "notification", platformTools::getNotification);
             case CURRENT_SUBSCRIPTION -> RoutedRead.backend(platformTools.currentSubscription());
             case UNSUPPORTED -> throw new IllegalStateException("Unsupported intent was already rejected");
         });
@@ -128,7 +140,7 @@ public class AgentReadRouter {
     }
 
     private RoutedRead resourceOrClarification(Long id, String resource,
-                                                java.util.function.LongFunction<String> lookup) {
+            java.util.function.LongFunction<String> lookup) {
         return id == null
                 ? RoutedRead.direct("Please provide the " + resource + " ID you want to inspect.")
                 : RoutedRead.backend(lookup.apply(id));
@@ -159,7 +171,8 @@ public class AgentReadRouter {
     }
 
     private static boolean isAnalyticsQuestion(String value) {
-        return value.matches(".*\\b(revenue|sales|turnover|metric|trend|ranking|orders? by status|stock value|chiffre d.?affaires|report|analytics)\\b.*");
+        return value.matches(
+                ".*\\b(revenue|sales|turnover|metric|trend|ranking|orders? by status|stock value|chiffre d.?affaires|report|analytics)\\b.*");
     }
 
     private static boolean mentionsRevenue(String value) {

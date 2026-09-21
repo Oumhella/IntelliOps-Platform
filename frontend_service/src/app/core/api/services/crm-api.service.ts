@@ -11,6 +11,7 @@ import {
   OrderResponse,
   OrderStatus,
   LeadStatus,
+  LogisticsReadinessResponse,
   PageResponse,
 } from '../models';
 
@@ -82,5 +83,9 @@ export class CrmApiService {
   changeOrderStatus(orderId: number, status: OrderStatus): Observable<OrderResponse> {
     const params = new HttpParams().set('nouveauStatut', status);
     return this.http.put<OrderResponse>(`${this.ordersUrl}/${orderId}/statut`, null, { params });
+  }
+
+  checkLogisticsReadiness(orderId: number): Observable<LogisticsReadinessResponse> {
+    return this.http.get<LogisticsReadinessResponse>(`${this.ordersUrl}/${orderId}/logistics-readiness`);
   }
 }
